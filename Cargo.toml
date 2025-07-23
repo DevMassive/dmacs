@@ -1,0 +1,15 @@
+[package]
+name = "dmacs"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+crossterm = "0.27.0"
+
+[[bin]]
+name = "dmacs"
+path = "src/bin/dmacs.rs"
+
+[lib]
+name = "dmacs"
+path = "src/lib.rs"
