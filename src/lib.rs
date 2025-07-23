@@ -1,4 +1,4 @@
-use pancurses::{initscr, endwin, noecho, curs_set, Input, Window};
+use pancurses::{Input, Window};
 use std::io::{self, Write};
 
 // Document being edited
@@ -78,7 +78,6 @@ impl Document {
 pub struct Editor {
     pub should_quit: bool,
     pub document: Document,
-    window: Window,
     cursor_x: i32,
     cursor_y: i32,
     desired_cursor_x: i32,
@@ -86,12 +85,7 @@ pub struct Editor {
 }
 
 impl Editor {
-    pub fn new(filename: Option<String>) -> io::Result<Self> {
-        let window = initscr();
-        window.keypad(true);
-        noecho();
-        curs_set(1);
-
+    pub fn new(filename: Option<String>) -> Self {
         let document = match filename {
             Some(fname) => {
                 if let Ok(doc) = Document::open(&fname) {
@@ -106,133 +100,160 @@ impl Editor {
             None => Document::default(),
         };
 
-        Ok(Self {
+        Self {
             should_quit: false,
             document,
-            window,
             cursor_x: 0,
             cursor_y: 0,
             desired_cursor_x: 0,
             status_message: "".to_string(),
-        })
-    }
-
-    pub fn run(&mut self) -> io::Result<()> {
-        loop {
-            self.refresh_screen();
-            if self.process_keypress() {
-                break;
-            }
         }
-        endwin();
-        Ok(())
     }
 
-    fn refresh_screen(&self) {
-        self.window.erase();
+    pub fn handle_keypress(&mut self, key: Input) {
+        match key {
+            Input::Character(c) => match c {
+                '' => self.quit(),
+                '' => self.save_document(),
+                '' => self.go_to_start_of_line(),
+                '' => self.go_to_end_of_line(),
+                '' => self.delete_forward_char(),
+                '\x0A' => self.insert_newline(),
+                _ => self.insert_char(c),
+            },
+            Input::KeyBackspace => self.delete_char(),
+            Input::KeyUp => self.move_cursor_up(),
+            Input::KeyDown => self.move_cursor_down(),
+            Input::KeyLeft => self.move_cursor_left(),
+            Input::KeyRight => self.move_cursor_right(),
+            _ => {}
+        }
+        self.clamp_cursor_x();
+    }
+
+    pub fn draw(&self, window: &Window) {
+        window.erase();
 
         // Draw text
         for (index, line) in self.document.lines.iter().enumerate() {
-            self.window.mvaddstr(index as i32, 0, line);
+            window.mvaddstr(index as i32, 0, line);
         }
 
         // Draw status bar
-        let status_bar = format!("{} - {} lines | {}",
+        let status_bar = format!(
+            "{} - {} lines | {}",
             self.document.filename.as_deref().unwrap_or("[No Name]"),
             self.document.lines.len(),
             self.status_message
         );
-        let (_max_y, max_x) = self.window.get_max_yx();
-        self.window.mvaddstr(self.window.get_max_y() - 1, 0, &status_bar);
+        window.mvaddstr(window.get_max_y() - 1, 0, &status_bar);
 
         // Move cursor
-        self.window.mv(self.cursor_y, self.cursor_x);
-        self.window.refresh();
+        window.mv(self.cursor_y, self.cursor_x);
+        window.refresh();
     }
 
-    fn process_keypress(&mut self) -> bool {
-        match self.window.getch() {
-            Some(Input::Character(c)) => {
-                if c == '\x18' { // Ctrl-X
-                    self.document.save().ok();
-                    self.should_quit = true;
-                } else if c == '\x13' { // Ctrl-S
-                    self.document.save().ok();
-                    self.status_message = "File saved successfully.".to_string();
-                } else if c == '\x01' { // Ctrl-A
-                    self.cursor_x = 0;
-                    self.desired_cursor_x = 0;
-                } else if c == '\x05' { // Ctrl-E
-                    let y = self.cursor_y as usize;
-                    self.cursor_x = self.document.lines[y].len() as i32;
-                    self.desired_cursor_x = self.cursor_x;
-                } else if c == '\x04' { // Ctrl-D
-                    let y = self.cursor_y as usize;
-                    let x = self.cursor_x as usize;
-                    let line_len = self.document.lines.get(y).map_or(0, |l| l.len());
-                    if x < line_len {
-                        self.document.delete(x, y);
-                    } else if y < self.document.lines.len() - 1 {
-                        let next_line = self.document.lines.remove(y + 1);
-                        self.document.lines[y].push_str(&next_line);
-                    }
-                } else if c == '\n' { // Enter
-                    self.document.insert_newline(self.cursor_x as usize, self.cursor_y as usize);
-                    self.cursor_y += 1;
-                    self.cursor_x = 0;
-                    self.desired_cursor_x = 0;
-                } else {
-                    self.document.insert(self.cursor_x as usize, self.cursor_y as usize, c);
-                    self.cursor_x += 1;
-                    self.desired_cursor_x = self.cursor_x;
-                    self.status_message = "".to_string();
-                }
-            }
-            Some(Input::KeyBackspace) => {
-                if self.cursor_x > 0 {
-                    self.cursor_x -= 1;
-                    self.document.delete(self.cursor_x as usize, self.cursor_y as usize);
-                    self.desired_cursor_x = self.cursor_x;
-                } else if self.cursor_y > 0 {
-                    let prev_line_len = self.document.lines[self.cursor_y as usize - 1].len();
-                    let current_line = self.document.lines.remove(self.cursor_y as usize);
-                    self.document.lines[self.cursor_y as usize - 1].push_str(&current_line);
-                    self.cursor_y -= 1;
-                    self.cursor_x = prev_line_len as i32;
-                    self.desired_cursor_x = self.cursor_x;
-                }
-            }
-            Some(Input::KeyUp) => {
-                if self.cursor_y > 0 {
-                    self.cursor_y -= 1;
-                }
-            }
-            Some(Input::KeyDown) => {
-                if self.cursor_y < self.document.lines.len() as i32 - 1 {
-                    self.cursor_y += 1;
-                }
-            }
-            Some(Input::KeyLeft) => {
-                if self.cursor_x > 0 {
-                    self.cursor_x -= 1;
-                    self.desired_cursor_x = self.cursor_x;
-                }
-            }
-            Some(Input::KeyRight) => {
-                let line_len = self.document.lines[self.cursor_y as usize].len() as i32;
-                if self.cursor_x < line_len {
-                    self.cursor_x += 1;
-                    self.desired_cursor_x = self.cursor_x;
-                }
-            }
-            _ => {}
+    pub fn move_cursor_up(&mut self) {
+        if self.cursor_y > 0 {
+            self.cursor_y -= 1;
         }
-        // Clamp cursor_x to the end of the line
+    }
+
+    pub fn move_cursor_down(&mut self) {
+        if self.cursor_y < self.document.lines.len() as i32 - 1 {
+            self.cursor_y += 1;
+        }
+    }
+
+    pub fn move_cursor_left(&mut self) {
+        if self.cursor_x > 0 {
+            self.cursor_x -= 1;
+            self.desired_cursor_x = self.cursor_x;
+        }
+    }
+
+    pub fn move_cursor_right(&mut self) {
+        let line_len = self.document.lines[self.cursor_y as usize].len() as i32;
+        if self.cursor_x < line_len {
+            self.cursor_x += 1;
+            self.desired_cursor_x = self.cursor_x;
+        }
+    }
+
+    pub fn insert_char(&mut self, c: char) {
+        self.document.insert(self.cursor_x as usize, self.cursor_y as usize, c);
+        self.cursor_x += 1;
+        self.desired_cursor_x = self.cursor_x;
+        self.status_message = "".to_string();
+    }
+
+    pub fn delete_char(&mut self) { // Backspace
+        if self.cursor_x > 0 {
+            self.cursor_x -= 1;
+            self.document.delete(self.cursor_x as usize, self.cursor_y as usize);
+            self.desired_cursor_x = self.cursor_x;
+        } else if self.cursor_y > 0 {
+            let prev_line_len = self.document.lines[self.cursor_y as usize - 1].len();
+            let current_line = self.document.lines.remove(self.cursor_y as usize);
+            self.document.lines[self.cursor_y as usize - 1].push_str(&current_line);
+            self.cursor_y -= 1;
+            self.cursor_x = prev_line_len as i32;
+            self.desired_cursor_x = self.cursor_x;
+        }
+    }
+
+    pub fn delete_forward_char(&mut self) { // Ctrl-D
+        let y = self.cursor_y as usize;
+        let x = self.cursor_x as usize;
+        let line_len = self.document.lines.get(y).map_or(0, |l| l.len());
+        if x < line_len {
+            self.document.delete(x, y);
+        } else if y < self.document.lines.len() - 1 {
+            let next_line = self.document.lines.remove(y + 1);
+            self.document.lines[y].push_str(&next_line);
+        }
+    }
+
+    pub fn insert_newline(&mut self) {
+        self.document.insert_newline(self.cursor_x as usize, self.cursor_y as usize);
+        self.cursor_y += 1;
+        self.cursor_x = 0;
+        self.desired_cursor_x = 0;
+    }
+
+    pub fn go_to_start_of_line(&mut self) {
+        self.cursor_x = 0;
+        self.desired_cursor_x = 0;
+    }
+
+    pub fn go_to_end_of_line(&mut self) {
+        let y = self.cursor_y as usize;
+        self.cursor_x = self.document.lines[y].len() as i32;
+        self.desired_cursor_x = self.cursor_x;
+    }
+
+    pub fn save_document(&mut self) {
+        if self.document.save().is_ok() {
+            self.status_message = "File saved successfully.".to_string();
+        } else {
+            self.status_message = "Error saving file!".to_string();
+        }
+    }
+
+    pub fn quit(&mut self) {
+        self.document.save().ok();
+        self.should_quit = true;
+    }
+
+    fn clamp_cursor_x(&mut self) {
         let y = self.cursor_y as usize;
         if y < self.document.lines.len() {
             let line_len = self.document.lines[y].len() as i32;
             self.cursor_x = self.desired_cursor_x.min(line_len);
         }
-        self.should_quit
+    }
+
+    pub fn cursor_pos(&self) -> (i32, i32) {
+        (self.cursor_x, self.cursor_y)
     }
 }
