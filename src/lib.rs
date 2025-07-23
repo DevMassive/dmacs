@@ -85,6 +85,7 @@ pub struct Editor {
     pub document: Document,
     cursor_x: u16,
     cursor_y: u16,
+    desired_cursor_x: u16,
     status_message: String,
 }
 
@@ -109,6 +110,7 @@ impl Editor {
             document,
             cursor_x: 0,
             cursor_y: 0,
+            desired_cursor_x: 0,
             status_message: "".to_string(),
         }
     }
@@ -164,7 +166,8 @@ impl Editor {
     fn process_keypress(&mut self) -> io::Result<bool> {
         if let Event::Key(key_event) = event::read()? {
             match (key_event.code, key_event.modifiers) {
-                (KeyCode::Char('q'), KeyModifiers::CONTROL) => {
+                (KeyCode::Char('x'), KeyModifiers::CONTROL) => {
+                    self.document.save()?;
                     self.should_quit = true;
                 }
                 (KeyCode::Char('s'), KeyModifiers::CONTROL) => {
@@ -173,10 +176,12 @@ impl Editor {
                 }
                 (KeyCode::Char('a'), KeyModifiers::CONTROL) => {
                     self.cursor_x = 0;
+                    self.desired_cursor_x = 0;
                 }
                 (KeyCode::Char('e'), KeyModifiers::CONTROL) => {
                     let y = self.cursor_y as usize;
                     self.cursor_x = self.document.lines[y].len() as u16;
+                    self.desired_cursor_x = self.cursor_x;
                 }
                 (KeyCode::Char('d'), KeyModifiers::CONTROL) => {
                     let y = self.cursor_y as usize;
@@ -192,24 +197,28 @@ impl Editor {
                 (KeyCode::Char(c), _) => {
                     self.document.insert(self.cursor_x as usize, self.cursor_y as usize, c);
                     self.cursor_x += 1;
+                    self.desired_cursor_x = self.cursor_x;
                     self.status_message = "".to_string();
                 }
                 (KeyCode::Backspace, _) => {
                     if self.cursor_x > 0 {
                         self.cursor_x -= 1;
                         self.document.delete(self.cursor_x as usize, self.cursor_y as usize);
+                        self.desired_cursor_x = self.cursor_x;
                     } else if self.cursor_y > 0 {
                         let prev_line_len = self.document.lines[self.cursor_y as usize - 1].len();
                         let current_line = self.document.lines.remove(self.cursor_y as usize);
                         self.document.lines[self.cursor_y as usize - 1].push_str(&current_line);
                         self.cursor_y -= 1;
                         self.cursor_x = prev_line_len as u16;
+                        self.desired_cursor_x = self.cursor_x;
                     }
                 }
                 (KeyCode::Enter, _) => {
                     self.document.insert_newline(self.cursor_x as usize, self.cursor_y as usize);
                     self.cursor_y += 1;
                     self.cursor_x = 0;
+                    self.desired_cursor_x = 0;
                 }
                 (KeyCode::Up, _) => {
                     if self.cursor_y > 0 {
@@ -224,12 +233,14 @@ impl Editor {
                 (KeyCode::Left, _) => {
                     if self.cursor_x > 0 {
                         self.cursor_x -= 1;
+                        self.desired_cursor_x = self.cursor_x;
                     }
                 }
                 (KeyCode::Right, _) => {
                     let line_len = self.document.lines[self.cursor_y as usize].len() as u16;
                     if self.cursor_x < line_len {
                         self.cursor_x += 1;
+                        self.desired_cursor_x = self.cursor_x;
                     }
                 }
                 _ => {}
@@ -238,9 +249,7 @@ impl Editor {
             let y = self.cursor_y as usize;
             if y < self.document.lines.len() {
                 let line_len = self.document.lines[y].len() as u16;
-                if self.cursor_x > line_len {
-                    self.cursor_x = line_len;
-                }
+                self.cursor_x = self.desired_cursor_x.min(line_len);
             }
         }
         Ok(self.should_quit)

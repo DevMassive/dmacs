@@ -16,11 +16,9 @@ To build a simple, functional text editor in Rust.
 
 ## Current Task
 
-*   Implement basic editing features:
-    *   Enter for newlines
-    *   Backspace and Ctrl-D for deletion
-    *   Ctrl-A/Ctrl-E for line navigation
-    *   Improved up/down arrow key movement
+*   Refine keybindings and cursor movement:
+    *   Change quit-and-save key to `Ctrl-X` (removing `Ctrl-Q`).
+    *   Implement desired horizontal cursor position memory for up/down arrow navigation.
 
 ## Key Files
 
