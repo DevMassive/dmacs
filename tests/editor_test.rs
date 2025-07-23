@@ -16,7 +16,8 @@ fn test_open_document() {
 
 #[test]
 fn test_editor_initial_state_no_file() {
-    let editor = Editor::new(None);
+    let tty = std::fs::File::open("/dev/null").unwrap();
+    let editor = Editor::new(None, tty);
     assert!(!editor.should_quit);
     assert_eq!(editor.document.lines.len(), 1);
     assert_eq!(editor.document.lines[0], "");
