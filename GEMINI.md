@@ -16,7 +16,7 @@ To build a simple, functional text editor in Rust.
 
 ## Current Task
 
-*   Initial setup and project analysis.
+*   Fix bug where a new file specified via command line argument is not created on save.
 
 ## Key Files
 

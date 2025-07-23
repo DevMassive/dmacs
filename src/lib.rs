@@ -59,10 +59,18 @@ pub struct Editor {
 
 impl Editor {
     pub fn new(filename: Option<String>) -> Self {
-        let document = if let Some(fname) = filename {
-            Document::open(&fname).unwrap_or_else(|_| Document::default())
-        } else {
-            Document::default()
+        let document = match filename {
+            Some(fname) => {
+                if let Ok(doc) = Document::open(&fname) {
+                    doc
+                } else {
+                    Document {
+                        lines: vec!["".to_string()],
+                        filename: Some(fname),
+                    }
+                }
+            }
+            None => Document::default(),
         };
 
         Self {
