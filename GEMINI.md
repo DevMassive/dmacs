@@ -16,7 +16,7 @@ To build a simple, functional text editor in Rust.
 
 ## Current Task
 
-*   Ready for next task.
+*   Fix `Failed to initialize input reader` error when launched from `tig` by redirecting stdin to `/dev/tty` if not already a TTY.
 
 ## Key Files
 
