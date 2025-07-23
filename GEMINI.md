@@ -16,9 +16,7 @@ To build a simple, functional text editor in Rust.
 
 ## Current Task
 
-*   Enable `dmacs` to function as a Git editor (e.g., from `tig`):
-    *   Modify input handling to read directly from `/dev/tty`.
-    *   Update `Cargo.toml` with necessary dependencies.
+*   Ready for next task.
 
 ## Key Files
 
