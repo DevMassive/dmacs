@@ -4,9 +4,14 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-crossterm = "0.27.0"
-isatty = "0.1.0"
+isatty = "0.1"
 libc = "0.2.153"
+log = "0.4"
+pancurses = "0.17.0"
+simplelog = "0.12.2"
+
+[dev-dependencies]
+tempfile = "3.10.1"
 
 [[bin]]
 name = "dmacs"

@@ -1,10 +1,5 @@
-use crossterm::{
-    cursor,
-    event::{self, Event, KeyCode, KeyModifiers},
-    terminal::{self, ClearType},
-    QueueableCommand,
-};
-use std::io::{self, stdout, Write};
+use pancurses::{initscr, endwin, noecho, curs_set, Input, Window};
+use std::io::{self, Write};
 
 // Document being edited
 pub struct Document {
@@ -83,14 +78,20 @@ impl Document {
 pub struct Editor {
     pub should_quit: bool,
     pub document: Document,
-    cursor_x: u16,
-    cursor_y: u16,
-    desired_cursor_x: u16,
+    window: Window,
+    cursor_x: i32,
+    cursor_y: i32,
+    desired_cursor_x: i32,
     status_message: String,
 }
 
 impl Editor {
-    pub fn new(filename: Option<String>) -> Self {
+    pub fn new(filename: Option<String>) -> io::Result<Self> {
+        let window = initscr();
+        window.keypad(true);
+        noecho();
+        curs_set(1);
+
         let document = match filename {
             Some(fname) => {
                 if let Ok(doc) = Document::open(&fname) {
@@ -105,85 +106,67 @@ impl Editor {
             None => Document::default(),
         };
 
-        Self {
+        Ok(Self {
             should_quit: false,
             document,
+            window,
             cursor_x: 0,
             cursor_y: 0,
             desired_cursor_x: 0,
             status_message: "".to_string(),
-        }
+        })
     }
 
     pub fn run(&mut self) -> io::Result<()> {
-        terminal::enable_raw_mode()?;
-        let result = self.run_event_loop();
-        terminal::disable_raw_mode()?;
-        result
-    }
-
-    fn run_event_loop(&mut self) -> io::Result<()> {
-        let mut stdout = stdout();
         loop {
-            self.refresh_screen(&mut stdout)?;
-            if self.process_keypress()? {
+            self.refresh_screen();
+            if self.process_keypress() {
                 break;
             }
         }
+        endwin();
         Ok(())
     }
 
-    fn refresh_screen<W: Write>(&self, w: &mut W) -> io::Result<()> {
-        w.queue(cursor::Hide)?;
-        w.queue(terminal::Clear(ClearType::All))?;
-        w.queue(cursor::MoveTo(0, 0))?;
+    fn refresh_screen(&self) {
+        self.window.erase();
 
-        if !self.should_quit {
-            // Draw text
-            for (index, line) in self.document.lines.iter().enumerate() {
-                w.queue(cursor::MoveTo(0, index as u16))?;
-                w.write_all(line.as_bytes())?;
-            }
-
-            // Draw status bar
-            let status_bar = format!("{} - {} lines | {}", 
-                self.document.filename.as_deref().unwrap_or("[No Name]"),
-                self.document.lines.len(),
-                self.status_message
-            );
-            let (_cols, rows) = terminal::size()?;
-            w.queue(cursor::MoveTo(0, rows - 1))?;
-            w.write_all(status_bar.as_bytes())?;
-
-            // Move cursor to its position
-            w.queue(cursor::MoveTo(self.cursor_x, self.cursor_y))?;
+        // Draw text
+        for (index, line) in self.document.lines.iter().enumerate() {
+            self.window.mvaddstr(index as i32, 0, line);
         }
 
-        w.queue(cursor::Show)?;
-        w.flush()
+        // Draw status bar
+        let status_bar = format!("{} - {} lines | {}",
+            self.document.filename.as_deref().unwrap_or("[No Name]"),
+            self.document.lines.len(),
+            self.status_message
+        );
+        let (_max_y, max_x) = self.window.get_max_yx();
+        self.window.mvaddstr(self.window.get_max_y() - 1, 0, &status_bar);
+
+        // Move cursor
+        self.window.mv(self.cursor_y, self.cursor_x);
+        self.window.refresh();
     }
 
-    fn process_keypress(&mut self) -> io::Result<bool> {
-        if let Event::Key(key_event) = event::read()? {
-            match (key_event.code, key_event.modifiers) {
-                (KeyCode::Char('x'), KeyModifiers::CONTROL) => {
-                    self.document.save()?;
+    fn process_keypress(&mut self) -> bool {
+        match self.window.getch() {
+            Some(Input::Character(c)) => {
+                if c == '\x18' { // Ctrl-X
+                    self.document.save().ok();
                     self.should_quit = true;
-                }
-                (KeyCode::Char('s'), KeyModifiers::CONTROL) => {
-                    self.document.save()?;
+                } else if c == '\x13' { // Ctrl-S
+                    self.document.save().ok();
                     self.status_message = "File saved successfully.".to_string();
-                }
-                (KeyCode::Char('a'), KeyModifiers::CONTROL) => {
+                } else if c == '\x01' { // Ctrl-A
                     self.cursor_x = 0;
                     self.desired_cursor_x = 0;
-                }
-                (KeyCode::Char('e'), KeyModifiers::CONTROL) => {
+                } else if c == '\x05' { // Ctrl-E
                     let y = self.cursor_y as usize;
-                    self.cursor_x = self.document.lines[y].len() as u16;
+                    self.cursor_x = self.document.lines[y].len() as i32;
                     self.desired_cursor_x = self.cursor_x;
-                }
-                (KeyCode::Char('d'), KeyModifiers::CONTROL) => {
+                } else if c == '\x04' { // Ctrl-D
                     let y = self.cursor_y as usize;
                     let x = self.cursor_x as usize;
                     let line_len = self.document.lines.get(y).map_or(0, |l| l.len());
@@ -193,65 +176,63 @@ impl Editor {
                         let next_line = self.document.lines.remove(y + 1);
                         self.document.lines[y].push_str(&next_line);
                     }
-                }
-                (KeyCode::Char(c), _) => {
+                } else if c == '\n' { // Enter
+                    self.document.insert_newline(self.cursor_x as usize, self.cursor_y as usize);
+                    self.cursor_y += 1;
+                    self.cursor_x = 0;
+                    self.desired_cursor_x = 0;
+                } else {
                     self.document.insert(self.cursor_x as usize, self.cursor_y as usize, c);
                     self.cursor_x += 1;
                     self.desired_cursor_x = self.cursor_x;
                     self.status_message = "".to_string();
                 }
-                (KeyCode::Backspace, _) => {
-                    if self.cursor_x > 0 {
-                        self.cursor_x -= 1;
-                        self.document.delete(self.cursor_x as usize, self.cursor_y as usize);
-                        self.desired_cursor_x = self.cursor_x;
-                    } else if self.cursor_y > 0 {
-                        let prev_line_len = self.document.lines[self.cursor_y as usize - 1].len();
-                        let current_line = self.document.lines.remove(self.cursor_y as usize);
-                        self.document.lines[self.cursor_y as usize - 1].push_str(&current_line);
-                        self.cursor_y -= 1;
-                        self.cursor_x = prev_line_len as u16;
-                        self.desired_cursor_x = self.cursor_x;
-                    }
+            }
+            Some(Input::KeyBackspace) => {
+                if self.cursor_x > 0 {
+                    self.cursor_x -= 1;
+                    self.document.delete(self.cursor_x as usize, self.cursor_y as usize);
+                    self.desired_cursor_x = self.cursor_x;
+                } else if self.cursor_y > 0 {
+                    let prev_line_len = self.document.lines[self.cursor_y as usize - 1].len();
+                    let current_line = self.document.lines.remove(self.cursor_y as usize);
+                    self.document.lines[self.cursor_y as usize - 1].push_str(&current_line);
+                    self.cursor_y -= 1;
+                    self.cursor_x = prev_line_len as i32;
+                    self.desired_cursor_x = self.cursor_x;
                 }
-                (KeyCode::Enter, _) => {
-                    self.document.insert_newline(self.cursor_x as usize, self.cursor_y as usize);
+            }
+            Some(Input::KeyUp) => {
+                if self.cursor_y > 0 {
+                    self.cursor_y -= 1;
+                }
+            }
+            Some(Input::KeyDown) => {
+                if self.cursor_y < self.document.lines.len() as i32 - 1 {
                     self.cursor_y += 1;
-                    self.cursor_x = 0;
-                    self.desired_cursor_x = 0;
                 }
-                (KeyCode::Up, _) => {
-                    if self.cursor_y > 0 {
-                        self.cursor_y -= 1;
-                    }
-                }
-                (KeyCode::Down, _) => {
-                    if self.cursor_y < self.document.lines.len() as u16 - 1 {
-                        self.cursor_y += 1;
-                    }
-                }
-                (KeyCode::Left, _) => {
-                    if self.cursor_x > 0 {
-                        self.cursor_x -= 1;
-                        self.desired_cursor_x = self.cursor_x;
-                    }
-                }
-                (KeyCode::Right, _) => {
-                    let line_len = self.document.lines[self.cursor_y as usize].len() as u16;
-                    if self.cursor_x < line_len {
-                        self.cursor_x += 1;
-                        self.desired_cursor_x = self.cursor_x;
-                    }
-                }
-                _ => {}
             }
-            // Clamp cursor_x to the end of the line after every keypress
-            let y = self.cursor_y as usize;
-            if y < self.document.lines.len() {
-                let line_len = self.document.lines[y].len() as u16;
-                self.cursor_x = self.desired_cursor_x.min(line_len);
+            Some(Input::KeyLeft) => {
+                if self.cursor_x > 0 {
+                    self.cursor_x -= 1;
+                    self.desired_cursor_x = self.cursor_x;
+                }
             }
+            Some(Input::KeyRight) => {
+                let line_len = self.document.lines[self.cursor_y as usize].len() as i32;
+                if self.cursor_x < line_len {
+                    self.cursor_x += 1;
+                    self.desired_cursor_x = self.cursor_x;
+                }
+            }
+            _ => {}
         }
-        Ok(self.should_quit)
+        // Clamp cursor_x to the end of the line
+        let y = self.cursor_y as usize;
+        if y < self.document.lines.len() {
+            let line_len = self.document.lines[y].len() as i32;
+            self.cursor_x = self.desired_cursor_x.min(line_len);
+        }
+        self.should_quit
     }
 }
