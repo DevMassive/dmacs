@@ -16,9 +16,9 @@ To build a simple, functional text editor in Rust.
 
 ## Current Task
 
-*   Refine keybindings and cursor movement:
-    *   Change quit-and-save key to `Ctrl-X` (removing `Ctrl-Q`).
-    *   Implement desired horizontal cursor position memory for up/down arrow navigation.
+*   Enable `dmacs` to function as a Git editor (e.g., from `tig`):
+    *   Modify input handling to read directly from `/dev/tty`.
+    *   Update `Cargo.toml` with necessary dependencies.
 
 ## Key Files
 

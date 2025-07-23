@@ -1,9 +1,11 @@
 use crossterm::{
     cursor,
-    event::{self, Event, KeyCode, KeyModifiers},
+    event::{self, Event, KeyCode, KeyModifiers, EventStream},
     terminal::{self, ClearType},
     QueueableCommand,
 };
+use futures_util::stream::StreamExt;
+use std::fs::File;
 use std::io::{self, stdout, Write};
 
 // Document being edited
@@ -87,10 +89,11 @@ pub struct Editor {
     cursor_y: u16,
     desired_cursor_x: u16,
     status_message: String,
+    tty: File,
 }
 
 impl Editor {
-    pub fn new(filename: Option<String>) -> Self {
+    pub fn new(filename: Option<String>, tty: File) -> Self {
         let document = match filename {
             Some(fname) => {
                 if let Ok(doc) = Document::open(&fname) {
@@ -112,21 +115,22 @@ impl Editor {
             cursor_y: 0,
             desired_cursor_x: 0,
             status_message: "".to_string(),
+            tty,
         }
     }
 
     pub fn run(&mut self) -> io::Result<()> {
         terminal::enable_raw_mode()?;
-        let result = self.run_event_loop();
+        let result = futures::executor::block_on(self.run_event_loop());
         terminal::disable_raw_mode()?;
         result
     }
 
-    fn run_event_loop(&mut self) -> io::Result<()> {
-        let mut stdout = stdout();
+    async fn run_event_loop(&mut self) -> io::Result<()> {
+        let mut event_stream = EventStream::new();
         loop {
-            self.refresh_screen(&mut stdout)?;
-            if self.process_keypress()? {
+            self.refresh_screen(&mut stdout())?;
+            if self.process_keypress(&mut event_stream).await? {
                 break;
             }
         }
@@ -163,8 +167,8 @@ impl Editor {
         w.flush()
     }
 
-    fn process_keypress(&mut self) -> io::Result<bool> {
-        if let Event::Key(key_event) = event::read()? {
+    async fn process_keypress(&mut self, event_stream: &mut EventStream) -> io::Result<bool> {
+        if let Some(Ok(Event::Key(key_event))) = event_stream.next().await {
             match (key_event.code, key_event.modifiers) {
                 (KeyCode::Char('x'), KeyModifiers::CONTROL) => {
                     self.document.save()?;
