@@ -16,7 +16,7 @@ To build a simple, functional text editor in Rust.
 
 ## Current Task
 
-*   Fix failing tests after TTY input changes.
+*   Ready for next task.
 
 ## Key Files
 
