@@ -43,8 +43,39 @@ impl Document {
         if at_y > self.lines.len() {
             return;
         }
+        if at_y == self.lines.len() {
+            self.lines.push(String::new());
+        }
         let line = self.lines.get_mut(at_y).unwrap();
-        line.insert(at_x, c);
+        if at_x > line.len() {
+            line.push(c);
+        } else {
+            line.insert(at_x, c);
+        }
+    }
+
+    pub fn delete(&mut self, at_x: usize, at_y: usize) {
+        if at_y >= self.lines.len() {
+            return;
+        }
+        let line = self.lines.get_mut(at_y).unwrap();
+        if at_x >= line.len() {
+            return;
+        }
+        line.remove(at_x);
+    }
+
+    pub fn insert_newline(&mut self, at_x: usize, at_y: usize) {
+        if at_y > self.lines.len() {
+            return;
+        }
+        if at_y == self.lines.len() {
+            self.lines.push(String::new());
+            return;
+        }
+        let current_line = self.lines.get_mut(at_y).unwrap();
+        let new_line = current_line.split_off(at_x);
+        self.lines.insert(at_y + 1, new_line);
     }
 }
 
@@ -132,42 +163,84 @@ impl Editor {
 
     fn process_keypress(&mut self) -> io::Result<bool> {
         if let Event::Key(key_event) = event::read()? {
-            match key_event.code {
-                KeyCode::Char('x') if key_event.modifiers == KeyModifiers::CONTROL => {
-                    self.document.save()?;
+            match (key_event.code, key_event.modifiers) {
+                (KeyCode::Char('q'), KeyModifiers::CONTROL) => {
                     self.should_quit = true;
                 }
-                KeyCode::Char('s') if key_event.modifiers == KeyModifiers::CONTROL => {
+                (KeyCode::Char('s'), KeyModifiers::CONTROL) => {
                     self.document.save()?;
                     self.status_message = "File saved successfully.".to_string();
                 }
-                KeyCode::Char(c) => {
+                (KeyCode::Char('a'), KeyModifiers::CONTROL) => {
+                    self.cursor_x = 0;
+                }
+                (KeyCode::Char('e'), KeyModifiers::CONTROL) => {
+                    let y = self.cursor_y as usize;
+                    self.cursor_x = self.document.lines[y].len() as u16;
+                }
+                (KeyCode::Char('d'), KeyModifiers::CONTROL) => {
+                    let y = self.cursor_y as usize;
+                    let x = self.cursor_x as usize;
+                    let line_len = self.document.lines.get(y).map_or(0, |l| l.len());
+                    if x < line_len {
+                        self.document.delete(x, y);
+                    } else if y < self.document.lines.len() - 1 {
+                        let next_line = self.document.lines.remove(y + 1);
+                        self.document.lines[y].push_str(&next_line);
+                    }
+                }
+                (KeyCode::Char(c), _) => {
                     self.document.insert(self.cursor_x as usize, self.cursor_y as usize, c);
                     self.cursor_x += 1;
                     self.status_message = "".to_string();
                 }
-                KeyCode::Up => {
+                (KeyCode::Backspace, _) => {
+                    if self.cursor_x > 0 {
+                        self.cursor_x -= 1;
+                        self.document.delete(self.cursor_x as usize, self.cursor_y as usize);
+                    } else if self.cursor_y > 0 {
+                        let prev_line_len = self.document.lines[self.cursor_y as usize - 1].len();
+                        let current_line = self.document.lines.remove(self.cursor_y as usize);
+                        self.document.lines[self.cursor_y as usize - 1].push_str(&current_line);
+                        self.cursor_y -= 1;
+                        self.cursor_x = prev_line_len as u16;
+                    }
+                }
+                (KeyCode::Enter, _) => {
+                    self.document.insert_newline(self.cursor_x as usize, self.cursor_y as usize);
+                    self.cursor_y += 1;
+                    self.cursor_x = 0;
+                }
+                (KeyCode::Up, _) => {
                     if self.cursor_y > 0 {
                         self.cursor_y -= 1;
                     }
                 }
-                KeyCode::Down => {
+                (KeyCode::Down, _) => {
                     if self.cursor_y < self.document.lines.len() as u16 - 1 {
                         self.cursor_y += 1;
                     }
                 }
-                KeyCode::Left => {
+                (KeyCode::Left, _) => {
                     if self.cursor_x > 0 {
                         self.cursor_x -= 1;
                     }
                 }
-                KeyCode::Right => {
+                (KeyCode::Right, _) => {
                     let line_len = self.document.lines[self.cursor_y as usize].len() as u16;
                     if self.cursor_x < line_len {
                         self.cursor_x += 1;
                     }
                 }
                 _ => {}
+            }
+            // Clamp cursor_x to the end of the line after every keypress
+            let y = self.cursor_y as usize;
+            if y < self.document.lines.len() {
+                let line_len = self.document.lines[y].len() as u16;
+                if self.cursor_x > line_len {
+                    self.cursor_x = line_len;
+                }
             }
         }
         Ok(self.should_quit)

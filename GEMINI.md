@@ -16,7 +16,11 @@ To build a simple, functional text editor in Rust.
 
 ## Current Task
 
-*   Fix bug where a new file specified via command line argument is not created on save.
+*   Implement basic editing features:
+    *   Enter for newlines
+    *   Backspace and Ctrl-D for deletion
+    *   Ctrl-A/Ctrl-E for line navigation
+    *   Improved up/down arrow key movement
 
 ## Key Files
 
