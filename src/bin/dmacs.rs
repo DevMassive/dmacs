@@ -1,7 +1,8 @@
 use dmacs::Editor;
 use std::env;
 use std::fs::OpenOptions;
-use std::io::{self, stdin};
+use std::io::{self};
+use std::os::unix::io::AsRawFd;
 use isatty::stdin_isatty;
 
 fn main() -> io::Result<()> {
