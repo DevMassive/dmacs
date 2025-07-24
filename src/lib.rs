@@ -124,6 +124,7 @@ impl Editor {
                 '\x0b' => self.delete_to_end_of_line(),
                 '\x7f' | '\x08' => self.delete_char(), // Backspace
                 '\n' | '\r' => self.insert_newline(),
+                '\x00' => {},
                 _ => self.insert_char(c),
             },
             Input::KeyBackspace => self.delete_char(),
