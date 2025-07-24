@@ -332,3 +332,21 @@ fn test_editor_hungry_delete() {
     assert_eq!(editor.document.lines[0], "");
     assert_eq!(editor.cursor_pos(), (0, 0));
 }
+
+#[test]
+fn test_editor_move_cursor_up_at_top_line() {
+    let mut editor = Editor::new(None);
+    editor.document.lines = vec!["line1".to_string(), "line2".to_string()];
+    editor.set_cursor_pos(3, 0); // Set cursor to (3, 0)
+    editor.handle_keypress(Input::KeyUp);
+    assert_eq!(editor.cursor_pos(), (0, 0)); // Should move to (0, 0)
+}
+
+#[test]
+fn test_editor_move_cursor_down_at_bottom_line() {
+    let mut editor = Editor::new(None);
+    editor.document.lines = vec!["line1".to_string(), "line2".to_string()];
+    editor.set_cursor_pos(0, 1); // Set cursor to (0, 1)
+    editor.handle_keypress(Input::KeyDown);
+    assert_eq!(editor.cursor_pos(), (5, 1)); // Should move to (end of line, 1)
+}

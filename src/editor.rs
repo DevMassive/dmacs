@@ -212,6 +212,10 @@ impl Editor {
         if self.cursor_y > 0 {
             self.cursor_y -= 1;
             self.cursor_x = self.get_byte_pos_from_display_width(self.desired_cursor_x);
+        } else {
+            // If at the top line, move to the beginning of the line
+            self.cursor_x = 0;
+            self.desired_cursor_x = 0;
         }
     }
 
@@ -219,6 +223,9 @@ impl Editor {
         if self.cursor_y < self.document.lines.len() - 1 {
             self.cursor_y += 1;
             self.cursor_x = self.get_byte_pos_from_display_width(self.desired_cursor_x);
+        } else {
+            // If at the bottom line, move to the end of the line
+            self.go_to_end_of_line();
         }
     }
 
