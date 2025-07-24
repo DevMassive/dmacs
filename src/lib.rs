@@ -167,7 +167,7 @@ impl Editor {
                         display_x += 1;
                     }
                 } else {
-                    window.mvaddch(index as i32, display_x as i32, ch);
+                    window.mvaddstr(index as i32, display_x as i32, &ch.to_string());
                     display_x += ch.width().unwrap_or(0);
                 }
             }
