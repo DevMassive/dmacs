@@ -85,7 +85,8 @@ pub struct Editor {
     cursor_y: usize,
     desired_cursor_x: usize, // column index
     status_message: String,
-    row_offset: usize,
+    pub row_offset: usize, // public for tests
+    pub col_offset: usize, // public for tests
 }
 
 impl Editor {
@@ -112,6 +113,7 @@ impl Editor {
             desired_cursor_x: 0,
             status_message: "".to_string(),
             row_offset: 0,
+            col_offset: 0,
         }
     }
 
@@ -156,25 +158,42 @@ impl Editor {
         width
     }
 
-    pub fn draw(&mut self, window: &Window) {
-        window.erase();
-
-        let screen_rows = window.get_max_y() as usize - 1; // Leave space for status bar
-
-        // Scroll
+    pub fn scroll(&mut self, screen_cols: usize, screen_rows: usize) {
+        // Vertical scroll
         if self.cursor_y < self.row_offset {
             self.row_offset = self.cursor_y;
         }
         if self.cursor_y >= self.row_offset + screen_rows {
             self.row_offset = self.cursor_y - screen_rows + 1;
         }
+        
+        // Horizontal scroll
+        let display_cursor_x = self.get_display_width(
+            &self.document.lines[self.cursor_y],
+            self.cursor_x,
+        );
+        if display_cursor_x < self.col_offset {
+            self.col_offset = display_cursor_x;
+        }
+        if display_cursor_x >= self.col_offset + screen_cols {
+            self.col_offset = display_cursor_x - screen_cols + 1;
+        }
+    }
+
+    pub fn draw(&mut self, window: &Window) {
+        let (screen_rows, screen_cols) = (
+            window.get_max_y() as usize - 1,
+            window.get_max_x() as usize
+        );
+        self.scroll(screen_cols, screen_rows);
+        
+        window.erase();
 
         // Draw text
         for (index, line) in self.document.lines.iter().enumerate() {
             if index < self.row_offset {
                 continue;
             }
-
             let row = index - self.row_offset;
             if row >= screen_rows {
                 break;
@@ -182,15 +201,36 @@ impl Editor {
 
             let mut display_x = 0;
             for ch in line.chars() {
-                if ch == '\t' {
-                    let spaces = TAB_STOP - (display_x % TAB_STOP);
-                    for _ in 0..spaces {
-                        window.mvaddch(row as i32, display_x as i32, ' ');
-                        display_x += 1;
-                    }
+                let char_start_display_x = display_x;
+
+                // Calculate character width
+                let char_width = if ch == '\t' {
+                    TAB_STOP - (display_x % TAB_STOP)
                 } else {
-                    window.mvaddstr(row as i32, display_x as i32, &ch.to_string());
-                    display_x += ch.width().unwrap_or(0);
+                    ch.width().unwrap_or(0)
+                };
+                display_x += char_width;
+
+                // Draw character
+                if display_x > self.col_offset {
+                    let screen_x = char_start_display_x.saturating_sub(self.col_offset);
+                    if screen_x < screen_cols {
+                        if ch == '\t' {
+                            // Draw a tab as spaces
+                            for i in 0..char_width {
+                                if screen_x + i < screen_cols {
+                                    window.mvaddch(row as i32, (screen_x + i) as i32, ' ');
+                                }
+                            }
+                        } else {
+                            // Draw character
+                            window.mvaddstr(row as i32, screen_x as i32, &ch.to_string());
+                        }
+                    }
+                }
+                // Stop drawing if we reach the end of the screen
+                if char_start_display_x.saturating_sub(self.col_offset) >= screen_cols {
+                    break;
                 }
             }
         }
@@ -205,11 +245,14 @@ impl Editor {
         window.mvaddstr(window.get_max_y() - 1, 0, &status_bar);
 
         // Move cursor
-        let display_x = self.get_display_width(
+        let display_cursor_x = self.get_display_width(
             &self.document.lines[self.cursor_y],
             self.cursor_x,
         );
-        window.mv((self.cursor_y - self.row_offset) as i32, display_x as i32);
+        window.mv(
+            (self.cursor_y - self.row_offset) as i32,
+            (display_cursor_x - self.col_offset) as i32,
+        );
         window.refresh();
     }
 
@@ -353,6 +396,9 @@ impl Editor {
             }
             else {
                 current_display_x += ch.width().unwrap_or(0);
+            }
+            if current_display_x > display_x {
+                break;
             }
             byte_pos += ch.len_utf8();
         }
