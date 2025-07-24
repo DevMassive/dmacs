@@ -5,6 +5,7 @@ use unicode_width::UnicodeWidthChar;
 const TAB_STOP: usize = 4;
 
 // Document being edited
+#[derive(Clone)]
 pub struct Document {
     pub lines: Vec<String>,
     pub filename: Option<String>,
@@ -87,6 +88,7 @@ pub struct Editor {
     status_message: String,
     pub row_offset: usize, // public for tests
     pub col_offset: usize, // public for tests
+    undo_stack: Vec<(Document, usize, usize)>, // Stores (Document, cursor_x, cursor_y)
 }
 
 impl Editor {
@@ -114,6 +116,23 @@ impl Editor {
             status_message: "".to_string(),
             row_offset: 0,
             col_offset: 0,
+            undo_stack: Vec::new(),
+        }
+    }
+
+    fn save_state_for_undo(&mut self) {
+        self.undo_stack.push((self.document.clone(), self.cursor_x, self.cursor_y));
+    }
+
+    pub fn undo(&mut self) {
+        if let Some((prev_document, prev_cursor_x, prev_cursor_y)) = self.undo_stack.pop() {
+            self.document = prev_document;
+            self.cursor_x = prev_cursor_x;
+            self.cursor_y = prev_cursor_y;
+            self.desired_cursor_x = self.get_display_width(&self.document.lines[self.cursor_y], self.cursor_x);
+            self.status_message = "Undo successful.".to_string();
+        } else {
+            self.status_message = "Nothing to undo.".to_string();
         }
     }
 
@@ -129,6 +148,7 @@ impl Editor {
                 '\x7f' | '\x08' => self.delete_char(), // Backspace
                 '\n' | '\r' => self.insert_newline(),
                 '\x00' => {},
+                '\x1f' => self.undo(), // Ctrl + _ for undo
                 _ => self.insert_char(c),
             },
             Input::KeyBackspace => self.delete_char(),
@@ -303,6 +323,7 @@ impl Editor {
     }
 
     pub fn insert_char(&mut self, c: char) {
+        self.save_state_for_undo();
         self.document.insert(self.cursor_x, self.cursor_y, c);
         self.cursor_x += c.len_utf8();
         self.desired_cursor_x = self.get_display_width(&self.document.lines[self.cursor_y], self.cursor_x);
@@ -310,6 +331,7 @@ impl Editor {
     }
 
     pub fn delete_char(&mut self) { // Backspace
+        self.save_state_for_undo();
         if self.cursor_x > 0 {
             self.move_cursor_left();
             self.document.delete(self.cursor_x, self.cursor_y);
@@ -324,6 +346,7 @@ impl Editor {
     }
 
     pub fn delete_forward_char(&mut self) { // Ctrl-D
+        self.save_state_for_undo();
         let y = self.cursor_y;
         let x = self.cursor_x;
         let line_len = self.document.lines.get(y).map_or(0, |l| l.len());
@@ -336,6 +359,7 @@ impl Editor {
     }
 
     pub fn insert_newline(&mut self) {
+        self.save_state_for_undo();
         self.document.insert_newline(self.cursor_x, self.cursor_y);
         self.cursor_y += 1;
         self.cursor_x = 0;
