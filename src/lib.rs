@@ -85,6 +85,7 @@ pub struct Editor {
     cursor_y: usize,
     desired_cursor_x: usize, // column index
     status_message: String,
+    row_offset: usize,
 }
 
 impl Editor {
@@ -110,6 +111,7 @@ impl Editor {
             cursor_y: 0,
             desired_cursor_x: 0,
             status_message: "".to_string(),
+            row_offset: 0,
         }
     }
 
@@ -154,21 +156,40 @@ impl Editor {
         width
     }
 
-    pub fn draw(&self, window: &Window) {
+    pub fn draw(&mut self, window: &Window) {
         window.erase();
+
+        let screen_rows = window.get_max_y() as usize - 1; // Leave space for status bar
+
+        // Scroll
+        if self.cursor_y < self.row_offset {
+            self.row_offset = self.cursor_y;
+        }
+        if self.cursor_y >= self.row_offset + screen_rows {
+            self.row_offset = self.cursor_y - screen_rows + 1;
+        }
 
         // Draw text
         for (index, line) in self.document.lines.iter().enumerate() {
+            if index < self.row_offset {
+                continue;
+            }
+
+            let row = index - self.row_offset;
+            if row >= screen_rows {
+                break;
+            }
+
             let mut display_x = 0;
             for ch in line.chars() {
                 if ch == '\t' {
                     let spaces = TAB_STOP - (display_x % TAB_STOP);
                     for _ in 0..spaces {
-                        window.mvaddch(index as i32, display_x as i32, ' ');
+                        window.mvaddch(row as i32, display_x as i32, ' ');
                         display_x += 1;
                     }
                 } else {
-                    window.mvaddstr(index as i32, display_x as i32, &ch.to_string());
+                    window.mvaddstr(row as i32, display_x as i32, &ch.to_string());
                     display_x += ch.width().unwrap_or(0);
                 }
             }
@@ -188,7 +209,7 @@ impl Editor {
             &self.document.lines[self.cursor_y],
             self.cursor_x,
         );
-        window.mv(self.cursor_y as i32, display_x as i32);
+        window.mv((self.cursor_y - self.row_offset) as i32, display_x as i32);
         window.refresh();
     }
 
