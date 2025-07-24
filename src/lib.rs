@@ -380,6 +380,67 @@ impl Editor {
         }
     }
 
+    pub fn hungry_delete(&mut self) {
+        self.save_state_for_undo();
+        let (x, y) = (self.cursor_x, self.cursor_y);
+        if y >= self.document.lines.len() { return; }
+
+        let current_line = &mut self.document.lines[y];
+        if x == 0 && y == 0 { return; } // Cannot delete before start of document
+
+        if x == 0 { // At the beginning of a line, join with previous line
+            if y > 0 {
+                let prev_line_len = self.document.lines[y - 1].len();
+                let current_line_content = self.document.lines.remove(y);
+                self.document.lines[y - 1].push_str(&current_line_content);
+                self.cursor_y -= 1;
+                self.cursor_x = prev_line_len;
+                self.desired_cursor_x = self.get_display_width(&self.document.lines[self.cursor_y], self.cursor_x);
+            }
+            return;
+        }
+
+        let mut chars_to_left = current_line[..x].char_indices().rev();
+        let mut start_delete_byte = x;
+
+        if let Some((idx, first_char_to_left)) = chars_to_left.next() {
+            if first_char_to_left.is_whitespace() {
+                // Delete all preceding whitespace
+                start_delete_byte = idx; // Start of the first whitespace char
+                for (idx, ch) in chars_to_left {
+                    if ch.is_whitespace() {
+                        start_delete_byte = idx;
+                    } else {
+                        break;
+                    }
+                }
+            } else {
+                // Delete the word to the left and any preceding whitespace
+                start_delete_byte = idx; // Start of the first non-whitespace char
+                // Find the beginning of the word
+                for (idx, ch) in chars_to_left.by_ref() { // Use by_ref to continue iteration
+                    if !ch.is_whitespace() {
+                        start_delete_byte = idx;
+                    } else {
+                        break;
+                    }
+                }
+                // Now find the beginning of any preceding whitespace
+                for (idx, ch) in chars_to_left { // Continue from where the previous loop left off
+                    if ch.is_whitespace() {
+                        start_delete_byte = idx;
+                    } else {
+                        break;
+                    }
+                }
+            }
+        }
+
+        current_line.replace_range(start_delete_byte..x, "");
+        self.cursor_x = start_delete_byte;
+        self.desired_cursor_x = self.get_display_width(&self.document.lines[self.cursor_y], self.cursor_x);
+    }
+
     pub fn go_to_start_of_line(&mut self) {
         self.cursor_x = 0;
         self.desired_cursor_x = 0;
@@ -439,5 +500,11 @@ impl Editor {
 
     pub fn cursor_pos(&self) -> (usize, usize) {
         (self.cursor_x, self.cursor_y)
+    }
+
+    pub fn set_cursor_pos(&mut self, x: usize, y: usize) {
+        self.cursor_x = x;
+        self.cursor_y = y;
+        self.clamp_cursor_x();
     }
 }

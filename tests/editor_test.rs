@@ -346,3 +346,44 @@ fn test_editor_undo() {
     assert_eq!(editor.document.lines[0], "ab");
     assert_eq!(editor.cursor_pos(), (2, 0));
 }
+
+#[test]
+fn test_editor_hungry_delete() {
+    let mut editor = Editor::new(None);
+
+    // Test deleting word and preceding whitespace
+    editor.document.lines[0] = "    hello".to_string();
+    editor.set_cursor_pos(9, 0);
+    editor.hungry_delete();
+    assert_eq!(editor.document.lines[0], "");
+    assert_eq!(editor.cursor_pos(), (0, 0));
+
+    // Test deleting word
+    editor.document.lines[0] = "hello world".to_string();
+    editor.set_cursor_pos(11, 0);
+    editor.hungry_delete();
+    assert_eq!(editor.document.lines[0], "hello ");
+    assert_eq!(editor.cursor_pos(), (6, 0));
+
+    // Test deleting across lines (joining lines)
+    editor.document.lines = vec!["line1".to_string(), "    line2".to_string()];
+    editor.set_cursor_pos(0, 1);
+    editor.hungry_delete();
+    assert_eq!(editor.document.lines.len(), 1);
+    assert_eq!(editor.document.lines[0], "line1    line2");
+    assert_eq!(editor.cursor_pos(), (5, 0));
+
+    // Test deleting word with leading whitespace
+    editor.document.lines[0] = "  foo bar".to_string();
+    editor.set_cursor_pos(9, 0);
+    editor.hungry_delete();
+    assert_eq!(editor.document.lines[0], "  foo ");
+    assert_eq!(editor.cursor_pos(), (6, 0));
+
+    // Test deleting only whitespace
+    editor.document.lines[0] = "  ".to_string();
+    editor.set_cursor_pos(2, 0);
+    editor.hungry_delete();
+    assert_eq!(editor.document.lines[0], "");
+    assert_eq!(editor.cursor_pos(), (0, 0));
+}
