@@ -1,4 +1,4 @@
-use pancurses::{Input, Window};
+use pancurses::{Input, Window, A_DIM};
 use std::io::{self, Write};
 use unicode_width::UnicodeWidthChar;
 
@@ -199,6 +199,11 @@ impl Editor {
                 break;
             }
 
+            let is_comment = line.trim_start().starts_with('#');
+            if is_comment {
+                window.attron(A_DIM);
+            }
+
             let mut display_x = 0;
             for ch in line.chars() {
                 let char_start_display_x = display_x;
@@ -232,6 +237,9 @@ impl Editor {
                 if char_start_display_x.saturating_sub(self.col_offset) >= screen_cols {
                     break;
                 }
+            }
+            if is_comment {
+                window.attroff(A_DIM);
             }
         }
 

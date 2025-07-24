@@ -1,5 +1,5 @@
 use dmacs::Editor;
-use pancurses::{endwin, initscr, noecho, curs_set};
+use pancurses::{endwin, initscr, noecho, curs_set, start_color, use_default_colors, init_pair, COLOR_WHITE};
 use std::env;
 use std::io;
 
@@ -11,6 +11,12 @@ fn main() -> io::Result<()> {
     window.keypad(true);
     noecho();
     curs_set(1);
+
+    if pancurses::has_colors() {
+        start_color();
+        use_default_colors();
+        init_pair(1, COLOR_WHITE, -1);
+    }
 
     let mut editor = Editor::new(filename);
 
