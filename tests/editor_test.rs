@@ -1,4 +1,5 @@
-use dmacs::{Document, Editor};
+use dmacs::document::Document;
+use dmacs::editor::Editor;
 use pancurses::Input;
 use std::fs;
 
