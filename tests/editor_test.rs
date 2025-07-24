@@ -128,3 +128,53 @@ fn test_go_to_line_boundaries() {
     editor.handle_keypress(Input::Character('\x05')); // Ctrl-E
     assert_eq!(editor.cursor_pos(), (5, 0));
 }
+
+#[test]
+fn test_editor_backspace_line_join() {
+    let mut editor = Editor::new(None);
+    editor.document.lines = vec!["hello".to_string(), "world".to_string()];
+    editor.handle_keypress(Input::KeyDown);
+    editor.handle_keypress(Input::KeyLeft);
+    editor.handle_keypress(Input::KeyLeft);
+    editor.handle_keypress(Input::KeyLeft);
+    editor.handle_keypress(Input::KeyLeft);
+    editor.handle_keypress(Input::KeyLeft);
+    editor.handle_keypress(Input::KeyBackspace);
+    assert_eq!(editor.document.lines.len(), 1);
+    assert_eq!(editor.document.lines[0], "helloworld");
+    assert_eq!(editor.cursor_pos(), (5, 0));
+}
+
+#[test]
+fn test_editor_delete_to_end_of_line() {
+    let mut editor = Editor::new(None);
+    editor.document.lines[0] = "hello world".to_string();
+    editor.handle_keypress(Input::KeyRight);
+    editor.handle_keypress(Input::KeyRight);
+    editor.handle_keypress(Input::KeyRight);
+    editor.handle_keypress(Input::KeyRight);
+    editor.handle_keypress(Input::KeyRight);
+    editor.handle_keypress(Input::Character('\x0b')); // Ctrl-K
+    assert_eq!(editor.document.lines[0], "hello");
+    assert_eq!(editor.cursor_pos(), (5, 0));
+}
+
+#[test]
+fn test_editor_delete_to_end_of_line_at_end() {
+    let mut editor = Editor::new(None);
+    editor.document.lines = vec!["hello".to_string(), "world".to_string()];
+    editor.handle_keypress(Input::Character('\x05')); // Ctrl-E
+    editor.handle_keypress(Input::Character('\x0b')); // Ctrl-K
+    assert_eq!(editor.document.lines.len(), 1);
+    assert_eq!(editor.document.lines[0], "helloworld");
+    assert_eq!(editor.cursor_pos(), (5, 0));
+}
+
+#[test]
+fn test_editor_del_key() {
+    let mut editor = Editor::new(None);
+    editor.handle_keypress(Input::Character('a'));
+    editor.handle_keypress(Input::Character('\x7f'));
+    assert_eq!(editor.document.lines[0], "");
+    assert_eq!(editor.cursor_pos(), (0, 0));
+}

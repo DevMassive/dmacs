@@ -113,11 +113,13 @@ impl Editor {
     pub fn handle_keypress(&mut self, key: Input) {
         match key {
             Input::Character(c) => match c {
-                '' => self.quit(),
-                '' => self.save_document(),
-                '' => self.go_to_start_of_line(),
-                '' => self.go_to_end_of_line(),
-                '' => self.delete_forward_char(),
+                '\x18' => self.quit(),
+                '\x13' => self.save_document(),
+                '\x01' => self.go_to_start_of_line(),
+                '\x05' => self.go_to_end_of_line(),
+                '\x04' => self.delete_forward_char(),
+                '\x0b' => self.delete_to_end_of_line(),
+                '\x7f' => self.delete_char(),
                 '\x0A' => self.insert_newline(),
                 _ => self.insert_char(c),
             },
@@ -219,6 +221,20 @@ impl Editor {
         self.cursor_y += 1;
         self.cursor_x = 0;
         self.desired_cursor_x = 0;
+    }
+
+    pub fn delete_to_end_of_line(&mut self) {
+        let y = self.cursor_y as usize;
+        let x = self.cursor_x as usize;
+        if y < self.document.lines.len() {
+            let line_len = self.document.lines[y].len();
+            if x < line_len {
+                self.document.lines[y].truncate(x);
+            } else if y + 1 < self.document.lines.len() {
+                let next_line = self.document.lines.remove(y + 1);
+                self.document.lines[y].push_str(&next_line);
+            }
+        }
     }
 
     pub fn go_to_start_of_line(&mut self) {
