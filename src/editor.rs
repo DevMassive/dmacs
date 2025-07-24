@@ -78,7 +78,9 @@ impl Editor {
                 '\x7f' | '\x08' => self.delete_char(), // Backspace
                 '\n' | '\r' => self.insert_newline(),
                 '\x00' => {}
-                '\x1f' => self.undo(), // Ctrl + _ for undo
+                '\x02' => self.move_cursor_word_left(), // Ctrl + B
+                '\x06' => self.move_cursor_word_right(), // Ctrl + F
+                '\x1f' => self.undo(),                  // Ctrl + _ for undo
                 _ => self.insert_char(c),
             },
             Input::KeyBackspace => self.delete_char(),
@@ -405,6 +407,88 @@ impl Editor {
         self.desired_cursor_x = self.get_display_width(&self.document.lines[y], self.cursor_x);
     }
 
+    fn move_cursor_word_left(&mut self) {
+        let current_line = &self.document.lines[self.cursor_y];
+        let mut new_cursor_x = self.cursor_x;
+
+        if new_cursor_x == 0 {
+            if self.cursor_y > 0 {
+                self.cursor_y -= 1;
+                self.cursor_x = self.document.lines[self.cursor_y].len();
+                self.desired_cursor_x =
+                    self.get_display_width(&self.document.lines[self.cursor_y], self.cursor_x);
+            }
+            return;
+        }
+
+        let mut char_indices = current_line[..new_cursor_x].char_indices().rev();
+
+        // Skip any trailing non-word characters (whitespace, punctuation)
+        for (idx, ch) in char_indices.by_ref() {
+            if is_word_char(ch) {
+                new_cursor_x = idx + ch.len_utf8(); // Move past the non-word char
+                break;
+            }
+            new_cursor_x = idx;
+        }
+
+        // Skip word characters
+        for (idx, ch) in char_indices {
+            if !is_word_char(ch) {
+                new_cursor_x = idx + ch.len_utf8(); // Move past the word char
+                break;
+            }
+            new_cursor_x = idx;
+        }
+
+        self.cursor_x = new_cursor_x;
+        self.desired_cursor_x = self.get_display_width(current_line, self.cursor_x);
+    }
+
+    fn move_cursor_word_right(&mut self) {
+        let current_line = &self.document.lines[self.cursor_y];
+        let mut new_cursor_x = self.cursor_x;
+        let line_len = current_line.len();
+
+        if new_cursor_x == line_len {
+            if self.cursor_y < self.document.lines.len() - 1 {
+                self.cursor_y += 1;
+                self.cursor_x = 0;
+                self.desired_cursor_x = 0;
+            }
+            return;
+        }
+
+        // Find the start of the next word
+        let mut found_word_start = false;
+        for (idx, ch) in current_line[new_cursor_x..].char_indices() {
+            if is_word_char(ch) {
+                new_cursor_x += idx; // Move to the start of the word
+                found_word_start = true;
+                break;
+            }
+        }
+
+        // If no word found after current position, move to end of line
+        if !found_word_start {
+            self.cursor_x = line_len;
+            self.desired_cursor_x = self.get_display_width(current_line, self.cursor_x);
+            return;
+        }
+
+        // Find the end of the current word
+        let chars_from_word_start = current_line[new_cursor_x..].chars();
+        for ch in chars_from_word_start {
+            if !is_word_char(ch) {
+                break; // Found non-word character, so word ends before this
+            }
+            new_cursor_x += ch.len_utf8();
+        }
+
+        self.cursor_x = new_cursor_x;
+        self.desired_cursor_x = self.get_display_width(current_line, self.cursor_x);
+    }
+
     pub fn save_document(&mut self) {
         if self.document.save().is_ok() {
             self.status_message = "File saved successfully.".to_string();
@@ -463,4 +547,8 @@ impl Editor {
     pub fn set_message(&mut self, message: &str) {
         self.status_message = message.to_string();
     }
+}
+
+fn is_word_char(ch: char) -> bool {
+    ch.is_alphanumeric() || ch == '_'
 }

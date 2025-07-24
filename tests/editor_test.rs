@@ -363,3 +363,58 @@ fn test_editor_move_cursor_right_across_lines() {
     editor.handle_keypress(Input::KeyRight);
     assert_eq!(editor.cursor_pos(), (0, 1)); // Should move to beginning of line2
 }
+
+#[test]
+fn test_editor_move_cursor_word_left() {
+    let mut editor = Editor::new(None);
+    editor.document.lines = vec!["word1 word2 word3".to_string()];
+    editor.set_cursor_pos(17, 0); // End of "word3"
+
+    editor.handle_keypress(Input::Character('')); // Ctrl-B
+    assert_eq!(editor.cursor_pos(), (12, 0)); // Should move to "word2 "
+
+    editor.handle_keypress(Input::Character('')); // Ctrl-B
+    assert_eq!(editor.cursor_pos(), (6, 0)); // Should move to "word1 "
+
+    editor.handle_keypress(Input::Character('')); // Ctrl-B
+    assert_eq!(editor.cursor_pos(), (0, 0)); // Should move to beginning of line
+
+    // Test with leading/trailing spaces
+    editor.document.lines = vec!["  word1  word2  ".to_string()];
+    editor.set_cursor_pos(16, 0); // End of line
+
+    editor.handle_keypress(Input::Character('')); // Ctrl-B
+    assert_eq!(editor.cursor_pos(), (9, 0)); // Should move to "word2"
+
+    editor.handle_keypress(Input::Character('')); // Ctrl-B
+    assert_eq!(editor.cursor_pos(), (2, 0)); // Should move to "word1"
+}
+
+#[test]
+fn test_editor_move_cursor_word_right() {
+    let mut editor = Editor::new(None);
+    editor.document.lines = vec!["word1 word2 word3".to_string()];
+    editor.set_cursor_pos(0, 0); // Beginning of "word1"
+
+    editor.handle_keypress(Input::Character('')); // Ctrl-F
+    assert_eq!(editor.cursor_pos(), (5, 0)); // Should move to "word2"
+
+    editor.handle_keypress(Input::Character('')); // Ctrl-F
+    assert_eq!(editor.cursor_pos(), (11, 0)); // Should move to "word3"
+
+    editor.handle_keypress(Input::Character('')); // Ctrl-F
+    assert_eq!(editor.cursor_pos(), (17, 0)); // Should move to end of line
+
+    // Test with leading/trailing spaces
+    editor.document.lines = vec!["  word1  word2  ".to_string()];
+    editor.set_cursor_pos(0, 0); // Beginning of line
+
+    editor.handle_keypress(Input::Character('')); // Ctrl-F
+    assert_eq!(editor.cursor_pos(), (7, 0)); // Should move to "word1"
+
+    editor.handle_keypress(Input::Character('')); // Ctrl-F
+    assert_eq!(editor.cursor_pos(), (14, 0)); // Should move to "word2"
+
+    editor.handle_keypress(Input::Character('')); // Ctrl-F
+    assert_eq!(editor.cursor_pos(), (16, 0)); // Should move to end of line
+}
