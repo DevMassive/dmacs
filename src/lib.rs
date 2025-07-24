@@ -1,4 +1,4 @@
-use pancurses::{Input, Window, A_DIM};
+use pancurses::{A_DIM, Input, Window};
 use std::io::{self, Write};
 use unicode_width::UnicodeWidthChar;
 
@@ -21,7 +21,7 @@ impl Document {
         })
     }
 
-    pub fn default() -> Self {
+    pub fn new_empty() -> Self {
         Self {
             lines: vec!["".to_string()],
             filename: None,
@@ -32,7 +32,7 @@ impl Document {
         if let Some(filename) = &self.filename {
             let mut file = std::fs::File::create(filename)?;
             for line in &self.lines {
-                writeln!(file, "{}", line)?;
+                writeln!(file, "{line}")?;
             }
         }
         Ok(())
@@ -78,6 +78,12 @@ impl Document {
     }
 }
 
+impl Default for Document {
+    fn default() -> Self {
+        Self::new_empty()
+    }
+}
+
 // Editor state
 pub struct Editor {
     pub should_quit: bool,
@@ -86,8 +92,8 @@ pub struct Editor {
     cursor_y: usize,
     desired_cursor_x: usize, // column index
     status_message: String,
-    pub row_offset: usize, // public for tests
-    pub col_offset: usize, // public for tests
+    pub row_offset: usize,                     // public for tests
+    pub col_offset: usize,                     // public for tests
     undo_stack: Vec<(Document, usize, usize)>, // Stores (Document, cursor_x, cursor_y)
 }
 
@@ -121,7 +127,8 @@ impl Editor {
     }
 
     fn save_state_for_undo(&mut self) {
-        self.undo_stack.push((self.document.clone(), self.cursor_x, self.cursor_y));
+        self.undo_stack
+            .push((self.document.clone(), self.cursor_x, self.cursor_y));
     }
 
     pub fn undo(&mut self) {
@@ -129,7 +136,8 @@ impl Editor {
             self.document = prev_document;
             self.cursor_x = prev_cursor_x;
             self.cursor_y = prev_cursor_y;
-            self.desired_cursor_x = self.get_display_width(&self.document.lines[self.cursor_y], self.cursor_x);
+            self.desired_cursor_x =
+                self.get_display_width(&self.document.lines[self.cursor_y], self.cursor_x);
             self.status_message = "Undo successful.".to_string();
         } else {
             self.status_message = "Nothing to undo.".to_string();
@@ -147,7 +155,7 @@ impl Editor {
                 '\x0b' => self.delete_to_end_of_line(),
                 '\x7f' | '\x08' => self.delete_char(), // Backspace
                 '\n' | '\r' => self.insert_newline(),
-                '\x00' => {},
+                '\x00' => {}
                 '\x1f' => self.undo(), // Ctrl + _ for undo
                 _ => self.insert_char(c),
             },
@@ -186,12 +194,10 @@ impl Editor {
         if self.cursor_y >= self.row_offset + screen_rows {
             self.row_offset = self.cursor_y - screen_rows + 1;
         }
-        
+
         // Horizontal scroll
-        let display_cursor_x = self.get_display_width(
-            &self.document.lines[self.cursor_y],
-            self.cursor_x,
-        );
+        let display_cursor_x =
+            self.get_display_width(&self.document.lines[self.cursor_y], self.cursor_x);
         if display_cursor_x < self.col_offset {
             self.col_offset = display_cursor_x;
         }
@@ -201,12 +207,10 @@ impl Editor {
     }
 
     pub fn draw(&mut self, window: &Window) {
-        let (screen_rows, screen_cols) = (
-            window.get_max_y() as usize - 1,
-            window.get_max_x() as usize
-        );
+        let (screen_rows, screen_cols) =
+            (window.get_max_y() as usize - 1, window.get_max_x() as usize);
         self.scroll(screen_cols, screen_rows);
-        
+
         window.erase();
 
         // Draw text
@@ -249,7 +253,7 @@ impl Editor {
                             }
                         } else {
                             // Draw character
-                            window.mvaddstr(row as i32, screen_x as i32, &ch.to_string());
+                            window.mvaddstr(row as i32, screen_x as i32, ch.to_string());
                         }
                     }
                 }
@@ -273,10 +277,8 @@ impl Editor {
         window.mvaddstr(window.get_max_y() - 1, 0, &status_bar);
 
         // Move cursor
-        let display_cursor_x = self.get_display_width(
-            &self.document.lines[self.cursor_y],
-            self.cursor_x,
-        );
+        let display_cursor_x =
+            self.get_display_width(&self.document.lines[self.cursor_y], self.cursor_x);
         window.mv(
             (self.cursor_y - self.row_offset) as i32,
             (display_cursor_x - self.col_offset) as i32,
@@ -326,11 +328,13 @@ impl Editor {
         self.save_state_for_undo();
         self.document.insert(self.cursor_x, self.cursor_y, c);
         self.cursor_x += c.len_utf8();
-        self.desired_cursor_x = self.get_display_width(&self.document.lines[self.cursor_y], self.cursor_x);
+        self.desired_cursor_x =
+            self.get_display_width(&self.document.lines[self.cursor_y], self.cursor_x);
         self.status_message = "".to_string();
     }
 
-    pub fn delete_char(&mut self) { // Backspace
+    pub fn delete_char(&mut self) {
+        // Backspace
         self.save_state_for_undo();
         if self.cursor_x > 0 {
             self.move_cursor_left();
@@ -341,11 +345,13 @@ impl Editor {
             self.document.lines[self.cursor_y - 1].push_str(&current_line);
             self.cursor_y -= 1;
             self.cursor_x = prev_line_len;
-            self.desired_cursor_x = self.get_display_width(&self.document.lines[self.cursor_y], self.cursor_x);
+            self.desired_cursor_x =
+                self.get_display_width(&self.document.lines[self.cursor_y], self.cursor_x);
         }
     }
 
-    pub fn delete_forward_char(&mut self) { // Ctrl-D
+    pub fn delete_forward_char(&mut self) {
+        // Ctrl-D
         self.save_state_for_undo();
         let y = self.cursor_y;
         let x = self.cursor_x;
@@ -383,19 +389,25 @@ impl Editor {
     pub fn hungry_delete(&mut self) {
         self.save_state_for_undo();
         let (x, y) = (self.cursor_x, self.cursor_y);
-        if y >= self.document.lines.len() { return; }
+        if y >= self.document.lines.len() {
+            return;
+        }
 
         let current_line = &mut self.document.lines[y];
-        if x == 0 && y == 0 { return; } // Cannot delete before start of document
+        if x == 0 && y == 0 {
+            return;
+        } // Cannot delete before start of document
 
-        if x == 0 { // At the beginning of a line, join with previous line
+        if x == 0 {
+            // At the beginning of a line, join with previous line
             if y > 0 {
                 let prev_line_len = self.document.lines[y - 1].len();
                 let current_line_content = self.document.lines.remove(y);
                 self.document.lines[y - 1].push_str(&current_line_content);
                 self.cursor_y -= 1;
                 self.cursor_x = prev_line_len;
-                self.desired_cursor_x = self.get_display_width(&self.document.lines[self.cursor_y], self.cursor_x);
+                self.desired_cursor_x =
+                    self.get_display_width(&self.document.lines[self.cursor_y], self.cursor_x);
             }
             return;
         }
@@ -418,7 +430,8 @@ impl Editor {
                 // Delete the word to the left and any preceding whitespace
                 start_delete_byte = idx; // Start of the first non-whitespace char
                 // Find the beginning of the word
-                for (idx, ch) in chars_to_left.by_ref() { // Use by_ref to continue iteration
+                for (idx, ch) in chars_to_left.by_ref() {
+                    // Use by_ref to continue iteration
                     if !ch.is_whitespace() {
                         start_delete_byte = idx;
                     } else {
@@ -426,7 +439,8 @@ impl Editor {
                     }
                 }
                 // Now find the beginning of any preceding whitespace
-                for (idx, ch) in chars_to_left { // Continue from where the previous loop left off
+                for (idx, ch) in chars_to_left {
+                    // Continue from where the previous loop left off
                     if ch.is_whitespace() {
                         start_delete_byte = idx;
                     } else {
@@ -438,7 +452,8 @@ impl Editor {
 
         current_line.replace_range(start_delete_byte..x, "");
         self.cursor_x = start_delete_byte;
-        self.desired_cursor_x = self.get_display_width(&self.document.lines[self.cursor_y], self.cursor_x);
+        self.desired_cursor_x =
+            self.get_display_width(&self.document.lines[self.cursor_y], self.cursor_x);
     }
 
     pub fn go_to_start_of_line(&mut self) {
@@ -486,8 +501,7 @@ impl Editor {
             }
             if ch == '\t' {
                 current_display_x += TAB_STOP - (current_display_x % TAB_STOP);
-            }
-            else {
+            } else {
                 current_display_x += ch.width().unwrap_or(0);
             }
             if current_display_x > display_x {

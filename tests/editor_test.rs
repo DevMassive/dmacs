@@ -26,9 +26,10 @@ fn test_editor_initial_state_no_file() {
 #[test]
 fn test_document_save() {
     let filename = "test_save.txt";
-    let mut doc = Document::default();
-    doc.filename = Some(filename.to_string());
-    doc.lines = vec!["line1".to_string(), "line2".to_string()];
+    let doc = Document {
+        filename: Some(filename.to_string()),
+        lines: vec!["line1".to_string(), "line2".to_string()],
+    };
     doc.save().unwrap();
 
     let content = fs::read_to_string(filename).unwrap();
@@ -201,7 +202,7 @@ fn test_editor_with_tabs() {
     assert_eq!(editor.document.lines[0], "\ta");
     // display width of tab is 8, plus 'a' is 1 = 9
     // cursor byte position is 1 (tab) + 1 (a) = 2
-    assert_eq!(editor.cursor_pos(), (2, 0)); 
+    assert_eq!(editor.cursor_pos(), (2, 0));
 }
 
 #[test]
@@ -215,7 +216,7 @@ fn test_horizontal_scroll_right() {
     for i in 0..12 {
         editor.handle_keypress(Input::KeyRight);
         editor.scroll(screen_width, screen_height);
-        
+
         let (x, _) = editor.cursor_pos();
         assert_eq!(x, i + 1);
 
@@ -252,7 +253,7 @@ fn test_horizontal_scroll_left() {
     for i in 0..10 {
         editor.handle_keypress(Input::KeyLeft);
         editor.scroll(screen_width, screen_height);
-        
+
         let (x, _) = editor.cursor_pos();
         let display_x = x; // In this test, display_width is same as byte position
         assert_eq!(x, 14 - i);
@@ -271,7 +272,7 @@ fn test_horizontal_scroll_line_change() {
     let mut editor = Editor::new(None);
     editor.document.lines = vec![
         "a very long line to test scrolling".to_string(), // len = 34
-        "short line".to_string(), // len = 10
+        "short line".to_string(),                         // len = 10
     ];
     let screen_width = 15;
     let screen_height = 20;
@@ -285,11 +286,11 @@ fn test_horizontal_scroll_line_change() {
     // Move down to the shorter line
     editor.handle_keypress(Input::KeyDown);
     editor.scroll(screen_width, screen_height);
-    
+
     // Cursor should be clamped to the end of the shorter line
-    assert_eq!(editor.cursor_pos(), (10, 1)); 
+    assert_eq!(editor.cursor_pos(), (10, 1));
     // The view should scroll left so the cursor is visible
-    assert_eq!(editor.col_offset, 10); 
+    assert_eq!(editor.col_offset, 10);
 }
 
 #[test]

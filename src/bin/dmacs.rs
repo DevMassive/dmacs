@@ -1,5 +1,7 @@
 use dmacs::Editor;
-use pancurses::{endwin, initscr, noecho, curs_set, start_color, use_default_colors, init_pair, COLOR_WHITE};
+use pancurses::{
+    COLOR_WHITE, curs_set, endwin, init_pair, initscr, noecho, start_color, use_default_colors,
+};
 use std::env;
 use std::io;
 
@@ -24,14 +26,16 @@ fn main() -> io::Result<()> {
         editor.draw(&window);
         if let Some(key) = window.getch() {
             match key {
-                pancurses::Input::Character('\x1b') => { // Escape key, potential start of Alt/Option sequence
+                pancurses::Input::Character('\x1b') => {
+                    // Escape key, potential start of Alt/Option sequence
                     if let Some(next_key) = window.getch() {
                         match next_key {
-                            pancurses::Input::Character('\x7f') | pancurses::Input::KeyBackspace => editor.hungry_delete(), // Alt/Option + Backspace
+                            pancurses::Input::Character('\x7f')
+                            | pancurses::Input::KeyBackspace => editor.hungry_delete(), // Alt/Option + Backspace
                             _ => editor.handle_keypress(pancurses::Input::Character('\x1b')), // Pass Escape if not followed by Backspace
                         }
                     }
-                },
+                }
                 _ => editor.handle_keypress(key),
             }
         }
