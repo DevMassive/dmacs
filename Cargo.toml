@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+ctrlc = { version = "3.4", features = ["termination"] }
 isatty = "0.1"
 libc = "0.2.153"
 log = "0.4"

@@ -521,4 +521,8 @@ impl Editor {
         self.cursor_y = y;
         self.clamp_cursor_x();
     }
+
+    pub fn set_message(&mut self, message: &str) {
+        self.status_message = message.to_string();
+    }
 }

@@ -4,6 +4,12 @@ use pancurses::{
 };
 use std::env;
 use std::io;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::mpsc;
+use std::thread;
+use std::time::Duration;
+
+static CTRL_C_COUNT: AtomicUsize = AtomicUsize::new(0);
 
 fn main() -> io::Result<()> {
     let args: Vec<String> = env::args().collect();
@@ -13,6 +19,7 @@ fn main() -> io::Result<()> {
     window.keypad(true);
     noecho();
     curs_set(1);
+    window.nodelay(true); // Make getch() non-blocking
 
     if pancurses::has_colors() {
         start_color();
@@ -20,10 +27,48 @@ fn main() -> io::Result<()> {
         init_pair(1, COLOR_WHITE, -1);
     }
 
+    let (tx, rx) = mpsc::channel();
+    let tx_clone_for_handler = tx.clone();
+    ctrlc::set_handler(move || {
+        CTRL_C_COUNT.fetch_add(1, Ordering::SeqCst); // Always increment
+        tx_clone_for_handler
+            .send(())
+            .expect("Could not send signal on channel."); // Always send signal
+    })
+    .expect("Error setting Ctrl-C handler");
+
     let mut editor = Editor::new(filename);
 
     loop {
         editor.draw(&window);
+
+        // Check for Ctrl+C signal
+        if rx.try_recv().is_ok() {
+            let current_ctrl_c_count = CTRL_C_COUNT.load(Ordering::SeqCst);
+            if current_ctrl_c_count == 1 {
+                editor.set_message("Press Ctrl+C again to quit.");
+                let tx_clone = tx.clone();
+                thread::spawn(move || {
+                    thread::sleep(Duration::from_secs(2)); // 2 seconds to press again
+                    // If after 2 seconds, the count is still 1, it means no second Ctrl+C was pressed.
+                    // Reset the atomic counter and send a signal to clear the message.
+                    if CTRL_C_COUNT
+                        .compare_exchange(1, 0, Ordering::SeqCst, Ordering::SeqCst)
+                        .is_ok()
+                    {
+                        tx_clone
+                            .send(())
+                            .expect("Could not send signal on channel."); // Dummy signal to clear message
+                    }
+                });
+            } else if current_ctrl_c_count >= 2 {
+                editor.should_quit = true;
+            } else if current_ctrl_c_count == 0 {
+                // This means the timeout thread reset it
+                editor.set_message(""); // Clear the message
+            }
+        }
+
         if let Some(key) = window.getch() {
             match key {
                 pancurses::Input::Character('\x1b') => {
