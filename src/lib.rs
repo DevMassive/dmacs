@@ -1,5 +1,8 @@
 use pancurses::{Input, Window};
 use std::io::{self, Write};
+use unicode_width::UnicodeWidthChar;
+
+const TAB_STOP: usize = 4;
 
 // Document being edited
 pub struct Document {
@@ -78,9 +81,9 @@ impl Document {
 pub struct Editor {
     pub should_quit: bool,
     pub document: Document,
-    cursor_x: i32,
-    cursor_y: i32,
-    desired_cursor_x: i32,
+    cursor_x: usize, // byte index
+    cursor_y: usize,
+    desired_cursor_x: usize, // column index
     status_message: String,
 }
 
@@ -119,8 +122,8 @@ impl Editor {
                 '\x05' => self.go_to_end_of_line(),
                 '\x04' => self.delete_forward_char(),
                 '\x0b' => self.delete_to_end_of_line(),
-                '\x7f' => self.delete_char(),
-                '\x0A' => self.insert_newline(),
+                '\x7f' | '\x08' => self.delete_char(), // Backspace
+                '\n' | '\r' => self.insert_newline(),
                 _ => self.insert_char(c),
             },
             Input::KeyBackspace => self.delete_char(),
@@ -133,12 +136,41 @@ impl Editor {
         self.clamp_cursor_x();
     }
 
+    fn get_display_width(&self, line: &str, until_byte: usize) -> usize {
+        let mut width = 0;
+        let mut bytes = 0;
+        for ch in line.chars() {
+            if bytes >= until_byte {
+                break;
+            }
+            if ch == '\t' {
+                width += TAB_STOP - (width % TAB_STOP);
+            } else {
+                width += ch.width().unwrap_or(0);
+            }
+            bytes += ch.len_utf8();
+        }
+        width
+    }
+
     pub fn draw(&self, window: &Window) {
         window.erase();
 
         // Draw text
         for (index, line) in self.document.lines.iter().enumerate() {
-            window.mvaddstr(index as i32, 0, line);
+            let mut display_x = 0;
+            for ch in line.chars() {
+                if ch == '\t' {
+                    let spaces = TAB_STOP - (display_x % TAB_STOP);
+                    for _ in 0..spaces {
+                        window.mvaddch(index as i32, display_x as i32, ' ');
+                        display_x += 1;
+                    }
+                } else {
+                    window.mvaddch(index as i32, display_x as i32, ch);
+                    display_x += ch.width().unwrap_or(0);
+                }
+            }
         }
 
         // Draw status bar
@@ -151,62 +183,76 @@ impl Editor {
         window.mvaddstr(window.get_max_y() - 1, 0, &status_bar);
 
         // Move cursor
-        window.mv(self.cursor_y, self.cursor_x);
+        let display_x = self.get_display_width(
+            &self.document.lines[self.cursor_y],
+            self.cursor_x,
+        );
+        window.mv(self.cursor_y as i32, display_x as i32);
         window.refresh();
     }
 
     pub fn move_cursor_up(&mut self) {
         if self.cursor_y > 0 {
             self.cursor_y -= 1;
+            self.cursor_x = self.get_byte_pos_from_display_width(self.desired_cursor_x);
         }
     }
 
     pub fn move_cursor_down(&mut self) {
-        if self.cursor_y < self.document.lines.len() as i32 - 1 {
+        if self.cursor_y < self.document.lines.len() - 1 {
             self.cursor_y += 1;
+            self.cursor_x = self.get_byte_pos_from_display_width(self.desired_cursor_x);
         }
     }
 
     pub fn move_cursor_left(&mut self) {
         if self.cursor_x > 0 {
-            self.cursor_x -= 1;
-            self.desired_cursor_x = self.cursor_x;
+            let line = &self.document.lines[self.cursor_y];
+            let mut new_pos = self.cursor_x - 1;
+            while !line.is_char_boundary(new_pos) {
+                new_pos -= 1;
+            }
+            self.cursor_x = new_pos;
+            self.desired_cursor_x = self.get_display_width(line, self.cursor_x);
         }
     }
 
     pub fn move_cursor_right(&mut self) {
-        let line_len = self.document.lines[self.cursor_y as usize].len() as i32;
-        if self.cursor_x < line_len {
-            self.cursor_x += 1;
-            self.desired_cursor_x = self.cursor_x;
+        let line = &self.document.lines[self.cursor_y];
+        if self.cursor_x < line.len() {
+            let mut new_pos = self.cursor_x + 1;
+            while !line.is_char_boundary(new_pos) {
+                new_pos += 1;
+            }
+            self.cursor_x = new_pos;
+            self.desired_cursor_x = self.get_display_width(line, self.cursor_x);
         }
     }
 
     pub fn insert_char(&mut self, c: char) {
-        self.document.insert(self.cursor_x as usize, self.cursor_y as usize, c);
-        self.cursor_x += 1;
-        self.desired_cursor_x = self.cursor_x;
+        self.document.insert(self.cursor_x, self.cursor_y, c);
+        self.cursor_x += c.len_utf8();
+        self.desired_cursor_x = self.get_display_width(&self.document.lines[self.cursor_y], self.cursor_x);
         self.status_message = "".to_string();
     }
 
     pub fn delete_char(&mut self) { // Backspace
         if self.cursor_x > 0 {
-            self.cursor_x -= 1;
-            self.document.delete(self.cursor_x as usize, self.cursor_y as usize);
-            self.desired_cursor_x = self.cursor_x;
+            self.move_cursor_left();
+            self.document.delete(self.cursor_x, self.cursor_y);
         } else if self.cursor_y > 0 {
-            let prev_line_len = self.document.lines[self.cursor_y as usize - 1].len();
-            let current_line = self.document.lines.remove(self.cursor_y as usize);
-            self.document.lines[self.cursor_y as usize - 1].push_str(&current_line);
+            let prev_line_len = self.document.lines[self.cursor_y - 1].len();
+            let current_line = self.document.lines.remove(self.cursor_y);
+            self.document.lines[self.cursor_y - 1].push_str(&current_line);
             self.cursor_y -= 1;
-            self.cursor_x = prev_line_len as i32;
-            self.desired_cursor_x = self.cursor_x;
+            self.cursor_x = prev_line_len;
+            self.desired_cursor_x = self.get_display_width(&self.document.lines[self.cursor_y], self.cursor_x);
         }
     }
 
     pub fn delete_forward_char(&mut self) { // Ctrl-D
-        let y = self.cursor_y as usize;
-        let x = self.cursor_x as usize;
+        let y = self.cursor_y;
+        let x = self.cursor_x;
         let line_len = self.document.lines.get(y).map_or(0, |l| l.len());
         if x < line_len {
             self.document.delete(x, y);
@@ -217,15 +263,15 @@ impl Editor {
     }
 
     pub fn insert_newline(&mut self) {
-        self.document.insert_newline(self.cursor_x as usize, self.cursor_y as usize);
+        self.document.insert_newline(self.cursor_x, self.cursor_y);
         self.cursor_y += 1;
         self.cursor_x = 0;
         self.desired_cursor_x = 0;
     }
 
     pub fn delete_to_end_of_line(&mut self) {
-        let y = self.cursor_y as usize;
-        let x = self.cursor_x as usize;
+        let y = self.cursor_y;
+        let x = self.cursor_x;
         if y < self.document.lines.len() {
             let line_len = self.document.lines[y].len();
             if x < line_len {
@@ -243,9 +289,9 @@ impl Editor {
     }
 
     pub fn go_to_end_of_line(&mut self) {
-        let y = self.cursor_y as usize;
-        self.cursor_x = self.document.lines[y].len() as i32;
-        self.desired_cursor_x = self.cursor_x;
+        let y = self.cursor_y;
+        self.cursor_x = self.document.lines[y].len();
+        self.desired_cursor_x = self.get_display_width(&self.document.lines[y], self.cursor_x);
     }
 
     pub fn save_document(&mut self) {
@@ -262,14 +308,36 @@ impl Editor {
     }
 
     fn clamp_cursor_x(&mut self) {
-        let y = self.cursor_y as usize;
-        if y < self.document.lines.len() {
-            let line_len = self.document.lines[y].len() as i32;
-            self.cursor_x = self.desired_cursor_x.min(line_len);
+        if self.cursor_y >= self.document.lines.len() {
+            self.cursor_x = 0;
+            return;
+        }
+        let line_len = self.document.lines[self.cursor_y].len();
+        if self.cursor_x > line_len {
+            self.cursor_x = line_len;
         }
     }
 
-    pub fn cursor_pos(&self) -> (i32, i32) {
+    fn get_byte_pos_from_display_width(&self, display_x: usize) -> usize {
+        let line = &self.document.lines[self.cursor_y];
+        let mut current_display_x = 0;
+        let mut byte_pos = 0;
+        for ch in line.chars() {
+            if current_display_x >= display_x {
+                break;
+            }
+            if ch == '\t' {
+                current_display_x += TAB_STOP - (current_display_x % TAB_STOP);
+            }
+            else {
+                current_display_x += ch.width().unwrap_or(0);
+            }
+            byte_pos += ch.len_utf8();
+        }
+        byte_pos
+    }
+
+    pub fn cursor_pos(&self) -> (usize, usize) {
         (self.cursor_x, self.cursor_y)
     }
 }

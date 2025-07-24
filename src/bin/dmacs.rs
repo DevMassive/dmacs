@@ -1,5 +1,5 @@
 use dmacs::Editor;
-use pancurses::{initscr, endwin, noecho, curs_set};
+use pancurses::{endwin, initscr, noecho, curs_set};
 use std::env;
 use std::io;
 
