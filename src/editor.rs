@@ -238,6 +238,11 @@ impl Editor {
             }
             self.cursor_x = new_pos;
             self.desired_cursor_x = self.get_display_width(line, self.cursor_x);
+        } else if self.cursor_y > 0 {
+            self.cursor_y -= 1;
+            self.cursor_x = self.document.lines[self.cursor_y].len();
+            self.desired_cursor_x =
+                self.get_display_width(&self.document.lines[self.cursor_y], self.cursor_x);
         }
     }
 
@@ -250,6 +255,10 @@ impl Editor {
             }
             self.cursor_x = new_pos;
             self.desired_cursor_x = self.get_display_width(line, self.cursor_x);
+        } else if self.cursor_y < self.document.lines.len() - 1 {
+            self.cursor_y += 1;
+            self.cursor_x = 0;
+            self.desired_cursor_x = 0;
         }
     }
 

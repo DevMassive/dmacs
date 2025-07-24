@@ -78,12 +78,7 @@ fn test_go_to_line_boundaries() {
 fn test_editor_backspace_line_join() {
     let mut editor = Editor::new(None);
     editor.document.lines = vec!["hello".to_string(), "world".to_string()];
-    editor.handle_keypress(Input::KeyDown);
-    editor.handle_keypress(Input::KeyLeft);
-    editor.handle_keypress(Input::KeyLeft);
-    editor.handle_keypress(Input::KeyLeft);
-    editor.handle_keypress(Input::KeyLeft);
-    editor.handle_keypress(Input::KeyLeft);
+    editor.set_cursor_pos(0, 1); // Set cursor to beginning of "world"
     editor.handle_keypress(Input::KeyBackspace);
     assert_eq!(editor.document.lines.len(), 1);
     assert_eq!(editor.document.lines[0], "helloworld");
@@ -349,4 +344,22 @@ fn test_editor_move_cursor_down_at_bottom_line() {
     editor.set_cursor_pos(0, 1); // Set cursor to (0, 1)
     editor.handle_keypress(Input::KeyDown);
     assert_eq!(editor.cursor_pos(), (5, 1)); // Should move to (end of line, 1)
+}
+
+#[test]
+fn test_editor_move_cursor_left_across_lines() {
+    let mut editor = Editor::new(None);
+    editor.document.lines = vec!["line1".to_string(), "line2".to_string()];
+    editor.set_cursor_pos(0, 1); // Start at beginning of line2
+    editor.handle_keypress(Input::KeyLeft);
+    assert_eq!(editor.cursor_pos(), (5, 0)); // Should move to end of line1
+}
+
+#[test]
+fn test_editor_move_cursor_right_across_lines() {
+    let mut editor = Editor::new(None);
+    editor.document.lines = vec!["line1".to_string(), "line2".to_string()];
+    editor.set_cursor_pos(5, 0); // Start at end of line1
+    editor.handle_keypress(Input::KeyRight);
+    assert_eq!(editor.cursor_pos(), (0, 1)); // Should move to beginning of line2
 }
