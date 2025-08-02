@@ -302,8 +302,8 @@ fn test_editor_hungry_delete() {
     editor.document.lines[0] = "hello world".to_string();
     editor.set_cursor_pos(11, 0);
     editor.hungry_delete();
-    assert_eq!(editor.document.lines[0], "hello ");
-    assert_eq!(editor.cursor_pos(), (6, 0));
+    assert_eq!(editor.document.lines[0], "hello");
+    assert_eq!(editor.cursor_pos(), (5, 0));
 
     // Test deleting across lines (joining lines)
     editor.document.lines = vec!["line1".to_string(), "    line2".to_string()];
@@ -317,8 +317,8 @@ fn test_editor_hungry_delete() {
     editor.document.lines[0] = "  foo bar".to_string();
     editor.set_cursor_pos(9, 0);
     editor.hungry_delete();
-    assert_eq!(editor.document.lines[0], "  foo ");
-    assert_eq!(editor.cursor_pos(), (6, 0));
+    assert_eq!(editor.document.lines[0], "  foo");
+    assert_eq!(editor.cursor_pos(), (5, 0));
 
     // Test deleting only whitespace
     editor.document.lines[0] = "  ".to_string();

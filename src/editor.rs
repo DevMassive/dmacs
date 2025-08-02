@@ -405,12 +405,9 @@ impl Editor {
         }
 
         let current_line = &mut self.document.lines[y];
-        if x == 0 && y == 0 {
-            return;
-        } // Cannot delete before start of document
 
         if x == 0 {
-            // At the beginning of a line, join with previous line
+            // If at the beginning of a line, join with previous line if available
             if y > 0 {
                 let prev_line_len = self.document.lines[y - 1].len();
                 let current_line_content = self.document.lines.remove(y);
@@ -423,43 +420,7 @@ impl Editor {
             return;
         }
 
-        let mut chars_to_left = current_line[..x].char_indices().rev();
-        let mut start_delete_byte = x;
-
-        if let Some((idx, first_char_to_left)) = chars_to_left.next() {
-            if first_char_to_left.is_whitespace() {
-                // Delete all preceding whitespace
-                start_delete_byte = idx; // Start of the first whitespace char
-                for (idx, ch) in chars_to_left {
-                    if ch.is_whitespace() {
-                        start_delete_byte = idx;
-                    } else {
-                        break;
-                    }
-                }
-            } else {
-                // Delete the word to the left and any preceding whitespace
-                start_delete_byte = idx; // Start of the first non-whitespace char
-                // Find the beginning of the word
-                for (idx, ch) in chars_to_left.by_ref() {
-                    // Use by_ref to continue iteration
-                    if !ch.is_whitespace() {
-                        start_delete_byte = idx;
-                    } else {
-                        break;
-                    }
-                }
-                // Now find the beginning of any preceding whitespace
-                for (idx, ch) in chars_to_left {
-                    // Continue from where the previous loop left off
-                    if ch.is_whitespace() {
-                        start_delete_byte = idx;
-                    } else {
-                        break;
-                    }
-                }
-            }
-        }
+        let start_delete_byte = find_word_boundary_left(current_line, x);
 
         current_line.replace_range(start_delete_byte..x, "");
         self.cursor_x = start_delete_byte;
@@ -481,7 +442,7 @@ impl Editor {
     }
 
     pub fn move_cursor_word_left(&mut self) {
-        self.last_action_was_kill = false;
+        self.last_action_was_kill = false; 
         let current_line = &self.document.lines[self.cursor_y];
         let mut new_cursor_x = self.cursor_x;
 
@@ -648,6 +609,58 @@ impl Editor {
             self.status_message = "Cannot move line down further.".to_string();
         }
     }
+}
+
+
+
+fn find_word_boundary_left(line: &str, current_x: usize) -> usize {
+    let mut delete_start = current_x;
+
+    if delete_start == 0 {
+        return 0;
+    }
+
+    let mut chars_to_left = line[..delete_start].char_indices().rev();
+
+    // Step 1: Skip any trailing non-word characters (e.g., punctuation, spaces after a word)
+    // until we hit a word character.
+    let mut found_word_char = false;
+    for (idx, ch) in chars_to_left.by_ref() {
+        if is_word_char(ch) {
+            delete_start = idx; // This is the start of the first word character encountered
+            found_word_char = true;
+            break;
+        }
+        delete_start = idx; // Keep moving left through non-word chars
+    }
+
+    // Step 2: If we found a word character, now skip all word characters
+    // to find the actual beginning of the word.
+    if found_word_char {
+        for (idx, ch) in chars_to_left.by_ref() {
+            if !is_word_char(ch) {
+                delete_start = idx + ch.len_utf8(); // This is the end of the non-word block (start of whitespace/punctuation)
+                break;
+            }
+            delete_start = idx; // Keep moving left through word chars
+        }
+    }
+
+    // Step 3: Now, `delete_start` is at the beginning of the word (or the beginning of the line
+    // if no word was found). We need to also delete any preceding whitespace.
+    // Iterate left from `delete_start` to find the first non-whitespace character.
+    // We need a new iterator for this, starting from `delete_start`.
+    let mut final_delete_start = delete_start;
+    let whitespace_chars_to_left = line[..delete_start].char_indices().rev();
+    for (idx, ch) in whitespace_chars_to_left {
+        if ch.is_whitespace() {
+            final_delete_start = idx;
+        } else {
+            break; // Found a non-whitespace character, stop.
+        }
+    }
+
+    final_delete_start
 }
 
 fn is_word_char(ch: char) -> bool {
