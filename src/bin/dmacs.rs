@@ -3,11 +3,15 @@ use pancurses::{
     COLOR_WHITE, curs_set, endwin, init_pair, initscr, noecho, start_color, use_default_colors,
 };
 use std::env;
-use std::io;
+use std::io::{self, stdin};
+use std::os::unix::io::AsRawFd;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::mpsc;
 use std::thread;
 use std::time::Duration;
+
+// Import necessary types and functions from the libc crate
+use libc::{_POSIX_VDISABLE, TCSANOW, VDSUSP, tcgetattr, tcsetattr, termios};
 
 static CTRL_C_COUNT: AtomicUsize = AtomicUsize::new(0);
 
@@ -20,6 +24,23 @@ fn main() -> io::Result<()> {
     noecho();
     curs_set(1);
     window.nodelay(true); // Make getch() non-blocking
+
+    // termios settings change starts here
+    let stdin_fd = stdin().as_raw_fd();
+    let mut termios_settings: termios = unsafe { std::mem::zeroed() };
+
+    // Get current termios settings
+    if unsafe { tcgetattr(stdin_fd, &mut termios_settings) } != 0 {
+        return Err(io::Error::last_os_error());
+    }
+
+    // Disable dsusp character
+    termios_settings.c_cc[VDSUSP] = _POSIX_VDISABLE;
+
+    // Apply changes
+    if unsafe { tcsetattr(stdin_fd, TCSANOW, &termios_settings) } != 0 {
+        return Err(io::Error::last_os_error());
+    }
 
     if pancurses::has_colors() {
         start_color();
