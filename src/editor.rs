@@ -624,6 +624,30 @@ impl Editor {
     pub fn set_message(&mut self, message: &str) {
         self.status_message = message.to_string();
     }
+
+    pub fn move_line_up(&mut self) {
+        self.last_action_was_kill = false;
+        if self.cursor_y > 0 {
+            self.save_state_for_undo();
+            self.document.swap_lines(self.cursor_y, self.cursor_y - 1);
+            self.cursor_y -= 1;
+            self.status_message = "Line moved up.".to_string();
+        } else {
+            self.status_message = "Cannot move line up further.".to_string();
+        }
+    }
+
+    pub fn move_line_down(&mut self) {
+        self.last_action_was_kill = false;
+        if self.cursor_y < self.document.lines.len() - 1 {
+            self.save_state_for_undo();
+            self.document.swap_lines(self.cursor_y, self.cursor_y + 1);
+            self.cursor_y += 1;
+            self.status_message = "Line moved down.".to_string();
+        } else {
+            self.status_message = "Cannot move line down further.".to_string();
+        }
+    }
 }
 
 fn is_word_char(ch: char) -> bool {

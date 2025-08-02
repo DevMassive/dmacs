@@ -80,3 +80,38 @@ fn test_document_insert_string() {
     doc3.insert_string(0, 1, "invalid");
     assert_eq!(doc3.lines[0], "line");
 }
+
+#[test]
+fn test_document_swap_lines() {
+    let mut doc = Document {
+        lines: vec![
+            "line1".to_string(),
+            "line2".to_string(),
+            "line3".to_string(),
+        ],
+        ..Default::default()
+    };
+
+    // Swap line1 and line2
+    doc.swap_lines(0, 1);
+    assert_eq!(doc.lines[0], "line2");
+    assert_eq!(doc.lines[1], "line1");
+    assert_eq!(doc.lines[2], "line3");
+
+    // Swap line1 (now at index 1) and line3
+    doc.swap_lines(1, 2);
+    assert_eq!(doc.lines[0], "line2");
+    assert_eq!(doc.lines[1], "line3");
+    assert_eq!(doc.lines[2], "line1");
+
+    // Try swapping out of bounds (should do nothing)
+    doc.swap_lines(0, 100);
+    assert_eq!(doc.lines[0], "line2");
+    assert_eq!(doc.lines[1], "line3");
+    assert_eq!(doc.lines[2], "line1");
+
+    doc.swap_lines(100, 0);
+    assert_eq!(doc.lines[0], "line2");
+    assert_eq!(doc.lines[1], "line3");
+    assert_eq!(doc.lines[2], "line1");
+}

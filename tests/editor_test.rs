@@ -537,6 +537,52 @@ fn test_editor_consecutive_kill_line() {
 }
 
 #[test]
+fn test_editor_move_line_up() {
+    let mut editor = Editor::new(None);
+    editor.document.lines = vec![
+        "line1".to_string(),
+        "line2".to_string(),
+        "line3".to_string(),
+    ];
+    editor.set_cursor_pos(0, 1); // Cursor on line2
+    editor.move_line_up(); // Call the function directly
+    assert_eq!(editor.document.lines[0], "line2");
+    assert_eq!(editor.document.lines[1], "line1");
+    assert_eq!(editor.document.lines[2], "line3");
+    assert_eq!(editor.cursor_pos(), (0, 0)); // Cursor should move up with the line
+
+    // Try moving up from the first line (should not change document, only status message)
+    editor.move_line_up(); // Call the function directly
+    assert_eq!(editor.document.lines[0], "line2");
+    assert_eq!(editor.document.lines[1], "line1");
+    assert_eq!(editor.document.lines[2], "line3");
+    assert_eq!(editor.cursor_pos(), (0, 0));
+}
+
+#[test]
+fn test_editor_move_line_down() {
+    let mut editor = Editor::new(None);
+    editor.document.lines = vec![
+        "line1".to_string(),
+        "line2".to_string(),
+        "line3".to_string(),
+    ];
+    editor.set_cursor_pos(0, 1); // Cursor on line2
+    editor.move_line_down(); // Call the function directly
+    assert_eq!(editor.document.lines[0], "line1");
+    assert_eq!(editor.document.lines[1], "line3");
+    assert_eq!(editor.document.lines[2], "line2");
+    assert_eq!(editor.cursor_pos(), (0, 2)); // Cursor should move down with the line
+
+    // Try moving down from the last line (should not change document, only status message)
+    editor.move_line_down(); // Call the function directly
+    assert_eq!(editor.document.lines[0], "line1");
+    assert_eq!(editor.document.lines[1], "line3");
+    assert_eq!(editor.document.lines[2], "line2");
+    assert_eq!(editor.cursor_pos(), (0, 2));
+}
+
+#[test]
 fn test_editor_yank_empty_kill_buffer() {
     let mut editor = Editor::new(None);
     editor.kill_buffer = "".to_string();

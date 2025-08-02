@@ -80,6 +80,12 @@ impl Document {
         let line = &mut self.lines[at_y];
         line.insert_str(at_x, s);
     }
+
+    pub fn swap_lines(&mut self, y1: usize, y2: usize) {
+        if y1 < self.lines.len() && y2 < self.lines.len() {
+            self.lines.swap(y1, y2);
+        }
+    }
 }
 
 impl Default for Document {
