@@ -71,6 +71,38 @@ impl Editor {
         }
     }
 
+    pub fn process_input(&mut self, key: Input, next_key: Option<Input>, third_key: Option<Input>) {
+        match key {
+            pancurses::Input::Character('\x1b') => {
+                // Escape key, potential start of Alt/Option sequence
+                if let Some(next_key_val) = next_key {
+                    match next_key_val {
+                        pancurses::Input::Character('b') => self.move_cursor_word_left(), // Alt/Option + Left Arrow (often sends ESC b)
+                        pancurses::Input::Character('f') => self.move_cursor_word_right(), // Alt/Option + Right Arrow (often sends ESC f)
+                        pancurses::Input::Character('[') => {
+                            if let Some(third_key_val) = third_key {
+                                match third_key_val {
+                                    pancurses::Input::Character('A') => self.move_line_up(), // Alt/Option + Up Arrow (often sends ESC [A)
+                                    pancurses::Input::Character('B') => self.move_line_down(), // Alt/Option + Down Arrow (often sends ESC [B)
+                                    _ => self.handle_keypress(pancurses::Input::Character('\x1b')), // Pass Escape if not a recognized sequence
+                                }
+                            } else {
+                                self.handle_keypress(pancurses::Input::Character('\x1b')); // Pass Escape if no third key
+                            }
+                        }
+                        pancurses::Input::Character('\x7f') | pancurses::Input::KeyBackspace => {
+                            self.hungry_delete()
+                        } // Alt/Option + Backspace
+                        _ => self.handle_keypress(pancurses::Input::Character('\x1b')), // Pass Escape if not followed by Backspace
+                    }
+                } else {
+                    self.handle_keypress(pancurses::Input::Character('\x1b')); // If no next_key, treat as plain Escape
+                }
+            }
+            _ => self.handle_keypress(key),
+        }
+    }
+
     pub fn handle_keypress(&mut self, key: Input) {
         match key {
             Input::Character(c) => match c {
@@ -442,7 +474,7 @@ impl Editor {
     }
 
     pub fn move_cursor_word_left(&mut self) {
-        self.last_action_was_kill = false; 
+        self.last_action_was_kill = false;
         let current_line = &self.document.lines[self.cursor_y];
         let mut new_cursor_x = self.cursor_x;
 
@@ -610,8 +642,6 @@ impl Editor {
         }
     }
 }
-
-
 
 fn find_word_boundary_left(line: &str, current_x: usize) -> usize {
     let mut delete_start = current_x;

@@ -91,35 +91,17 @@ fn main() -> io::Result<()> {
         }
 
         if let Some(key) = window.getch() {
-            match key {
-                pancurses::Input::Character('\x1b') => {
-                    // Escape key, potential start of Alt/Option sequence
-                    if let Some(next_key) = window.getch() {
-                        match next_key {
-                            pancurses::Input::Character('b') => editor.move_cursor_word_left(), // Alt/Option + Left Arrow (often sends ESC b)
-                            pancurses::Input::Character('f') => editor.move_cursor_word_right(), // Alt/Option + Right Arrow (often sends ESC f)
-                            pancurses::Input::Character('[') => {
-                                if let Some(third_key) = window.getch() {
-                                    match third_key {
-                                        pancurses::Input::Character('A') => editor.move_line_up(), // Alt/Option + Up Arrow (often sends ESC [A)
-                                        pancurses::Input::Character('B') => editor.move_line_down(), // Alt/Option + Down Arrow (often sends ESC [B)
-                                        _ => {
-                                            editor.handle_keypress(pancurses::Input::Character(''))
-                                        } // Pass Escape if not a recognized sequence
-                                    }
-                                } else {
-                                    editor.handle_keypress(pancurses::Input::Character('')); // Pass Escape if no third key
-                                }
-                            }
-                            pancurses::Input::Character('') | pancurses::Input::KeyBackspace => {
-                                editor.hungry_delete()
-                            } // Alt/Option + Backspace
-                            _ => editor.handle_keypress(pancurses::Input::Character('')), // Pass Escape if not followed by Backspace
-                        }
-                    }
-                }
-                _ => editor.handle_keypress(key),
-            }
+            let next_key = if key == pancurses::Input::Character('\x1b') {
+                window.getch()
+            } else {
+                None
+            };
+            let third_key = if next_key == Some(pancurses::Input::Character('[')) {
+                window.getch()
+            } else {
+                None
+            };
+            editor.process_input(key, next_key, third_key);
         }
         if editor.should_quit {
             break;
