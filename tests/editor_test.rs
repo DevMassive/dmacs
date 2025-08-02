@@ -418,3 +418,87 @@ fn test_editor_move_cursor_word_right() {
     editor.handle_keypress(Input::Character('')); // Ctrl-F
     assert_eq!(editor.cursor_pos(), (16, 0)); // Should move to end of line
 }
+
+#[test]
+fn test_editor_kill_line_middle_of_line() {
+    let mut editor = Editor::new(None);
+    editor.document.lines = vec!["hello world".to_string()];
+    editor.set_cursor_pos(6, 0); // Cursor at 'w' in "world"
+    editor.kill_line();
+    assert_eq!(editor.document.lines[0], "hello ");
+    assert_eq!(editor.kill_buffer, "world");
+    assert_eq!(editor.cursor_pos(), (6, 0));
+}
+
+#[test]
+fn test_editor_kill_line_end_of_line_not_last_line() {
+    let mut editor = Editor::new(None);
+    editor.document.lines = vec!["hello".to_string(), "world".to_string()];
+    editor.set_cursor_pos(5, 0); // Cursor at end of "hello"
+    editor.kill_line();
+    assert_eq!(editor.document.lines.len(), 1);
+    assert_eq!(editor.document.lines[0], "helloworld");
+    assert_eq!(editor.kill_buffer, "\nworld"); // Newline + content of next line
+    assert_eq!(editor.cursor_pos(), (5, 0));
+}
+
+#[test]
+fn test_editor_kill_line_empty_line_not_last_line() {
+    let mut editor = Editor::new(None);
+    editor.document.lines = vec!["line1".to_string(), "".to_string(), "line3".to_string()];
+    editor.set_cursor_pos(0, 1); // Cursor at beginning of empty line
+    editor.kill_line();
+    assert_eq!(editor.document.lines.len(), 2);
+    assert_eq!(editor.document.lines[0], "line1");
+    assert_eq!(editor.document.lines[1], "line3");
+    assert_eq!(editor.kill_buffer, "\n"); // Only newline killed
+    assert_eq!(editor.cursor_pos(), (0, 1));
+}
+
+#[test]
+fn test_editor_kill_line_last_line() {
+    let mut editor = Editor::new(None);
+    editor.document.lines = vec!["last line".to_string()];
+    editor.set_cursor_pos(0, 0);
+    editor.kill_line();
+    assert_eq!(editor.document.lines[0], "");
+    assert_eq!(editor.kill_buffer, "last line");
+    assert_eq!(editor.cursor_pos(), (0, 0));
+}
+
+#[test]
+fn test_editor_yank_single_line() {
+    let mut editor = Editor::new(None);
+    editor.kill_buffer = "yanked text".to_string();
+    editor.document.lines = vec!["start ".to_string(), "end".to_string()];
+    editor.set_cursor_pos(6, 0); // After "start "
+    editor.yank();
+    assert_eq!(editor.document.lines[0], "start yanked text");
+    assert_eq!(editor.cursor_pos(), (17, 0)); // Cursor after yanked text
+}
+
+#[test]
+fn test_editor_yank_multiple_lines() {
+    let mut editor = Editor::new(None);
+    editor.kill_buffer = "line1\nline2\nline3".to_string();
+    editor.document.lines = vec!["start".to_string(), "end".to_string()];
+    editor.set_cursor_pos(5, 0); // After "start"
+    editor.yank();
+    assert_eq!(editor.document.lines.len(), 4);
+    assert_eq!(editor.document.lines[0], "startline1");
+    assert_eq!(editor.document.lines[1], "line2");
+    assert_eq!(editor.document.lines[2], "line3");
+    assert_eq!(editor.document.lines[3], "end");
+    assert_eq!(editor.cursor_pos(), (5, 2)); // Cursor at end of last yanked line
+}
+
+#[test]
+fn test_editor_yank_empty_kill_buffer() {
+    let mut editor = Editor::new(None);
+    editor.kill_buffer = "".to_string();
+    editor.document.lines = vec!["original".to_string()];
+    editor.set_cursor_pos(0, 0);
+    editor.yank();
+    assert_eq!(editor.document.lines[0], "original"); // Document should be unchanged
+    assert_eq!(editor.cursor_pos(), (0, 0));
+}

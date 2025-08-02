@@ -72,6 +72,14 @@ impl Document {
         let new_line = current_line.split_off(at_x);
         self.lines.insert(at_y + 1, new_line);
     }
+
+    pub fn insert_string(&mut self, at_x: usize, at_y: usize, s: &str) {
+        if at_y >= self.lines.len() {
+            return;
+        }
+        let line = &mut self.lines[at_y];
+        line.insert_str(at_x, s);
+    }
 }
 
 impl Default for Document {

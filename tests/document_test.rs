@@ -55,3 +55,28 @@ fn test_insert_newline() {
     assert_eq!(doc.lines[0], "abc");
     assert_eq!(doc.lines[1], "def");
 }
+
+#[test]
+fn test_document_insert_string() {
+    let mut doc = Document::default();
+    doc.lines[0] = "hello".to_string();
+    doc.insert_string(2, 0, "X");
+    assert_eq!(doc.lines[0], "heXllo");
+
+    doc.insert_string(0, 0, "YY");
+    assert_eq!(doc.lines[0], "YYheXllo");
+
+    doc.insert_string(doc.lines[0].len(), 0, "ZZ");
+    assert_eq!(doc.lines[0], "YYheXlloZZ");
+
+    // Test inserting into an empty document
+    let mut doc2 = Document::default();
+    doc2.insert_string(0, 0, "test");
+    assert_eq!(doc2.lines[0], "test");
+
+    // Test inserting at an invalid line index (should do nothing)
+    let mut doc3 = Document::default();
+    doc3.lines[0] = "line".to_string();
+    doc3.insert_string(0, 1, "invalid");
+    assert_eq!(doc3.lines[0], "line");
+}

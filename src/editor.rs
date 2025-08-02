@@ -17,6 +17,7 @@ pub struct Editor {
     pub row_offset: usize,                     // public for tests
     pub col_offset: usize,                     // public for tests
     undo_stack: Vec<(Document, usize, usize)>, // Stores (Document, cursor_x, cursor_y)
+    pub kill_buffer: String,
 }
 
 impl Editor {
@@ -45,6 +46,7 @@ impl Editor {
             row_offset: 0,
             col_offset: 0,
             undo_stack: Vec::new(),
+            kill_buffer: String::new(),
         }
     }
 
@@ -74,7 +76,8 @@ impl Editor {
                 '\x01' => self.go_to_start_of_line(),
                 '\x05' => self.go_to_end_of_line(),
                 '\x04' => self.delete_forward_char(),
-                '\x0b' => self.delete_to_end_of_line(),
+                '\x0b' => self.kill_line(),
+                '\x19' => self.yank(),                 // Ctrl + Y
                 '\x7f' | '\x08' => self.delete_char(), // Backspace
                 '\n' | '\r' => self.insert_newline(),
                 '\x00' => {}
@@ -312,18 +315,68 @@ impl Editor {
         self.desired_cursor_x = 0;
     }
 
-    pub fn delete_to_end_of_line(&mut self) {
+    pub fn kill_line(&mut self) {
+        self.save_state_for_undo();
         let y = self.cursor_y;
         let x = self.cursor_x;
-        if y < self.document.lines.len() {
-            let line_len = self.document.lines[y].len();
-            if x < line_len {
-                self.document.lines[y].truncate(x);
-            } else if y + 1 < self.document.lines.len() {
-                let next_line = self.document.lines.remove(y + 1);
-                self.document.lines[y].push_str(&next_line);
-            }
+        if y >= self.document.lines.len() {
+            return;
         }
+
+        let current_line_len = self.document.lines[y].len();
+        self.kill_buffer.clear(); // Always clear the kill buffer
+
+        if x == 0 && current_line_len == 0 && y < self.document.lines.len() - 1 {
+            // Case 3: Cursor is at the beginning of an empty line, and it's not the last line
+            // Kill the newline and remove the empty line
+            self.document.lines.remove(y); // Remove the empty line
+            self.kill_buffer.push('\n');
+        } else if x < current_line_len {
+            // Case 1: Cursor is within the line (not at the very end)
+            // Kill from cursor to end of line
+            let killed_text = self.document.lines[y].split_off(x);
+            self.kill_buffer.push_str(&killed_text);
+        } else if x == current_line_len && y < self.document.lines.len() - 1 {
+            // Case 2: Cursor is at the end of the line, and it's not the last line
+            // Kill the newline and join with the next line
+            let next_line_content = self.document.lines.remove(y + 1);
+            self.document.lines[y].push_str(&next_line_content);
+            self.kill_buffer.push('\n');
+            self.kill_buffer.push_str(&next_line_content);
+        }
+    }
+
+    pub fn yank(&mut self) {
+        self.save_state_for_undo();
+        let text_to_yank = self.kill_buffer.clone();
+        let mut current_x = self.cursor_x;
+        let mut current_y = self.cursor_y;
+
+        let lines_to_yank: Vec<&str> = text_to_yank.split('\n').collect();
+
+        if lines_to_yank.is_empty() {
+            return;
+        }
+
+        // Insert the first part of the yanked text into the current line
+        self.document
+            .insert_string(current_x, current_y, lines_to_yank[0]);
+        current_x += lines_to_yank[0].len();
+
+        // Insert subsequent lines
+        for line_to_yank in lines_to_yank.iter().skip(1) {
+            self.document.insert_newline(current_x, current_y);
+            current_y += 1;
+            current_x = 0;
+            self.document
+                .insert_string(current_x, current_y, line_to_yank);
+            current_x += line_to_yank.len();
+        }
+
+        self.cursor_x = current_x;
+        self.cursor_y = current_y;
+        self.desired_cursor_x =
+            self.get_display_width(&self.document.lines[self.cursor_y], self.cursor_x);
     }
 
     pub fn hungry_delete(&mut self) {
