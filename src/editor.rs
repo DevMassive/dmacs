@@ -407,7 +407,7 @@ impl Editor {
         self.desired_cursor_x = self.get_display_width(&self.document.lines[y], self.cursor_x);
     }
 
-    fn move_cursor_word_left(&mut self) {
+    pub fn move_cursor_word_left(&mut self) {
         let current_line = &self.document.lines[self.cursor_y];
         let mut new_cursor_x = self.cursor_x;
 
@@ -445,7 +445,7 @@ impl Editor {
         self.desired_cursor_x = self.get_display_width(current_line, self.cursor_x);
     }
 
-    fn move_cursor_word_right(&mut self) {
+    pub fn move_cursor_word_right(&mut self) {
         let current_line = &self.document.lines[self.cursor_y];
         let mut new_cursor_x = self.cursor_x;
         let line_len = current_line.len();

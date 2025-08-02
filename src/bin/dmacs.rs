@@ -75,6 +75,8 @@ fn main() -> io::Result<()> {
                     // Escape key, potential start of Alt/Option sequence
                     if let Some(next_key) = window.getch() {
                         match next_key {
+                            pancurses::Input::Character('b') => editor.move_cursor_word_left(), // Alt/Option + Left Arrow (often sends ESC b)
+                            pancurses::Input::Character('f') => editor.move_cursor_word_right(), // Alt/Option + Right Arrow (often sends ESC f)
                             pancurses::Input::Character('\x7f')
                             | pancurses::Input::KeyBackspace => editor.hungry_delete(), // Alt/Option + Backspace
                             _ => editor.handle_keypress(pancurses::Input::Character('\x1b')), // Pass Escape if not followed by Backspace
