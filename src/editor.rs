@@ -18,6 +18,7 @@ pub struct Editor {
     pub col_offset: usize,                     // public for tests
     undo_stack: Vec<(Document, usize, usize)>, // Stores (Document, cursor_x, cursor_y)
     pub kill_buffer: String,
+    last_action_was_kill: bool,
 }
 
 impl Editor {
@@ -47,6 +48,7 @@ impl Editor {
             col_offset: 0,
             undo_stack: Vec::new(),
             kill_buffer: String::new(),
+            last_action_was_kill: false,
         }
     }
 
@@ -56,6 +58,7 @@ impl Editor {
     }
 
     pub fn undo(&mut self) {
+        self.last_action_was_kill = false;
         if let Some((prev_document, prev_cursor_x, prev_cursor_y)) = self.undo_stack.pop() {
             self.document = prev_document;
             self.cursor_x = prev_cursor_x;
@@ -76,7 +79,10 @@ impl Editor {
                 '\x01' => self.go_to_start_of_line(),
                 '\x05' => self.go_to_end_of_line(),
                 '\x04' => self.delete_forward_char(),
-                '\x0b' => self.kill_line(),
+                '\x0b' => {
+                    self.kill_line();
+                    self.last_action_was_kill = true;
+                }
                 '\x19' => self.yank(),                 // Ctrl + Y
                 '\x7f' | '\x08' => self.delete_char(), // Backspace
                 '\n' | '\r' => self.insert_newline(),
@@ -214,6 +220,7 @@ impl Editor {
     }
 
     pub fn move_cursor_up(&mut self) {
+        self.last_action_was_kill = false;
         if self.cursor_y > 0 {
             self.cursor_y -= 1;
             self.cursor_x = self.get_byte_pos_from_display_width(self.desired_cursor_x);
@@ -225,6 +232,7 @@ impl Editor {
     }
 
     pub fn move_cursor_down(&mut self) {
+        self.last_action_was_kill = false;
         if self.cursor_y < self.document.lines.len() - 1 {
             self.cursor_y += 1;
             self.cursor_x = self.get_byte_pos_from_display_width(self.desired_cursor_x);
@@ -235,6 +243,7 @@ impl Editor {
     }
 
     pub fn move_cursor_left(&mut self) {
+        self.last_action_was_kill = false;
         if self.cursor_x > 0 {
             let line = &self.document.lines[self.cursor_y];
             let mut new_pos = self.cursor_x - 1;
@@ -252,6 +261,7 @@ impl Editor {
     }
 
     pub fn move_cursor_right(&mut self) {
+        self.last_action_was_kill = false;
         let line = &self.document.lines[self.cursor_y];
         if self.cursor_x < line.len() {
             let mut new_pos = self.cursor_x + 1;
@@ -268,6 +278,7 @@ impl Editor {
     }
 
     pub fn insert_char(&mut self, c: char) {
+        self.last_action_was_kill = false;
         self.save_state_for_undo();
         self.document.insert(self.cursor_x, self.cursor_y, c);
         self.cursor_x += c.len_utf8();
@@ -277,6 +288,7 @@ impl Editor {
     }
 
     pub fn delete_char(&mut self) {
+        self.last_action_was_kill = false;
         // Backspace
         self.save_state_for_undo();
         if self.cursor_x > 0 {
@@ -294,6 +306,7 @@ impl Editor {
     }
 
     pub fn delete_forward_char(&mut self) {
+        self.last_action_was_kill = false;
         // Ctrl-D
         self.save_state_for_undo();
         let y = self.cursor_y;
@@ -308,6 +321,7 @@ impl Editor {
     }
 
     pub fn insert_newline(&mut self) {
+        self.last_action_was_kill = false;
         self.save_state_for_undo();
         self.document.insert_newline(self.cursor_x, self.cursor_y);
         self.cursor_y += 1;
@@ -324,7 +338,9 @@ impl Editor {
         }
 
         let current_line_len = self.document.lines[y].len();
-        self.kill_buffer.clear(); // Always clear the kill buffer
+        if !self.last_action_was_kill {
+            self.kill_buffer.clear();
+        }
 
         if x == 0 && current_line_len == 0 && y < self.document.lines.len() - 1 {
             // Case 3: Cursor is at the beginning of an empty line, and it's not the last line
@@ -344,9 +360,11 @@ impl Editor {
             self.kill_buffer.push('\n');
             self.kill_buffer.push_str(&next_line_content);
         }
+        self.last_action_was_kill = true;
     }
 
     pub fn yank(&mut self) {
+        self.last_action_was_kill = false;
         self.save_state_for_undo();
         let text_to_yank = self.kill_buffer.clone();
         let mut current_x = self.cursor_x;
@@ -450,17 +468,20 @@ impl Editor {
     }
 
     pub fn go_to_start_of_line(&mut self) {
+        self.last_action_was_kill = false;
         self.cursor_x = 0;
         self.desired_cursor_x = 0;
     }
 
     pub fn go_to_end_of_line(&mut self) {
+        self.last_action_was_kill = false;
         let y = self.cursor_y;
         self.cursor_x = self.document.lines[y].len();
         self.desired_cursor_x = self.get_display_width(&self.document.lines[y], self.cursor_x);
     }
 
     pub fn move_cursor_word_left(&mut self) {
+        self.last_action_was_kill = false;
         let current_line = &self.document.lines[self.cursor_y];
         let mut new_cursor_x = self.cursor_x;
 
@@ -499,6 +520,7 @@ impl Editor {
     }
 
     pub fn move_cursor_word_right(&mut self) {
+        self.last_action_was_kill = false;
         let current_line = &self.document.lines[self.cursor_y];
         let mut new_cursor_x = self.cursor_x;
         let line_len = current_line.len();
@@ -543,6 +565,7 @@ impl Editor {
     }
 
     pub fn save_document(&mut self) {
+        self.last_action_was_kill = false;
         if self.document.save().is_ok() {
             self.status_message = "File saved successfully.".to_string();
         } else {
@@ -551,6 +574,7 @@ impl Editor {
     }
 
     pub fn quit(&mut self) {
+        self.last_action_was_kill = false;
         self.document.save().ok();
         self.should_quit = true;
     }

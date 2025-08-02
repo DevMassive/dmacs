@@ -493,6 +493,50 @@ fn test_editor_yank_multiple_lines() {
 }
 
 #[test]
+fn test_editor_consecutive_kill_line() {
+    let mut editor = Editor::new(None);
+    editor.document.lines = vec![
+        "line one".to_string(),
+        "line two".to_string(),
+        "line three".to_string(),
+    ];
+
+    // Kill "line one"
+    editor.set_cursor_pos(0, 0);
+    editor.handle_keypress(Input::Character('\x0b')); // Ctrl-K
+    assert_eq!(editor.kill_buffer, "line one");
+    assert_eq!(editor.document.lines.len(), 3);
+    assert_eq!(editor.document.lines[0], ""); // "line one" should be removed
+
+    editor.set_cursor_pos(0, 0);
+    editor.handle_keypress(Input::Character('\x0b')); // Ctrl-K
+    assert_eq!(editor.kill_buffer, "line one\n");
+    assert_eq!(editor.document.lines.len(), 2);
+    assert_eq!(editor.document.lines[0], "line two"); // "line one\n" should be removed
+
+    // Kill "line two" immediately after
+    editor.set_cursor_pos(0, 0); // Cursor is now at the start of "line two"
+    editor.handle_keypress(Input::Character('\x0b')); // Ctrl-K
+    assert_eq!(editor.kill_buffer, "line one\nline two"); // Should append
+    assert_eq!(editor.document.lines.len(), 2);
+    assert_eq!(editor.document.lines[0], ""); // "line two" should be removed
+
+    editor.set_cursor_pos(0, 0);
+    editor.handle_keypress(Input::Character('\x0b')); // Ctrl-K
+    assert_eq!(editor.kill_buffer, "line one\nline two\n"); // Should append
+    assert_eq!(editor.document.lines.len(), 1);
+    assert_eq!(editor.document.lines[0], "line three"); // "line two" should be removed
+
+    // Yank the accumulated content
+    editor.set_cursor_pos(0, 0);
+    editor.handle_keypress(Input::Character('\x19')); // Ctrl-Y
+    assert_eq!(editor.document.lines.len(), 3);
+    assert_eq!(editor.document.lines[0], "line one");
+    assert_eq!(editor.document.lines[1], "line two");
+    assert_eq!(editor.document.lines[2], "line three");
+}
+
+#[test]
 fn test_editor_yank_empty_kill_buffer() {
     let mut editor = Editor::new(None);
     editor.kill_buffer = "".to_string();
