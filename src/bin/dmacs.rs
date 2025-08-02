@@ -11,7 +11,7 @@ use std::thread;
 use std::time::Duration;
 
 // Import necessary types and functions from the libc crate
-use libc::{_POSIX_VDISABLE, TCSANOW, VDSUSP, tcgetattr, tcsetattr, termios};
+use libc::{_POSIX_VDISABLE, TCSANOW, VDSUSP, VLNEXT, tcgetattr, tcsetattr, termios};
 
 static CTRL_C_COUNT: AtomicUsize = AtomicUsize::new(0);
 
@@ -37,6 +37,9 @@ fn main() -> io::Result<()> {
     // Disable dsusp character
     termios_settings.c_cc[VDSUSP] = _POSIX_VDISABLE;
 
+    // Disable lnext character (Ctrl+V)
+    termios_settings.c_cc[VLNEXT] = _POSIX_VDISABLE;
+
     // Apply changes
     if unsafe { tcsetattr(stdin_fd, TCSANOW, &termios_settings) } != 0 {
         return Err(io::Error::last_os_error());
@@ -61,6 +64,10 @@ fn main() -> io::Result<()> {
     let mut editor = Editor::new(filename);
 
     loop {
+        // Update screen dimensions on each loop iteration
+        let (screen_rows, screen_cols) = (window.get_max_y() as usize, window.get_max_x() as usize);
+        editor.update_screen_size(screen_rows, screen_cols);
+
         editor.draw(&window);
 
         // Check for Ctrl+C signal

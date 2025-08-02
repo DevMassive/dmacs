@@ -19,6 +19,8 @@ pub struct Editor {
     undo_stack: Vec<(Document, usize, usize)>, // Stores (Document, cursor_x, cursor_y)
     pub kill_buffer: String,
     last_action_was_kill: bool,
+    screen_rows: usize,
+    screen_cols: usize,
 }
 
 impl Editor {
@@ -49,6 +51,8 @@ impl Editor {
             undo_stack: Vec::new(),
             kill_buffer: String::new(),
             last_action_was_kill: false,
+            screen_rows: 0,
+            screen_cols: 0,
         }
     }
 
@@ -77,6 +81,7 @@ impl Editor {
                 // Escape key, potential start of Alt/Option sequence
                 if let Some(next_key_val) = next_key {
                     match next_key_val {
+                        pancurses::Input::Character('v') => self.scroll_page_up(), // Alt/Option + V for page up (often sends ESC v)
                         pancurses::Input::Character('b') => self.move_cursor_word_left(), // Alt/Option + Left Arrow (often sends ESC b)
                         pancurses::Input::Character('f') => self.move_cursor_word_right(), // Alt/Option + Right Arrow (often sends ESC f)
                         pancurses::Input::Character('[') => {
@@ -116,6 +121,7 @@ impl Editor {
                     self.last_action_was_kill = true;
                 }
                 '\x19' => self.yank(),                 // Ctrl + Y
+                '\x16' => self.scroll_page_down(),     // Ctrl + V
                 '\x7f' | '\x08' => self.delete_char(), // Backspace
                 '\n' | '\r' => self.insert_newline(),
                 '\x00' => {}
@@ -172,9 +178,7 @@ impl Editor {
     }
 
     pub fn draw(&mut self, window: &Window) {
-        let (screen_rows, screen_cols) =
-            (window.get_max_y() as usize - 1, window.get_max_x() as usize);
-        self.scroll(screen_cols, screen_rows);
+        self.scroll(self.screen_cols, self.screen_rows - 1);
 
         window.erase();
 
@@ -184,7 +188,8 @@ impl Editor {
                 continue;
             }
             let row = index - self.row_offset;
-            if row >= screen_rows {
+            if row >= self.screen_rows.saturating_sub(1) {
+                // Account for status bar
                 break;
             }
 
@@ -208,11 +213,11 @@ impl Editor {
                 // Draw character
                 if display_x > self.col_offset {
                     let screen_x = char_start_display_x.saturating_sub(self.col_offset);
-                    if screen_x < screen_cols {
+                    if screen_x < self.screen_cols {
                         if ch == '\t' {
                             // Draw a tab as spaces
                             for i in 0..char_width {
-                                if screen_x + i < screen_cols {
+                                if screen_x + i < self.screen_cols {
                                     window.mvaddch(row as i32, (screen_x + i) as i32, ' ');
                                 }
                             }
@@ -223,7 +228,7 @@ impl Editor {
                     }
                 }
                 // Stop drawing if we reach the end of the screen
-                if char_start_display_x.saturating_sub(self.col_offset) >= screen_cols {
+                if char_start_display_x.saturating_sub(self.col_offset) >= self.screen_cols {
                     break;
                 }
             }
@@ -618,6 +623,11 @@ impl Editor {
         self.status_message = message.to_string();
     }
 
+    pub fn update_screen_size(&mut self, rows: usize, cols: usize) {
+        self.screen_rows = rows;
+        self.screen_cols = cols;
+    }
+
     pub fn move_line_up(&mut self) {
         self.last_action_was_kill = false;
         if self.cursor_y > 0 {
@@ -640,6 +650,25 @@ impl Editor {
         } else {
             self.status_message = "Cannot move line down further.".to_string();
         }
+    }
+
+    pub fn scroll_page_down(&mut self) {
+        self.last_action_was_kill = false;
+        let page_height = self.screen_rows.saturating_sub(1).max(1); // Usable screen height, ensure at least 1
+        self.row_offset = self.row_offset.saturating_add(page_height);
+        self.row_offset = self
+            .row_offset
+            .min(self.document.lines.len().saturating_sub(1));
+        self.cursor_y = self.row_offset; // Set cursor to the top of the new view
+        self.clamp_cursor_x();
+    }
+
+    pub fn scroll_page_up(&mut self) {
+        self.last_action_was_kill = false;
+        let page_height = self.screen_rows.saturating_sub(1).max(1); // Usable screen height, ensure at least 1
+        self.row_offset = self.row_offset.saturating_sub(page_height);
+        self.cursor_y = self.row_offset; // Set cursor to the top of the new view
+        self.clamp_cursor_x();
     }
 }
 

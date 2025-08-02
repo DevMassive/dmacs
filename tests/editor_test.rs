@@ -599,6 +599,78 @@ fn test_editor_move_line_down() {
 }
 
 #[test]
+fn test_editor_scroll_page_down() {
+    let mut editor = Editor::new(None);
+    for _ in 0..50 {
+        // Create 50 lines
+        editor.document.lines.push("test line".to_string());
+    }
+    editor.update_screen_size(25, 80); // screen_rows = 25, usable height = 24
+
+    // Initial state
+    assert_eq!(editor.cursor_pos().1, 0);
+    assert_eq!(editor.row_offset, 0);
+
+    // Scroll down one page
+    editor.scroll_page_down();
+    assert_eq!(editor.cursor_pos().1, 24); // Should move to the top of the next page
+    assert_eq!(editor.row_offset, 24);
+
+    // Scroll down another page
+    editor.scroll_page_down();
+    assert_eq!(editor.cursor_pos().1, 48);
+    assert_eq!(editor.row_offset, 48);
+
+    // Scroll down beyond document end
+    editor.scroll_page_down();
+    assert_eq!(editor.cursor_pos().1, 50); // Clamped to last line
+    assert_eq!(editor.row_offset, 50); // Clamped to last line
+
+    // Test with cursor not at 0
+    editor.set_cursor_pos(0, 10);
+    editor.row_offset = 10;
+    editor.scroll_page_down();
+    assert_eq!(editor.cursor_pos().1, 34); // 10 + 24
+    assert_eq!(editor.row_offset, 34);
+}
+
+#[test]
+fn test_editor_scroll_page_up() {
+    let mut editor = Editor::new(None);
+    for _ in 0..50 {
+        // Create 50 lines
+        editor.document.lines.push("test line".to_string());
+    }
+    editor.update_screen_size(25, 80); // screen_rows = 25, usable height = 24
+
+    // First, scroll down to simulate being in the middle of the document
+    editor.set_cursor_pos(0, 48);
+    editor.row_offset = 48;
+
+    // Scroll up one page
+    editor.scroll_page_up();
+    assert_eq!(editor.cursor_pos().1, 24); // Should move to the top of the previous page
+    assert_eq!(editor.row_offset, 24);
+
+    // Scroll up another page
+    editor.scroll_page_up();
+    assert_eq!(editor.cursor_pos().1, 0);
+    assert_eq!(editor.row_offset, 0);
+
+    // Scroll up beyond document start
+    editor.scroll_page_up();
+    assert_eq!(editor.cursor_pos().1, 0);
+    assert_eq!(editor.row_offset, 0);
+
+    // Test with cursor not at 0
+    editor.set_cursor_pos(0, 34);
+    editor.row_offset = 34;
+    editor.scroll_page_up();
+    assert_eq!(editor.cursor_pos().1, 10); // 34 - 24
+    assert_eq!(editor.row_offset, 10);
+}
+
+#[test]
 fn test_editor_yank_empty_kill_buffer() {
     let mut editor = Editor::new(None);
     editor.kill_buffer = "".to_string();
