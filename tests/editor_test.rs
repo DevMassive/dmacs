@@ -294,21 +294,21 @@ fn test_editor_hungry_delete() {
     // Test deleting word and preceding whitespace
     editor.document.lines[0] = "    hello".to_string();
     editor.set_cursor_pos(9, 0);
-    editor.hungry_delete();
+    editor.process_input(Input::Character('\x1b'), Some(Input::KeyBackspace), None);
     assert_eq!(editor.document.lines[0], "");
     assert_eq!(editor.cursor_pos(), (0, 0));
 
     // Test deleting word
     editor.document.lines[0] = "hello world".to_string();
     editor.set_cursor_pos(11, 0);
-    editor.hungry_delete();
+    editor.process_input(Input::Character('\x1b'), Some(Input::KeyBackspace), None);
     assert_eq!(editor.document.lines[0], "hello");
     assert_eq!(editor.cursor_pos(), (5, 0));
 
     // Test deleting across lines (joining lines)
     editor.document.lines = vec!["line1".to_string(), "    line2".to_string()];
     editor.set_cursor_pos(0, 1);
-    editor.hungry_delete();
+    editor.process_input(Input::Character('\x1b'), Some(Input::KeyBackspace), None);
     assert_eq!(editor.document.lines.len(), 1);
     assert_eq!(editor.document.lines[0], "line1    line2");
     assert_eq!(editor.cursor_pos(), (5, 0));
@@ -316,14 +316,14 @@ fn test_editor_hungry_delete() {
     // Test deleting word with leading whitespace
     editor.document.lines[0] = "  foo bar".to_string();
     editor.set_cursor_pos(9, 0);
-    editor.hungry_delete();
+    editor.process_input(Input::Character('\x1b'), Some(Input::KeyBackspace), None);
     assert_eq!(editor.document.lines[0], "  foo");
     assert_eq!(editor.cursor_pos(), (5, 0));
 
     // Test deleting only whitespace
     editor.document.lines[0] = "  ".to_string();
     editor.set_cursor_pos(2, 0);
-    editor.hungry_delete();
+    editor.process_input(Input::Character('\x1b'), Some(Input::KeyBackspace), None);
     assert_eq!(editor.document.lines[0], "");
     assert_eq!(editor.cursor_pos(), (0, 0));
 }
@@ -424,7 +424,7 @@ fn test_editor_kill_line_middle_of_line() {
     let mut editor = Editor::new(None);
     editor.document.lines = vec!["hello world".to_string()];
     editor.set_cursor_pos(6, 0); // Cursor at 'w' in "world"
-    editor.kill_line();
+    editor.handle_keypress(Input::Character('\x0b'));
     assert_eq!(editor.document.lines[0], "hello ");
     assert_eq!(editor.kill_buffer, "world");
     assert_eq!(editor.cursor_pos(), (6, 0));
@@ -435,7 +435,7 @@ fn test_editor_kill_line_end_of_line_not_last_line() {
     let mut editor = Editor::new(None);
     editor.document.lines = vec!["hello".to_string(), "world".to_string()];
     editor.set_cursor_pos(5, 0); // Cursor at end of "hello"
-    editor.kill_line();
+    editor.handle_keypress(Input::Character('\x0b'));
     assert_eq!(editor.document.lines.len(), 1);
     assert_eq!(editor.document.lines[0], "helloworld");
     assert_eq!(editor.kill_buffer, "\nworld"); // Newline + content of next line
@@ -447,7 +447,7 @@ fn test_editor_kill_line_empty_line_not_last_line() {
     let mut editor = Editor::new(None);
     editor.document.lines = vec!["line1".to_string(), "".to_string(), "line3".to_string()];
     editor.set_cursor_pos(0, 1); // Cursor at beginning of empty line
-    editor.kill_line();
+    editor.handle_keypress(Input::Character('\x0b'));
     assert_eq!(editor.document.lines.len(), 2);
     assert_eq!(editor.document.lines[0], "line1");
     assert_eq!(editor.document.lines[1], "line3");
@@ -460,7 +460,7 @@ fn test_editor_kill_line_last_line() {
     let mut editor = Editor::new(None);
     editor.document.lines = vec!["last line".to_string()];
     editor.set_cursor_pos(0, 0);
-    editor.kill_line();
+    editor.handle_keypress(Input::Character('\x0b'));
     assert_eq!(editor.document.lines[0], "");
     assert_eq!(editor.kill_buffer, "last line");
     assert_eq!(editor.cursor_pos(), (0, 0));
@@ -472,7 +472,7 @@ fn test_editor_yank_single_line() {
     editor.kill_buffer = "yanked text".to_string();
     editor.document.lines = vec!["start ".to_string(), "end".to_string()];
     editor.set_cursor_pos(6, 0); // After "start "
-    editor.yank();
+    editor.handle_keypress(Input::Character('\x19'));
     assert_eq!(editor.document.lines[0], "start yanked text");
     assert_eq!(editor.cursor_pos(), (17, 0)); // Cursor after yanked text
 }
@@ -483,7 +483,7 @@ fn test_editor_yank_multiple_lines() {
     editor.kill_buffer = "line1\nline2\nline3".to_string();
     editor.document.lines = vec!["start".to_string(), "end".to_string()];
     editor.set_cursor_pos(5, 0); // After "start"
-    editor.yank();
+    editor.handle_keypress(Input::Character('\x19'));
     assert_eq!(editor.document.lines.len(), 4);
     assert_eq!(editor.document.lines[0], "startline1");
     assert_eq!(editor.document.lines[1], "line2");
@@ -545,14 +545,22 @@ fn test_editor_move_line_up() {
         "line3".to_string(),
     ];
     editor.set_cursor_pos(0, 1); // Cursor on line2
-    editor.move_line_up(); // Call the function directly
+    editor.process_input(
+        Input::Character('\x1b'),
+        Some(Input::Character('[')),
+        Some(Input::Character('A')),
+    );
     assert_eq!(editor.document.lines[0], "line2");
     assert_eq!(editor.document.lines[1], "line1");
     assert_eq!(editor.document.lines[2], "line3");
     assert_eq!(editor.cursor_pos(), (0, 0)); // Cursor should move up with the line
 
     // Try moving up from the first line (should not change document, only status message)
-    editor.move_line_up(); // Call the function directly
+    editor.process_input(
+        Input::Character('\x1b'),
+        Some(Input::Character('[')),
+        Some(Input::Character('A')),
+    );
     assert_eq!(editor.document.lines[0], "line2");
     assert_eq!(editor.document.lines[1], "line1");
     assert_eq!(editor.document.lines[2], "line3");
@@ -568,14 +576,22 @@ fn test_editor_move_line_down() {
         "line3".to_string(),
     ];
     editor.set_cursor_pos(0, 1); // Cursor on line2
-    editor.move_line_down(); // Call the function directly
+    editor.process_input(
+        Input::Character('\x1b'),
+        Some(Input::Character('[')),
+        Some(Input::Character('B')),
+    );
     assert_eq!(editor.document.lines[0], "line1");
     assert_eq!(editor.document.lines[1], "line3");
     assert_eq!(editor.document.lines[2], "line2");
     assert_eq!(editor.cursor_pos(), (0, 2)); // Cursor should move down with the line
 
     // Try moving down from the last line (should not change document, only status message)
-    editor.move_line_down(); // Call the function directly
+    editor.process_input(
+        Input::Character('\x1b'),
+        Some(Input::Character('[')),
+        Some(Input::Character('B')),
+    );
     assert_eq!(editor.document.lines[0], "line1");
     assert_eq!(editor.document.lines[1], "line3");
     assert_eq!(editor.document.lines[2], "line2");
@@ -588,7 +604,7 @@ fn test_editor_yank_empty_kill_buffer() {
     editor.kill_buffer = "".to_string();
     editor.document.lines = vec!["original".to_string()];
     editor.set_cursor_pos(0, 0);
-    editor.yank();
+    editor.handle_keypress(Input::Character('\x19'));
     assert_eq!(editor.document.lines[0], "original"); // Document should be unchanged
     assert_eq!(editor.cursor_pos(), (0, 0));
 }
