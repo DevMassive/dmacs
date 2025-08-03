@@ -1,6 +1,7 @@
 use dmacs::editor::Editor;
 use pancurses::{
-    COLOR_WHITE, curs_set, endwin, init_pair, initscr, noecho, start_color, use_default_colors,
+    COLOR_BLACK, COLOR_WHITE, curs_set, endwin, init_pair, initscr, noecho, start_color,
+    use_default_colors,
 };
 use std::env;
 use std::io::{self, stdin};
@@ -11,7 +12,7 @@ use std::thread;
 use std::time::Duration;
 
 // Import necessary types and functions from the libc crate
-use libc::{_POSIX_VDISABLE, TCSANOW, VDSUSP, VLNEXT, tcgetattr, tcsetattr, termios};
+use libc::{_POSIX_VDISABLE, TCSANOW, VDSUSP, VLNEXT, VSTOP, tcgetattr, tcsetattr, termios};
 
 static CTRL_C_COUNT: AtomicUsize = AtomicUsize::new(0);
 
@@ -40,6 +41,9 @@ fn main() -> io::Result<()> {
     // Disable lnext character (Ctrl+V)
     termios_settings.c_cc[VLNEXT] = _POSIX_VDISABLE;
 
+    // Disable stop character (Ctrl+S)
+    termios_settings.c_cc[VSTOP] = _POSIX_VDISABLE;
+
     // Apply changes
     if unsafe { tcsetattr(stdin_fd, TCSANOW, &termios_settings) } != 0 {
         return Err(io::Error::last_os_error());
@@ -49,6 +53,7 @@ fn main() -> io::Result<()> {
         start_color();
         use_default_colors();
         init_pair(1, COLOR_WHITE, -1);
+        init_pair(2, COLOR_BLACK, COLOR_WHITE); // For highlighting
     }
 
     let (tx, rx) = mpsc::channel();

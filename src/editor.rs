@@ -1,4 +1,4 @@
-use pancurses::{A_DIM, Input, Window};
+use pancurses::{A_DIM, A_REVERSE, Input, Window};
 
 use unicode_width::UnicodeWidthChar;
 
@@ -13,14 +13,19 @@ pub struct Editor {
     cursor_x: usize, // byte index
     cursor_y: usize,
     desired_cursor_x: usize, // column index
-    status_message: String,
+    pub status_message: String,
     pub row_offset: usize,                     // public for tests
     pub col_offset: usize,                     // public for tests
     undo_stack: Vec<(Document, usize, usize)>, // Stores (Document, cursor_x, cursor_y)
     pub kill_buffer: String,
     last_action_was_kill: bool,
-    screen_rows: usize,
-    screen_cols: usize,
+    pub screen_rows: usize,
+    pub screen_cols: usize,
+    pub search_mode: bool,
+    pub search_query: String,
+    pub search_results: Vec<(usize, usize)>,
+    pub current_match_index: Option<usize>,
+    pub previous_status_message: String,
 }
 
 impl Editor {
@@ -53,6 +58,11 @@ impl Editor {
             last_action_was_kill: false,
             screen_rows: 0,
             screen_cols: 0,
+            search_mode: false,
+            search_query: String::new(),
+            search_results: Vec::new(),
+            current_match_index: None,
+            previous_status_message: String::new(),
         }
     }
 
@@ -76,6 +86,11 @@ impl Editor {
     }
 
     pub fn process_input(&mut self, key: Input, next_key: Option<Input>, third_key: Option<Input>) {
+        if self.search_mode {
+            self.handle_search_input(key);
+            return;
+        }
+
         match key {
             pancurses::Input::Character('\x1b') => {
                 // Escape key, potential start of Alt/Option sequence
@@ -112,7 +127,7 @@ impl Editor {
         match key {
             Input::Character(c) => match c {
                 '\x18' => self.quit(),
-                '\x13' => self.save_document(),
+                '\x13' => self.enter_search_mode(), // Ctrl + S
                 '\x01' => self.go_to_start_of_line(),
                 '\x05' => self.go_to_end_of_line(),
                 '\x04' => self.delete_forward_char(),
@@ -138,6 +153,147 @@ impl Editor {
             _ => {}
         }
         self.clamp_cursor_x();
+    }
+
+    fn enter_search_mode(&mut self) {
+        self.search_mode = true;
+        self.search_query.clear();
+        self.search_results.clear();
+        self.current_match_index = None;
+        self.previous_status_message = self.status_message.clone(); // Save current status message
+        self.status_message = "Search: ".to_string();
+    }
+
+    fn handle_search_input(&mut self, key: Input) {
+        if let Input::Character(c) = key {
+            match c {
+                '\x1b' => {
+                    // Escape key to exit search mode
+                    self.search_mode = false;
+                    self.search_query.clear();
+                    self.search_results.clear();
+                    self.current_match_index = None;
+                    self.status_message = self.previous_status_message.clone(); // Restore previous status message
+                }
+                '\n' | '\r' => {
+                    // Enter to confirm search and exit search mode
+                    self.search_mode = false;
+                    self.search_query.clear();
+                    self.search_results.clear();
+                    self.current_match_index = None;
+                    self.status_message = self.previous_status_message.clone(); // Restore previous status message
+                }
+                '\x13' => {
+                    // Ctrl + S for next match
+                    self.move_to_next_match();
+                }
+                '\x0e' => {
+                    // Ctrl + N for next match (already handled, but keeping for consistency)
+                    self.move_to_next_match();
+                }
+                '\x10' => {
+                    // Ctrl + P for previous match
+                    self.move_to_prev_match();
+                }
+                '\x7f' | '\x08' => {
+                    // Backspace
+                    self.search_query.pop();
+                    self.search();
+                }
+                _ => {
+                    self.search_query.push(c);
+                    self.search();
+                }
+            }
+        }
+        if self.search_mode {
+            self.status_message = format!(
+                "Search: {}{}",
+                self.search_query,
+                if self.search_query.is_empty() {
+                    ""
+                } else if self.search_results.is_empty() {
+                    " (No match)"
+                } else {
+                    ""
+                }
+            );
+        }
+    }
+
+    fn search(&mut self) {
+        self.search_results.clear();
+        self.current_match_index = None;
+
+        if self.search_query.is_empty() {
+            return;
+        }
+
+        for (row_idx, line) in self.document.lines.iter().enumerate() {
+            for (col_idx, _) in line.match_indices(&self.search_query) {
+                self.search_results.push((row_idx, col_idx));
+            }
+        }
+
+        if !self.search_results.is_empty() {
+            // Try to find a match from the current cursor position onwards
+            let current_pos = (self.cursor_y, self.cursor_x);
+            let mut found_current_or_next = false;
+            for (i, &(row, col)) in self.search_results.iter().enumerate() {
+                if row > current_pos.0 || (row == current_pos.0 && col >= current_pos.1) {
+                    self.current_match_index = Some(i);
+                    self.move_to_match();
+                    found_current_or_next = true;
+                    break;
+                }
+            }
+            if !found_current_or_next {
+                // If no match found after current position, wrap around to the first match
+                self.current_match_index = Some(0);
+                self.move_to_match();
+            }
+        }
+    }
+
+    fn move_to_match(&mut self) {
+        if let Some(index) = self.current_match_index {
+            if let Some(&(row, col)) = self.search_results.get(index) {
+                self.cursor_y = row;
+                self.cursor_x = col;
+                self.desired_cursor_x =
+                    self.get_display_width(&self.document.lines[self.cursor_y], self.cursor_x);
+            }
+        }
+    }
+
+    fn move_to_next_match(&mut self) {
+        if self.search_results.is_empty() {
+            return;
+        }
+        let next_index = match self.current_match_index {
+            Some(idx) => (idx + 1) % self.search_results.len(),
+            None => 0,
+        };
+        self.current_match_index = Some(next_index);
+        self.move_to_match();
+    }
+
+    fn move_to_prev_match(&mut self) {
+        if self.search_results.is_empty() {
+            return;
+        }
+        let prev_index = match self.current_match_index {
+            Some(idx) => {
+                if idx == 0 {
+                    self.search_results.len() - 1
+                } else {
+                    idx - 1
+                }
+            }
+            None => self.search_results.len() - 1,
+        };
+        self.current_match_index = Some(prev_index);
+        self.move_to_match();
     }
 
     fn get_display_width(&self, line: &str, until_byte: usize) -> usize {
@@ -199,6 +355,7 @@ impl Editor {
             }
 
             let mut display_x = 0;
+            let mut byte_idx = 0;
             for ch in line.chars() {
                 let char_start_display_x = display_x;
 
@@ -209,6 +366,16 @@ impl Editor {
                     ch.width().unwrap_or(0)
                 };
                 display_x += char_width;
+
+                // Check if this character is part of a search result
+                let is_highlighted = self.search_mode
+                    && self.search_results.iter().any(|&(r, c)| {
+                        r == index && byte_idx >= c && byte_idx < c + self.search_query.len()
+                    });
+
+                if is_highlighted {
+                    window.attron(A_REVERSE);
+                }
 
                 // Draw character
                 if display_x > self.col_offset {
@@ -231,6 +398,11 @@ impl Editor {
                 if char_start_display_x.saturating_sub(self.col_offset) >= self.screen_cols {
                     break;
                 }
+
+                if is_highlighted {
+                    window.attroff(A_REVERSE);
+                }
+                byte_idx += ch.len_utf8();
             }
             if is_comment {
                 window.attroff(A_DIM);
