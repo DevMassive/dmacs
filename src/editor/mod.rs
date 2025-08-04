@@ -566,42 +566,37 @@ impl Editor {
             return; // Nothing to do in an empty document
         }
 
-        let mut found_delimiter_line_idx = None;
+        let mut target_line_y: Option<usize> = None;
 
-        // Search for the next delimiter starting from the current line
-        for i in current_line_idx..num_lines {
-            if self.document.lines[i] == "---" {
-                found_delimiter_line_idx = Some(i);
-                break;
-            }
-        }
-
-        // If no delimiter found from current position to end, search from beginning
-        if found_delimiter_line_idx.is_none() {
-            for i in 0..current_line_idx {
+        // Scenario 1: Current line is a delimiter. Move to the line immediately after it.
+        if current_line_idx < num_lines && self.document.lines[current_line_idx] == "---" {
+            target_line_y = Some(current_line_idx + 1);
+        } else {
+            // Scenario 2: Current line is not a delimiter. Search for the next delimiter *after* the current position.
+            for i in (current_line_idx + 1)..num_lines {
                 if self.document.lines[i] == "---" {
-                    found_delimiter_line_idx = Some(i);
+                    target_line_y = Some(i + 1);
                     break;
                 }
             }
+            // If target_line_y is still None here, it means there are no delimiters
+            // after the current position. According to the user's request, we should do nothing
+            // in this case (no wrapping around to previous delimiters).
         }
 
-        if let Some(delimiter_line) = found_delimiter_line_idx {
-            let mut new_cursor_y = delimiter_line + 1;
+        if let Some(new_cursor_y) = target_line_y {
+            // If moving past the last line, and it was the last delimiter, do nothing.
+            // This handles the case where the last delimiter is at the very end of the file.
             if new_cursor_y >= num_lines {
-                new_cursor_y = 0; // Wrap around to the beginning of the document
+                return; // Do nothing if moving past the last delimiter and no more exist.
             }
+
             self.cursor_y = new_cursor_y;
             self.cursor_x = 0;
             self.desired_cursor_x = 0;
             self.row_offset = self.cursor_y; // Scroll to make cursor at top
-        } else {
-            // If no delimiter found anywhere, go to the beginning of the document
-            self.cursor_y = 0;
-            self.cursor_x = 0;
-            self.desired_cursor_x = 0;
-            self.row_offset = 0;
         }
+        // If target_line_y is None, do nothing, which is the desired behavior.
     }
 }
 
