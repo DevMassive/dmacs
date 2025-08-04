@@ -6,7 +6,7 @@ fn test_editor_kill_line_middle_of_line() {
     let mut editor = Editor::new(None);
     editor.document.lines = vec!["hello world".to_string()];
     editor.set_cursor_pos(6, 0); // Cursor at 'w' in "world"
-    editor.handle_keypress(Input::Character('\x0b'));
+    editor.handle_keypress(Input::Character('\x0b')).unwrap();
     assert_eq!(editor.document.lines[0], "hello ");
     assert_eq!(editor.kill_buffer, "world");
     assert_eq!(editor.cursor_pos(), (6, 0));
@@ -17,7 +17,7 @@ fn test_editor_kill_line_end_of_line_not_last_line() {
     let mut editor = Editor::new(None);
     editor.document.lines = vec!["hello".to_string(), "world".to_string()];
     editor.set_cursor_pos(5, 0); // Cursor at end of "hello"
-    editor.handle_keypress(Input::Character('\x0b'));
+    editor.handle_keypress(Input::Character('\x0b')).unwrap();
     assert_eq!(editor.document.lines.len(), 1);
     assert_eq!(editor.document.lines[0], "helloworld");
     assert_eq!(editor.kill_buffer, "\nworld"); // Newline + content of next line
@@ -29,7 +29,7 @@ fn test_editor_kill_line_empty_line_not_last_line() {
     let mut editor = Editor::new(None);
     editor.document.lines = vec!["line1".to_string(), "".to_string(), "line3".to_string()];
     editor.set_cursor_pos(0, 1); // Cursor at beginning of empty line
-    editor.handle_keypress(Input::Character('\x0b'));
+    editor.handle_keypress(Input::Character('\x0b')).unwrap();
     assert_eq!(editor.document.lines.len(), 2);
     assert_eq!(editor.document.lines[0], "line1");
     assert_eq!(editor.document.lines[1], "line3");
@@ -42,7 +42,7 @@ fn test_editor_kill_line_last_line() {
     let mut editor = Editor::new(None);
     editor.document.lines = vec!["last line".to_string()];
     editor.set_cursor_pos(0, 0);
-    editor.handle_keypress(Input::Character('\x0b'));
+    editor.handle_keypress(Input::Character('\x0b')).unwrap();
     assert_eq!(editor.document.lines[0], "");
     assert_eq!(editor.kill_buffer, "last line");
     assert_eq!(editor.cursor_pos(), (0, 0));
@@ -54,7 +54,7 @@ fn test_editor_yank_single_line() {
     editor.kill_buffer = "yanked text".to_string();
     editor.document.lines = vec!["start ".to_string(), "end".to_string()];
     editor.set_cursor_pos(6, 0); // After "start "
-    editor.handle_keypress(Input::Character('\x19'));
+    editor.handle_keypress(Input::Character('\x19')).unwrap();
     assert_eq!(editor.document.lines[0], "start yanked text");
     assert_eq!(editor.cursor_pos(), (17, 0)); // Cursor after yanked text
 }
@@ -65,7 +65,7 @@ fn test_editor_yank_multiple_lines() {
     editor.kill_buffer = "line1\nline2\nline3".to_string();
     editor.document.lines = vec!["start".to_string(), "end".to_string()];
     editor.set_cursor_pos(5, 0); // After "start"
-    editor.handle_keypress(Input::Character('\x19'));
+    editor.handle_keypress(Input::Character('\x19')).unwrap();
     assert_eq!(editor.document.lines.len(), 4);
     assert_eq!(editor.document.lines[0], "startline1");
     assert_eq!(editor.document.lines[1], "line2");
@@ -85,33 +85,33 @@ fn test_editor_consecutive_kill_line() {
 
     // Kill "line one"
     editor.set_cursor_pos(0, 0);
-    editor.handle_keypress(Input::Character('\x0b')); // Ctrl-K
+    editor.handle_keypress(Input::Character('\x0b')).unwrap(); // Ctrl-K
     assert_eq!(editor.kill_buffer, "line one");
     assert_eq!(editor.document.lines.len(), 3);
     assert_eq!(editor.document.lines[0], ""); // "line one" should be removed
 
     editor.set_cursor_pos(0, 0);
-    editor.handle_keypress(Input::Character('\x0b')); // Ctrl-K
+    editor.handle_keypress(Input::Character('\x0b')).unwrap(); // Ctrl-K
     assert_eq!(editor.kill_buffer, "line one\n");
     assert_eq!(editor.document.lines.len(), 2);
     assert_eq!(editor.document.lines[0], "line two"); // "line one\n" should be removed
 
     // Kill "line two" immediately after
     editor.set_cursor_pos(0, 0); // Cursor is now at the start of "line two"
-    editor.handle_keypress(Input::Character('\x0b')); // Ctrl-K
+    editor.handle_keypress(Input::Character('\x0b')).unwrap(); // Ctrl-K
     assert_eq!(editor.kill_buffer, "line one\nline two"); // Should append
     assert_eq!(editor.document.lines.len(), 2);
     assert_eq!(editor.document.lines[0], ""); // "line two" should be removed
 
     editor.set_cursor_pos(0, 0);
-    editor.handle_keypress(Input::Character('\x0b')); // Ctrl-K
+    editor.handle_keypress(Input::Character('\x0b')).unwrap(); // Ctrl-K
     assert_eq!(editor.kill_buffer, "line one\nline two\n"); // Should append
     assert_eq!(editor.document.lines.len(), 1);
     assert_eq!(editor.document.lines[0], "line three"); // "line two" should be removed
 
     // Yank the accumulated content
     editor.set_cursor_pos(0, 0);
-    editor.handle_keypress(Input::Character('\x19')); // Ctrl-Y
+    editor.handle_keypress(Input::Character('\x19')).unwrap(); // Ctrl-Y
     assert_eq!(editor.document.lines.len(), 3);
     assert_eq!(editor.document.lines[0], "line one");
     assert_eq!(editor.document.lines[1], "line two");
@@ -124,7 +124,7 @@ fn test_editor_yank_empty_kill_buffer() {
     editor.kill_buffer = "".to_string();
     editor.document.lines = vec!["original".to_string()];
     editor.set_cursor_pos(0, 0);
-    editor.handle_keypress(Input::Character('\x19'));
+    editor.handle_keypress(Input::Character('\x19')).unwrap();
     assert_eq!(editor.document.lines[0], "original"); // Document should be unchanged
     assert_eq!(editor.cursor_pos(), (0, 0));
 }

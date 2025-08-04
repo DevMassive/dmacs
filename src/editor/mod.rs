@@ -2,6 +2,7 @@ use unicode_width::UnicodeWidthChar;
 
 use crate::document::Document;
 use crate::editor::search::Search;
+use crate::error::{DmacsError, Result};
 
 pub mod input;
 pub mod search;
@@ -85,23 +86,24 @@ impl Editor {
         }
     }
 
-    pub fn insert_char(&mut self, c: char) {
+    pub fn insert_char(&mut self, c: char) -> Result<()> {
         self.last_action_was_kill = false;
         self.save_state_for_undo();
-        self.document.insert(self.cursor_x, self.cursor_y, c);
+        self.document.insert(self.cursor_x, self.cursor_y, c)?;
         self.cursor_x += c.len_utf8();
         self.desired_cursor_x =
             self.get_display_width(&self.document.lines[self.cursor_y], self.cursor_x);
         self.status_message = "".to_string();
+        Ok(())
     }
 
-    pub fn delete_char(&mut self) {
+    pub fn delete_char(&mut self) -> Result<()> {
         self.last_action_was_kill = false;
         // Backspace
         self.save_state_for_undo();
         if self.cursor_x > 0 {
             self.move_cursor_left();
-            self.document.delete(self.cursor_x, self.cursor_y);
+            self.document.delete(self.cursor_x, self.cursor_y)?;
         } else if self.cursor_y > 0 {
             let prev_line_len = self.document.lines[self.cursor_y - 1].len();
             let current_line = self.document.lines.remove(self.cursor_y);
@@ -111,9 +113,10 @@ impl Editor {
             self.desired_cursor_x =
                 self.get_display_width(&self.document.lines[self.cursor_y], self.cursor_x);
         }
+        Ok(())
     }
 
-    pub fn delete_forward_char(&mut self) {
+    pub fn delete_forward_char(&mut self) -> Result<()> {
         self.last_action_was_kill = false;
         // Ctrl-D
         self.save_state_for_undo();
@@ -121,20 +124,22 @@ impl Editor {
         let x = self.cursor_x;
         let line_len = self.document.lines.get(y).map_or(0, |l| l.len());
         if x < line_len {
-            self.document.delete(x, y);
+            self.document.delete(x, y)?;
         } else if y < self.document.lines.len() - 1 {
             let next_line = self.document.lines.remove(y + 1);
             self.document.lines[y].push_str(&next_line);
         }
+        Ok(())
     }
 
-    pub fn insert_newline(&mut self) {
+    pub fn insert_newline(&mut self) -> Result<()> {
         self.last_action_was_kill = false;
         self.save_state_for_undo();
-        self.document.insert_newline(self.cursor_x, self.cursor_y);
+        self.document.insert_newline(self.cursor_x, self.cursor_y)?;
         self.cursor_y += 1;
         self.cursor_x = 0;
         self.desired_cursor_x = 0;
+        Ok(())
     }
 
     pub fn kill_line(&mut self) {
@@ -171,7 +176,7 @@ impl Editor {
         self.last_action_was_kill = true;
     }
 
-    pub fn yank(&mut self) {
+    pub fn yank(&mut self) -> Result<()> {
         self.last_action_was_kill = false;
         self.save_state_for_undo();
         let text_to_yank = self.kill_buffer.clone();
@@ -181,21 +186,21 @@ impl Editor {
         let lines_to_yank: Vec<&str> = text_to_yank.split('\x0a').collect();
 
         if lines_to_yank.is_empty() {
-            return;
+            return Ok(());
         }
 
         // Insert the first part of the yanked text into the current line
         self.document
-            .insert_string(current_x, current_y, lines_to_yank[0]);
+            .insert_string(current_x, current_y, lines_to_yank[0])?;
         current_x += lines_to_yank[0].len();
 
         // Insert subsequent lines
         for line_to_yank in lines_to_yank.iter().skip(1) {
-            self.document.insert_newline(current_x, current_y);
+            self.document.insert_newline(current_x, current_y)?;
             current_y += 1;
             current_x = 0;
             self.document
-                .insert_string(current_x, current_y, line_to_yank);
+                .insert_string(current_x, current_y, line_to_yank)?;
             current_x += line_to_yank.len();
         }
 
@@ -203,6 +208,7 @@ impl Editor {
         self.cursor_y = current_y;
         self.desired_cursor_x =
             self.get_display_width(&self.document.lines[self.cursor_y], self.cursor_x);
+        Ok(())
     }
 
     pub fn hungry_delete(&mut self) {
@@ -249,7 +255,7 @@ impl Editor {
         self.desired_cursor_x = self.get_display_width(&self.document.lines[y], self.cursor_x);
     }
 
-    pub fn move_cursor_word_left(&mut self) {
+    pub fn move_cursor_word_left(&mut self) -> Result<()> {
         self.last_action_was_kill = false;
         let current_line = &self.document.lines[self.cursor_y];
         let mut new_cursor_x = self.cursor_x;
@@ -261,7 +267,7 @@ impl Editor {
                 self.desired_cursor_x =
                     self.get_display_width(&self.document.lines[self.cursor_y], self.cursor_x);
             }
-            return;
+            return Ok(());
         }
 
         let mut chars_iter = current_line[..new_cursor_x].char_indices().rev();
@@ -292,9 +298,10 @@ impl Editor {
 
         self.cursor_x = new_cursor_x;
         self.desired_cursor_x = self.get_display_width(current_line, self.cursor_x);
+        Ok(())
     }
 
-    pub fn move_cursor_word_right(&mut self) {
+    pub fn move_cursor_word_right(&mut self) -> Result<()> {
         self.last_action_was_kill = false;
         let current_line = &self.document.lines[self.cursor_y];
         let line_len = current_line.len();
@@ -305,14 +312,19 @@ impl Editor {
                 self.cursor_x = 0;
                 self.desired_cursor_x = 0;
             }
-            return;
+            return Ok(());
         }
 
         let mut current_byte_idx = self.cursor_x;
 
         // If we are currently on a non-word character, skip until we hit a word character.
         if current_byte_idx < line_len
-            && !is_word_char(current_line[current_byte_idx..].chars().next().unwrap())
+            && !is_word_char(
+                current_line[current_byte_idx..]
+                    .chars()
+                    .next()
+                    .ok_or(DmacsError::Editor("Invalid character".to_string()))?,
+            )
         {
             for ch in current_line[current_byte_idx..].chars() {
                 if is_word_char(ch) {
@@ -325,7 +337,12 @@ impl Editor {
         // Now, current_byte_idx is either at the start of a word, or at the end of the line.
         // If it's at the start of a word, skip until we hit a non-word character or end of line.
         if current_byte_idx < line_len
-            && is_word_char(current_line[current_byte_idx..].chars().next().unwrap())
+            && is_word_char(
+                current_line[current_byte_idx..]
+                    .chars()
+                    .next()
+                    .ok_or(DmacsError::Editor("Invalid character".to_string()))?,
+            )
         {
             for ch in current_line[current_byte_idx..].chars() {
                 if !is_word_char(ch) {
@@ -337,21 +354,21 @@ impl Editor {
 
         self.cursor_x = current_byte_idx;
         self.desired_cursor_x = self.get_display_width(current_line, self.cursor_x);
+        Ok(())
     }
 
-    pub fn save_document(&mut self) {
+    pub fn save_document(&mut self) -> Result<()> {
         self.last_action_was_kill = false;
-        if self.document.save().is_ok() {
-            self.status_message = "File saved successfully.".to_string();
-        } else {
-            self.status_message = "Error saving file!".to_string();
-        }
+        self.document.save()?;
+        self.status_message = "File saved successfully.".to_string();
+        Ok(())
     }
 
-    pub fn quit(&mut self) {
+    pub fn quit(&mut self) -> Result<()> {
         self.last_action_was_kill = false;
-        self.document.save().ok();
+        self.document.save()?;
         self.should_quit = true;
+        Ok(())
     }
 
     pub fn clamp_cursor_x(&mut self) {

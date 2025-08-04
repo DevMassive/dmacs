@@ -8,6 +8,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::mpsc::{self, Receiver};
 
 use crate::Event;
+use crate::error::{DmacsError, Result};
 
 // Import necessary types and functions from the libc crate
 use libc::{
@@ -24,7 +25,7 @@ pub struct Terminal {
 }
 
 impl Terminal {
-    pub fn new() -> io::Result<Self> {
+    pub fn new() -> Result<Self> {
         let window = initscr();
         window.keypad(true);
         noecho();
@@ -38,7 +39,7 @@ impl Terminal {
 
         // Get current termios settings
         if unsafe { tcgetattr(stdin_fd, &mut termios_settings) } != 0 {
-            return Err(io::Error::last_os_error());
+            return Err(DmacsError::Io(io::Error::last_os_error()));
         }
         original_termios.clone_from(&termios_settings);
 
@@ -54,7 +55,7 @@ impl Terminal {
         // Disable reprint character (Ctrl+R)
         termios_settings.c_cc[VREPRINT] = _POSIX_VDISABLE;
         if unsafe { tcsetattr(stdin_fd, TCSANOW, &termios_settings) } != 0 {
-            return Err(io::Error::last_os_error());
+            return Err(DmacsError::Io(io::Error::last_os_error()));
         }
 
         if pancurses::has_colors() {
@@ -70,11 +71,12 @@ impl Terminal {
         // Ctrl+C handler
         ctrlc::set_handler(move || {
             let _current_count = CTRL_C_COUNT.fetch_add(1, Ordering::SeqCst) + 1;
-            tx_clone_for_handler
-                .send(Event::Quit)
-                .expect("Could not send signal on channel.");
+            if let Err(e) = tx_clone_for_handler.send(Event::Quit) {
+                // Log the error or handle it appropriately, but don't return a Result
+                eprintln!("Could not send signal on channel: {e}");
+            }
         })
-        .expect("Error setting Ctrl-C handler");
+        .map_err(|e| DmacsError::Terminal(format!("Error setting Ctrl-C handler: {e}")))?;
 
         Ok(Self {
             window,
@@ -99,10 +101,16 @@ impl Terminal {
         self.event_tx.clone()
     }
 
-    pub fn next_event(&self) -> Option<Event> {
+    pub fn next_event(&self) -> Result<Option<Event>> {
         // Try to receive an event from the channel first
-        if let Ok(event) = self.event_rx.try_recv() {
-            return Some(event);
+        match self.event_rx.try_recv() {
+            Ok(event) => return Ok(Some(event)),
+            Err(mpsc::TryRecvError::Empty) => {}
+            Err(mpsc::TryRecvError::Disconnected) => {
+                return Err(DmacsError::Terminal(
+                    "Event channel disconnected".to_string(),
+                ));
+            }
         }
 
         // If no channel event, check for key input
@@ -158,13 +166,13 @@ impl Terminal {
                     }
                 }
                 Input::KeyResize => {
-                    return Some(Event::Resize);
+                    return Ok(Some(Event::Resize));
                 }
                 _ => key,
             };
-            return Some(Event::Key(processed_key, is_alt_pressed));
+            return Ok(Some(Event::Key(processed_key, is_alt_pressed)));
         }
-        None
+        Ok(None)
     }
 }
 

@@ -9,7 +9,7 @@ fn test_editor_horizontal_scroll_right() {
 
     // Move cursor to the right, beyond the screen width
     for i in 0..12 {
-        editor.handle_keypress(Input::KeyRight);
+        editor.handle_keypress(Input::KeyRight).unwrap();
         editor.scroll();
 
         let (x, _) = editor.cursor_pos();
@@ -42,7 +42,7 @@ fn test_editor_horizontal_scroll_left() {
 
     // First, scroll to the right
     for _ in 0..15 {
-        editor.handle_keypress(Input::KeyRight);
+        editor.handle_keypress(Input::KeyRight).unwrap();
     }
     editor.scroll();
     assert_eq!(editor.cursor_pos(), (15, 0));
@@ -55,7 +55,7 @@ fn test_editor_horizontal_scroll_left() {
 
     // Now, move cursor to the left, back into the scrolled area
     for i in 0..10 {
-        editor.handle_keypress(Input::KeyLeft);
+        editor.handle_keypress(Input::KeyLeft).unwrap();
         editor.scroll();
 
         let (x, _) = editor.cursor_pos();
@@ -76,7 +76,7 @@ fn test_editor_horizontal_scroll_line_change() {
     editor.update_screen_size(15, 20);
 
     // Go to the end of the long line to force scrolling
-    editor.handle_keypress(Input::Character('\x05')); // Ctrl-E (end of line)
+    editor.handle_keypress(Input::Character('\x05')).unwrap(); // Ctrl-E (end of line)
     editor.scroll();
     // Note: screen_width is not directly used here, but the logic implies it.
     // For testing purposes, we can assume a fixed screen_width for this assertion.
@@ -84,7 +84,7 @@ fn test_editor_horizontal_scroll_line_change() {
     assert_eq!(editor.col_offset, 34 - editor.screen_cols + 1);
 
     // Move down to the shorter line
-    editor.handle_keypress(Input::KeyDown);
+    editor.handle_keypress(Input::KeyDown).unwrap();
     editor.scroll();
 
     // Cursor should be clamped to the end of the shorter line

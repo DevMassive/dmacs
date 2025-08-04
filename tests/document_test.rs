@@ -31,17 +31,17 @@ fn test_document_save() {
 #[test]
 fn test_document_insert() {
     let mut doc = Document::default();
-    doc.insert(0, 0, 'h');
-    doc.insert(1, 0, 'i');
+    doc.insert(0, 0, 'h').unwrap();
+    doc.insert(1, 0, 'i').unwrap();
     assert_eq!(doc.lines[0], "hi");
 }
 
 #[test]
 fn test_document_delete() {
     let mut doc = Document::default();
-    doc.insert(0, 0, 'h');
-    doc.insert(1, 0, 'i');
-    doc.delete(0, 0);
+    doc.insert(0, 0, 'h').unwrap();
+    doc.insert(1, 0, 'i').unwrap();
+    doc.delete(0, 0).unwrap();
     assert_eq!(doc.lines[0], "i");
 }
 
@@ -49,7 +49,7 @@ fn test_document_delete() {
 fn test_insert_newline() {
     let mut doc = Document::default();
     doc.lines[0] = "abcdef".to_string();
-    doc.insert_newline(3, 0);
+    doc.insert_newline(3, 0).unwrap();
     assert_eq!(doc.lines.len(), 2);
     assert_eq!(doc.lines[0], "abc");
     assert_eq!(doc.lines[1], "def");
@@ -59,24 +59,24 @@ fn test_insert_newline() {
 fn test_document_insert_string() {
     let mut doc = Document::default();
     doc.lines[0] = "hello".to_string();
-    doc.insert_string(2, 0, "X");
+    doc.insert_string(2, 0, "X").unwrap();
     assert_eq!(doc.lines[0], "heXllo");
 
-    doc.insert_string(0, 0, "YY");
+    doc.insert_string(0, 0, "YY").unwrap();
     assert_eq!(doc.lines[0], "YYheXllo");
 
-    doc.insert_string(doc.lines[0].len(), 0, "ZZ");
+    doc.insert_string(doc.lines[0].len(), 0, "ZZ").unwrap();
     assert_eq!(doc.lines[0], "YYheXlloZZ");
 
     // Test inserting into an empty document
     let mut doc2 = Document::default();
-    doc2.insert_string(0, 0, "test");
+    doc2.insert_string(0, 0, "test").unwrap();
     assert_eq!(doc2.lines[0], "test");
 
     // Test inserting at an invalid line index (should do nothing)
     let mut doc3 = Document::default();
     doc3.lines[0] = "line".to_string();
-    doc3.insert_string(0, 1, "invalid");
+    assert!(doc3.insert_string(0, 1, "invalid").is_err());
     assert_eq!(doc3.lines[0], "line");
 }
 
@@ -135,7 +135,7 @@ fn test_is_dirty_after_modification() {
     fs::write(filename, content).unwrap();
 
     let mut doc = Document::open(filename).unwrap();
-    doc.insert(0, 0, 'X'); // Modify the document
+    doc.insert(0, 0, 'X').unwrap(); // Modify the document
     assert!(
         doc.is_dirty(),
         "Document should be dirty after modification."
@@ -151,7 +151,7 @@ fn test_is_dirty_after_save() {
     fs::write(filename, content).unwrap();
 
     let mut doc = Document::open(filename).unwrap();
-    doc.insert(0, 0, 'X'); // Modify the document
+    doc.insert(0, 0, 'X').unwrap(); // Modify the document
     assert!(doc.is_dirty(), "Document should be dirty before saving.");
     doc.save().unwrap();
     assert!(
