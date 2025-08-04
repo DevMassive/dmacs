@@ -7,7 +7,7 @@ const TAB_STOP: usize = 4;
 
 impl Editor {
     pub fn draw(&mut self, window: &Window) {
-        self.scroll(self.screen_cols, self.screen_rows - 1);
+        self.scroll(self.screen_cols, self.screen_rows - 2);
 
         window.erase();
 
@@ -17,8 +17,8 @@ impl Editor {
                 continue;
             }
             let row = index - self.row_offset;
-            if row >= self.screen_rows.saturating_sub(1) {
-                // Account for status bar
+            if row >= self.screen_rows.saturating_sub(2) {
+                // Account for status bar and horizontal line
                 break;
             }
 
@@ -96,6 +96,11 @@ impl Editor {
             modified_indicator,
             status_message_str
         );
+        // Draw horizontal line above status bar
+        for i in 0..self.screen_cols {
+            window.mvaddch(window.get_max_y() - 2, i as i32, pancurses::ACS_HLINE());
+        }
+
         window.mvaddstr(window.get_max_y() - 1, 0, &status_bar);
         window.attron(A_BOLD);
         window.mvaddstr(
