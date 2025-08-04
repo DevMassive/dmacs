@@ -4,7 +4,7 @@ use pancurses::Input;
 #[test]
 fn test_editor_insert_char() {
     let mut editor = Editor::new(None);
-    editor.handle_keypress(Input::Character('a')).unwrap();
+    editor.process_input(Input::Character('a'), false).unwrap();
     assert_eq!(editor.document.lines[0], "a");
     assert_eq!(editor.cursor_pos(), (1, 0));
 }
@@ -12,8 +12,8 @@ fn test_editor_insert_char() {
 #[test]
 fn test_editor_delete_char() {
     let mut editor = Editor::new(None);
-    editor.handle_keypress(Input::Character('a')).unwrap();
-    editor.handle_keypress(Input::KeyBackspace).unwrap();
+    editor.process_input(Input::Character('a'), false).unwrap();
+    editor.process_input(Input::KeyBackspace, false).unwrap();
     assert_eq!(editor.document.lines[0], "");
     assert_eq!(editor.cursor_pos(), (0, 0));
 }
@@ -21,9 +21,11 @@ fn test_editor_delete_char() {
 #[test]
 fn test_editor_delete_forward_char() {
     let mut editor = Editor::new(None);
-    editor.handle_keypress(Input::Character('a')).unwrap();
-    editor.handle_keypress(Input::KeyLeft).unwrap();
-    editor.handle_keypress(Input::Character('\x04')).unwrap(); // Ctrl-D
+    editor.process_input(Input::Character('a'), false).unwrap();
+    editor.process_input(Input::KeyLeft, false).unwrap();
+    editor
+        .process_input(Input::Character('\x04'), false)
+        .unwrap(); // Ctrl-D
     assert_eq!(editor.document.lines[0], "");
     assert_eq!(editor.cursor_pos(), (0, 0));
 }
@@ -31,8 +33,10 @@ fn test_editor_delete_forward_char() {
 #[test]
 fn test_editor_insert_newline() {
     let mut editor = Editor::new(None);
-    editor.handle_keypress(Input::Character('a')).unwrap();
-    editor.handle_keypress(Input::Character('\x0A')).unwrap();
+    editor.process_input(Input::Character('a'), false).unwrap();
+    editor
+        .process_input(Input::Character('\x0A'), false)
+        .unwrap();
     assert_eq!(editor.document.lines.len(), 2);
     assert_eq!(editor.document.lines[0], "a");
     assert_eq!(editor.document.lines[1], "");
@@ -44,7 +48,7 @@ fn test_editor_backspace_line_join() {
     let mut editor = Editor::new(None);
     editor.document.lines = vec!["hello".to_string(), "world".to_string()];
     editor.set_cursor_pos(0, 1); // Set cursor to beginning of "world"
-    editor.handle_keypress(Input::KeyBackspace).unwrap();
+    editor.process_input(Input::KeyBackspace, false).unwrap();
     assert_eq!(editor.document.lines.len(), 1);
     assert_eq!(editor.document.lines[0], "helloworld");
     assert_eq!(editor.cursor_pos(), (5, 0));
@@ -54,12 +58,14 @@ fn test_editor_backspace_line_join() {
 fn test_editor_delete_to_end_of_line() {
     let mut editor = Editor::new(None);
     editor.document.lines[0] = "hello world".to_string();
-    editor.handle_keypress(Input::KeyRight).unwrap();
-    editor.handle_keypress(Input::KeyRight).unwrap();
-    editor.handle_keypress(Input::KeyRight).unwrap();
-    editor.handle_keypress(Input::KeyRight).unwrap();
-    editor.handle_keypress(Input::KeyRight).unwrap();
-    editor.handle_keypress(Input::Character('\x0b')).unwrap(); // Ctrl-K
+    editor.process_input(Input::KeyRight, false).unwrap();
+    editor.process_input(Input::KeyRight, false).unwrap();
+    editor.process_input(Input::KeyRight, false).unwrap();
+    editor.process_input(Input::KeyRight, false).unwrap();
+    editor.process_input(Input::KeyRight, false).unwrap();
+    editor
+        .process_input(Input::Character('\x0b'), false)
+        .unwrap(); // Ctrl-K
     assert_eq!(editor.document.lines[0], "hello");
     assert_eq!(editor.cursor_pos(), (5, 0));
 }
@@ -68,8 +74,12 @@ fn test_editor_delete_to_end_of_line() {
 fn test_editor_delete_to_end_of_line_at_end() {
     let mut editor = Editor::new(None);
     editor.document.lines = vec!["hello".to_string(), "world".to_string()];
-    editor.handle_keypress(Input::Character('\x05')).unwrap(); // Ctrl-E
-    editor.handle_keypress(Input::Character('\x0b')).unwrap(); // Ctrl-K
+    editor
+        .process_input(Input::Character('\x05'), false)
+        .unwrap(); // Ctrl-E
+    editor
+        .process_input(Input::Character('\x0b'), false)
+        .unwrap(); // Ctrl-K
     assert_eq!(editor.document.lines.len(), 1);
     assert_eq!(editor.document.lines[0], "helloworld");
     assert_eq!(editor.cursor_pos(), (5, 0));
@@ -78,8 +88,10 @@ fn test_editor_delete_to_end_of_line_at_end() {
 #[test]
 fn test_editor_del_key() {
     let mut editor = Editor::new(None);
-    editor.handle_keypress(Input::Character('a')).unwrap();
-    editor.handle_keypress(Input::Character('\x7f')).unwrap();
+    editor.process_input(Input::Character('a'), false).unwrap();
+    editor
+        .process_input(Input::Character('\x7f'), false)
+        .unwrap();
     assert_eq!(editor.document.lines[0], "");
     assert_eq!(editor.cursor_pos(), (0, 0));
 }

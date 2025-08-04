@@ -34,7 +34,7 @@ impl Editor {
         Ok(())
     }
 
-    pub fn handle_keypress(&mut self, key: Input) -> Result<()> {
+    fn handle_keypress(&mut self, key: Input) -> Result<()> {
         self.status_message.clear();
         match key {
             Input::Character(c) => match c {
