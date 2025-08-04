@@ -438,7 +438,7 @@ impl Editor {
 
     pub fn scroll_page_down(&mut self) {
         self.last_action_was_kill = false;
-        let page_height = self.screen_rows.saturating_sub(1).max(1);
+        let page_height = self.screen_rows.saturating_sub(2).max(1);
         self.row_offset = self.row_offset.saturating_add(page_height);
         self.row_offset = self
             .row_offset
@@ -449,7 +449,7 @@ impl Editor {
 
     pub fn scroll_page_up(&mut self) {
         self.last_action_was_kill = false;
-        let page_height = self.screen_rows.saturating_sub(1).max(1);
+        let page_height = self.screen_rows.saturating_sub(2).max(1);
         self.row_offset = self.row_offset.saturating_sub(page_height);
         self.cursor_y = self.row_offset;
         self.clamp_cursor_x();

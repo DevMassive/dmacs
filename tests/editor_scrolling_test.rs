@@ -96,7 +96,7 @@ fn test_editor_scroll_page_down() {
         // Create 50 lines
         editor.document.lines.push("test line".to_string());
     }
-    editor.update_screen_size(25, 80); // screen_rows = 25, usable height = 24
+    editor.update_screen_size(25, 80); // screen_rows = 25, usable height = 23
 
     // Initial state
     assert_eq!(editor.cursor_pos().1, 0);
@@ -104,13 +104,13 @@ fn test_editor_scroll_page_down() {
 
     // Scroll down one page
     editor.scroll_page_down();
-    assert_eq!(editor.cursor_pos().1, 24); // Should move to the top of the next page
-    assert_eq!(editor.row_offset, 24);
+    assert_eq!(editor.cursor_pos().1, 23); // Should move to the top of the next page
+    assert_eq!(editor.row_offset, 23);
 
     // Scroll down another page
     editor.scroll_page_down();
-    assert_eq!(editor.cursor_pos().1, 48);
-    assert_eq!(editor.row_offset, 48);
+    assert_eq!(editor.cursor_pos().1, 46);
+    assert_eq!(editor.row_offset, 46);
 
     // Scroll down beyond document end
     editor.scroll_page_down();
@@ -121,8 +121,8 @@ fn test_editor_scroll_page_down() {
     editor.set_cursor_pos(0, 10);
     editor.row_offset = 10;
     editor.scroll_page_down();
-    assert_eq!(editor.cursor_pos().1, 34); // 10 + 24
-    assert_eq!(editor.row_offset, 34);
+    assert_eq!(editor.cursor_pos().1, 33); // 10 + 23
+    assert_eq!(editor.row_offset, 33);
 }
 
 #[test]
@@ -132,16 +132,16 @@ fn test_editor_scroll_page_up() {
         // Create 50 lines
         editor.document.lines.push("test line".to_string());
     }
-    editor.update_screen_size(25, 80); // screen_rows = 25, usable height = 24
+    editor.update_screen_size(25, 80); // screen_rows = 25, usable height = 23
 
     // First, scroll down to simulate being in the middle of the document
-    editor.set_cursor_pos(0, 48);
-    editor.row_offset = 48;
+    editor.set_cursor_pos(0, 46);
+    editor.row_offset = 46;
 
     // Scroll up one page
     editor.scroll_page_up();
-    assert_eq!(editor.cursor_pos().1, 24); // Should move to the top of the previous page
-    assert_eq!(editor.row_offset, 24);
+    assert_eq!(editor.cursor_pos().1, 23); // Should move to the top of the previous page
+    assert_eq!(editor.row_offset, 23);
 
     // Scroll up another page
     editor.scroll_page_up();
@@ -157,6 +157,6 @@ fn test_editor_scroll_page_up() {
     editor.set_cursor_pos(0, 34);
     editor.row_offset = 34;
     editor.scroll_page_up();
-    assert_eq!(editor.cursor_pos().1, 10); // 34 - 24
-    assert_eq!(editor.row_offset, 10);
+    assert_eq!(editor.cursor_pos().1, 11); // 34 - 23
+    assert_eq!(editor.row_offset, 11);
 }

@@ -97,9 +97,11 @@ impl Editor {
             status_message_str
         );
         // Draw horizontal line above status bar
+        window.attron(A_DIM);
         for i in 0..self.screen_cols {
             window.mvaddch(window.get_max_y() - 2, i as i32, pancurses::ACS_HLINE());
         }
+        window.attroff(A_DIM);
 
         window.mvaddstr(window.get_max_y() - 1, 0, &status_bar);
         window.attron(A_BOLD);
