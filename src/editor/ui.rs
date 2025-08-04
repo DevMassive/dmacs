@@ -85,20 +85,6 @@ impl Editor {
             }
         }
 
-        // Draw status bar
-        let modified_indicator = if self.document.is_dirty() { "*" } else { "" };
-        let status_message_str = if self.status_message.is_empty() {
-            "".to_string()
-        } else {
-            format!(" | {}", self.status_message)
-        };
-        let status_bar = format!(
-            "{} - {} lines{}{}",
-            self.document.filename.as_deref().unwrap_or("[No Name]"),
-            self.document.lines.len(),
-            modified_indicator,
-            status_message_str
-        );
         // Draw horizontal line above status bar
         window.attron(A_DIM);
         for i in 0..screen_cols {
@@ -106,14 +92,40 @@ impl Editor {
         }
         window.attroff(A_DIM);
 
-        window.mvaddstr(window.get_max_y() - 1, 0, &status_bar);
+        // Draw filename (bold) and modified indicator
+        let filename_display = self.document.filename.as_deref().unwrap_or("[No Name]");
+        let modified_indicator = if self.document.is_dirty() { "*" } else { "" };
+        let filename_and_modified = format!("{filename_display}{modified_indicator}");
         window.attron(A_BOLD);
-        window.mvaddstr(
-            window.get_max_y() - 1,
-            0,
-            self.document.filename.as_deref().unwrap_or("[No Name]"),
-        );
+        window.mvaddstr(window.get_max_y() - 1, 0, &filename_and_modified);
         window.attroff(A_BOLD);
+
+        // Calculate the display width of the filename and modified indicator
+        let mut current_col = 0;
+        for ch in filename_and_modified.chars() {
+            current_col += ch.width().unwrap_or(0);
+        }
+
+        // Draw line count
+        let line_count_str = format!(" - {} lines", self.document.lines.len());
+        window.mvaddstr(window.get_max_y() - 1, current_col as i32, &line_count_str);
+        for ch in line_count_str.chars() {
+            current_col += ch.width().unwrap_or(0);
+        }
+
+        // Draw the status message on the right, if present
+        if !self.status_message.is_empty() {
+            let mut message_display_width = 0;
+            for ch in self.status_message.chars() {
+                message_display_width += ch.width().unwrap_or(0);
+            }
+            let message_start_col = screen_cols.saturating_sub(message_display_width);
+            window.mvaddstr(
+                window.get_max_y() - 1,
+                message_start_col as i32,
+                &self.status_message,
+            );
+        }
 
         // Move cursor
         let display_cursor_x =

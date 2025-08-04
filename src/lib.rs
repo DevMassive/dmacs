@@ -32,6 +32,7 @@ pub fn run_editor() -> Result<()> {
             match event {
                 Event::Key(key, is_alt_pressed) => {
                     editor.process_input(key, is_alt_pressed)?;
+                    terminal::CTRL_C_COUNT.store(0, std::sync::atomic::Ordering::SeqCst);
                 }
                 Event::Resize => {
                     // Handled by update_screen_size at the beginning of the loop
@@ -43,6 +44,7 @@ pub fn run_editor() -> Result<()> {
                         editor.set_message("Press Ctrl+C again to quit.");
                         let tx_clone = terminal.get_tx_for_timeout();
                         std::thread::spawn(move || {
+                            std::thread::sleep(std::time::Duration::from_secs(2));
                             if let Err(e) = tx_clone.send(Event::ClearMessage) {
                                 eprintln!("Could not send clear message signal: {e}");
                             }
