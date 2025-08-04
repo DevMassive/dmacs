@@ -1,4 +1,4 @@
-use crate::editor::state::Editor;
+use crate::editor::Editor;
 
 pub struct Search {
     pub mode: bool,

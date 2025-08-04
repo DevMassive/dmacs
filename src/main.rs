@@ -1,5 +1,5 @@
 use dmacs::Event;
-use dmacs::editor::state::Editor;
+use dmacs::editor::Editor;
 use dmacs::terminal::Terminal;
 use std::env;
 use std::io;

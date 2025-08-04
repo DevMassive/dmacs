@@ -1,6 +1,6 @@
 use pancurses::Input;
 
-use crate::editor::state::Editor;
+use crate::editor::Editor;
 
 impl Editor {
     pub fn process_input(&mut self, key: Input, is_alt_pressed: bool) {

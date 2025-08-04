@@ -1,7 +1,7 @@
 use pancurses::{A_BOLD, A_DIM, A_REVERSE, Window};
 use unicode_width::UnicodeWidthChar;
 
-use crate::editor::state::Editor;
+use crate::editor::Editor;
 
 const TAB_STOP: usize = 4;
 
