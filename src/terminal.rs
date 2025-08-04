@@ -137,11 +137,6 @@ impl Terminal {
                                 _ => Input::Character('\x1b'), // Fallback if not an arrow key sequence
                             }
                         }
-                        Some(Input::Character(c)) => {
-                            // If the next character is a printable character, it's likely an Alt/Meta sequence.
-                            is_alt_pressed = true;
-                            Input::Character(c)
-                        }
                         Some(Input::KeyLeft) => {
                             is_alt_pressed = true;
                             Input::KeyLeft
@@ -158,9 +153,14 @@ impl Terminal {
                             is_alt_pressed = true;
                             Input::KeyDown
                         }
-                        Some(Input::KeyBackspace) => {
+                        Some(Input::Character('\x7f') | Input::KeyBackspace) => {
                             is_alt_pressed = true;
                             Input::KeyBackspace
+                        }
+                        Some(Input::Character(c)) => {
+                            // If the next character is a printable character, it's likely an Alt/Meta sequence.
+                            is_alt_pressed = true;
+                            Input::Character(c)
                         }
                         _ => Input::Character('\x1b'), // Just an escape key
                     }
