@@ -45,7 +45,7 @@ impl Editor {
                     self.search.current_match_index = None;
                     self.status_message = self.previous_status_message.clone(); // Restore previous status message
                 }
-                '\n' | '\r' => {
+                '\x0a' | '\x0d' => {
                     // Enter to confirm search and exit search mode
                     self.search.mode = false;
                     self.search.query.clear();

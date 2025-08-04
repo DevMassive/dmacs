@@ -146,7 +146,7 @@ impl Editor {
             // Case 3: Cursor is at the beginning of an empty line, and it's not the last line
             // Kill the newline and remove the empty line
             self.document.lines.remove(y); // Remove the empty line
-            self.kill_buffer.push('\n');
+            self.kill_buffer.push('\x0a');
         } else if x < current_line_len {
             // Case 1: Cursor is within the line (not at the very end)
             // Kill from cursor to end of line
@@ -157,7 +157,7 @@ impl Editor {
             // Kill the newline and join with the next line
             let next_line_content = self.document.lines.remove(y + 1);
             self.document.lines[y].push_str(&next_line_content);
-            self.kill_buffer.push('\n');
+            self.kill_buffer.push('\x0a');
             self.kill_buffer.push_str(&next_line_content);
         }
         self.last_action_was_kill = true;
@@ -170,7 +170,7 @@ impl Editor {
         let mut current_x = self.cursor_x;
         let mut current_y = self.cursor_y;
 
-        let lines_to_yank: Vec<&str> = text_to_yank.split('\n').collect();
+        let lines_to_yank: Vec<&str> = text_to_yank.split('\x0a').collect();
 
         if lines_to_yank.is_empty() {
             return;
@@ -359,7 +359,7 @@ impl Editor {
             if bytes >= until_byte {
                 break;
             }
-            if ch == '\t' {
+            if ch == '\x09' {
                 width += TAB_STOP - (width % TAB_STOP);
             } else {
                 width += ch.width().unwrap_or(0);
@@ -377,7 +377,7 @@ impl Editor {
             if current_display_x >= display_x {
                 break;
             }
-            if ch == '\t' {
+            if ch == '\x09' {
                 current_display_x += TAB_STOP - (current_display_x % TAB_STOP);
             } else {
                 current_display_x += ch.width().unwrap_or(0);

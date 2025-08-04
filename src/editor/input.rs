@@ -58,7 +58,7 @@ impl Editor {
                 '\x19' => self.yank(),                 // Ctrl + Y
                 '\x16' => self.scroll_page_down(),     // Ctrl + V
                 '\x7f' | '\x08' => self.delete_char(), // Backspace
-                '\n' | '\r' => self.insert_newline(),
+                '\x0a' | '\x0d' => self.insert_newline(),
                 '\x00' => {}
                 '\x02' => self.move_cursor_word_left(), // Ctrl + B
                 '\x06' => self.move_cursor_word_right(), // Ctrl + F

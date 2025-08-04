@@ -33,7 +33,7 @@ impl Editor {
                 let char_start_display_x = display_x;
 
                 // Calculate character width
-                let char_width = if ch == ' ' {
+                let char_width = if ch == '\x09' {
                     TAB_STOP - (display_x % TAB_STOP)
                 } else {
                     ch.width().unwrap_or(0)
@@ -54,7 +54,7 @@ impl Editor {
                 if display_x > self.col_offset {
                     let screen_x = char_start_display_x.saturating_sub(self.col_offset);
                     if screen_x < self.screen_cols {
-                        if ch == ' ' {
+                        if ch == '\x09' {
                             // Draw a tab as spaces
                             for i in 0..char_width {
                                 if screen_x + i < self.screen_cols {
