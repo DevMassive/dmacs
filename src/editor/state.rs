@@ -428,7 +428,6 @@ impl Editor {
             self.save_state_for_undo();
             self.cursor_y += 1;
             self.document.swap_lines(self.cursor_y - 1, self.cursor_y);
-            self.status_message = "Line moved down.".to_string();
         } else {
             self.status_message = "Cannot move line down further.".to_string();
         }
