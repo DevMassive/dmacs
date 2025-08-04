@@ -34,10 +34,6 @@ impl Document {
             for line in &self.lines {
                 writeln!(file, "{line}").map_err(DmacsError::Io)?;
             }
-            let mut file = std::fs::File::create(filename).map_err(DmacsError::Io)?;
-            for line in &self.lines {
-                writeln!(file, "{line}").map_err(DmacsError::Io)?;
-            }
             self.original_content = Some(self.lines.join("\n") + "\n");
         }
         Ok(())
@@ -48,16 +44,13 @@ impl Document {
             // New file, always dirty until saved
             return true;
         }
-        let current_content = self.lines.join("\n");
-        let current_content_with_newline =
-            if !self.lines.is_empty() && !current_content.ends_with('\n') {
-                current_content + "\n"
-            } else {
-                current_content
-            };
-        self.original_content
+        let original_lines: Vec<String> = self
+            .original_content
             .as_ref()
-            .is_none_or(|orig| *orig != current_content_with_newline)
+            .map(|s| s.lines().map(|line| line.to_string()).collect())
+            .unwrap_or_default();
+
+        self.lines != original_lines
     }
 
     pub fn insert(&mut self, at_x: usize, at_y: usize, c: char) -> Result<()> {

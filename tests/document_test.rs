@@ -167,3 +167,18 @@ fn test_is_dirty_new_file() {
     let doc = Document::new_empty();
     assert!(doc.is_dirty(), "New document should be dirty.");
 }
+
+#[test]
+fn test_is_dirty_after_opening_file_no_trailing_newline() {
+    let filename = "test_dirty_check_no_newline.txt";
+    let content = "line1\nline2";
+    fs::write(filename, content).unwrap();
+
+    let doc = Document::open(filename).unwrap();
+    assert!(
+        !doc.is_dirty(),
+        "Document should not be dirty after opening a clean file with no trailing newline."
+    );
+
+    fs::remove_file(filename).unwrap();
+}
