@@ -112,3 +112,108 @@ fn test_move_to_next_delimiter_no_further_delimiters() {
     );
     assert_eq!(editor.cursor_x, 0);
 }
+
+#[test]
+fn test_move_to_previous_delimiter_no_delimiters() {
+    let mut editor = setup_editor_with_content(vec!["line 1", "line 2", "line 3"]);
+    editor.cursor_y = 1; // Start in the middle
+
+    editor.move_to_previous_delimiter();
+    assert_eq!(
+        editor.cursor_y, 0,
+        "Cursor should move to page 0 if no delimiters above"
+    );
+    assert_eq!(editor.cursor_x, 0);
+}
+
+#[test]
+fn test_move_to_previous_delimiter_before_current_position() {
+    let mut editor = setup_editor_with_content(vec!["line 1", "---", "line 3", "---", "line 5"]);
+    editor.cursor_y = 4; // Start at line 5
+
+    editor.move_to_previous_delimiter();
+    assert_eq!(
+        editor.cursor_y, 2,
+        "Cursor should move to line after previous delimiter"
+    );
+    assert_eq!(editor.cursor_x, 0);
+
+    editor.move_to_previous_delimiter();
+    assert_eq!(
+        editor.cursor_y, 0,
+        "Cursor should move to page 0 after previous delimiter"
+    );
+    assert_eq!(editor.cursor_x, 0);
+}
+
+#[test]
+fn test_move_to_previous_delimiter_from_delimiter_line() {
+    let mut editor = setup_editor_with_content(vec!["line 1", "---", "line 3", "line 4"]);
+    editor.cursor_y = 1; // Start on the delimiter
+
+    editor.move_to_previous_delimiter();
+    assert_eq!(
+        editor.cursor_y, 0,
+        "Cursor should move to line before the current delimiter"
+    );
+    assert_eq!(editor.cursor_x, 0);
+}
+
+#[test]
+fn test_move_to_previous_delimiter_multiple_delimiters() {
+    let mut editor =
+        setup_editor_with_content(vec!["---", "line 1", "---", "line 2", "---", "line 3"]);
+    editor.cursor_y = 5;
+
+    editor.move_to_previous_delimiter();
+    assert_eq!(editor.cursor_y, 3);
+
+    editor.move_to_previous_delimiter();
+    assert_eq!(editor.cursor_y, 1);
+
+    editor.move_to_previous_delimiter();
+    assert_eq!(editor.cursor_y, 0);
+
+    // No more delimiters, cursor should move to page 0
+    editor.move_to_previous_delimiter();
+    assert_eq!(editor.cursor_y, 0);
+}
+
+#[test]
+fn test_move_to_previous_delimiter_at_beginning_of_file() {
+    let mut editor = setup_editor_with_content(vec!["---", "line 1", "line 2"]);
+    editor.cursor_y = 0;
+
+    editor.move_to_previous_delimiter();
+    assert_eq!(
+        editor.cursor_y, 0,
+        "Cursor should remain at 0,0 if at beginning of file"
+    );
+    assert_eq!(editor.cursor_x, 0);
+}
+
+#[test]
+fn test_move_to_previous_delimiter_empty_document() {
+    let mut editor = setup_editor_with_content(vec![]);
+    editor.cursor_y = 0;
+
+    editor.move_to_previous_delimiter();
+    assert_eq!(
+        editor.cursor_y, 0,
+        "Cursor should remain at 0,0 in empty document"
+    );
+    assert_eq!(editor.cursor_x, 0);
+}
+
+#[test]
+fn test_move_to_previous_delimiter_no_previous_delimiters() {
+    let mut editor = setup_editor_with_content(vec!["line 1", "---", "line 3", "line 4"]);
+    editor.cursor_y = 1; // Start before the first delimiter
+
+    editor.move_to_previous_delimiter();
+    assert_eq!(
+        editor.cursor_y, 0,
+        "Cursor should move to page 0 if no previous delimiters"
+    );
+    assert_eq!(editor.cursor_x, 0);
+}

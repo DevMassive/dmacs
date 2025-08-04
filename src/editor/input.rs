@@ -47,10 +47,11 @@ impl Editor {
                     self.kill_line();
                     self.last_action_was_kill = true;
                 }
-                '\x19' => self.yank()?,                  // Ctrl + Y
-                '\x16' => self.scroll_page_down(),       // Ctrl + V
-                '\x0e' => self.move_to_next_delimiter(), // Ctrl + N
-                '\x7f' | '\x08' => self.delete_char()?,  // Backspace
+                '\x19' => self.yank()?,                      // Ctrl + Y
+                '\x16' => self.scroll_page_down(),           // Ctrl + V
+                '\x0e' => self.move_to_next_delimiter(),     // Ctrl + N
+                '\x10' => self.move_to_previous_delimiter(), // Ctrl + P
+                '\x7f' | '\x08' => self.delete_char()?,      // Backspace
                 '\x0a' | '\x0d' => self.insert_newline()?,
                 '\x00' => {}
                 '\x02' => self.move_cursor_word_left()?, // Ctrl + B

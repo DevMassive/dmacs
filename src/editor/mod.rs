@@ -598,6 +598,45 @@ impl Editor {
         }
         // If target_line_y is None, do nothing, which is the desired behavior.
     }
+
+    pub fn move_to_previous_delimiter(&mut self) {
+        self.last_action_was_kill = false;
+        let current_line_idx = self.cursor_y;
+        let num_lines = self.document.lines.len();
+
+        if num_lines == 0 {
+            return; // Nothing to do in an empty document
+        }
+
+        let mut target_line_y: Option<usize> = None;
+
+        // Iterate backwards from the line *before* the current cursor position
+        // to find the closest "page position" above it.
+        for i in (0..current_line_idx).rev() {
+            // Check if 'i' itself is a page position (i.e., line 0 or line after a delimiter)
+            if i == 0 {
+                target_line_y = Some(0);
+                break;
+            }
+            if self.document.lines[i - 1] == "---" {
+                target_line_y = Some(i); // 'i' is the line after the delimiter at 'i-1'
+                break;
+            }
+        }
+
+        // If no page position found above (meaning we reached the beginning of the file
+        // without finding a delimiter), move to page 0.
+        if target_line_y.is_none() {
+            target_line_y = Some(0);
+        }
+
+        if let Some(new_cursor_y) = target_line_y {
+            self.cursor_y = new_cursor_y;
+            self.cursor_x = 0;
+            self.desired_cursor_x = 0;
+            self.row_offset = self.cursor_y; // Scroll to make cursor at top
+        }
+    }
 }
 
 fn find_word_boundary_left(line: &str, current_x: usize) -> usize {
