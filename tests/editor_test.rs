@@ -62,7 +62,7 @@ fn test_editor_insert_newline() {
 }
 
 #[test]
-fn test_go_to_line_boundaries() {
+fn test_editor_go_to_line_boundaries() {
     let mut editor = Editor::new(None);
     editor.document.lines[0] = "hello".to_string();
     editor.handle_keypress(Input::KeyRight);
@@ -145,7 +145,7 @@ fn test_editor_with_tabs() {
 }
 
 #[test]
-fn test_horizontal_scroll_right() {
+fn test_editor_horizontal_scroll_right() {
     let mut editor = Editor::new(None);
     editor.document.lines[0] = "0123456789abcdef".to_string();
     let screen_width = 10;
@@ -174,7 +174,7 @@ fn test_horizontal_scroll_right() {
 }
 
 #[test]
-fn test_horizontal_scroll_left() {
+fn test_editor_horizontal_scroll_left() {
     let mut editor = Editor::new(None);
     editor.document.lines[0] = "0123456789abcdef".to_string();
     let screen_width = 10;
@@ -207,7 +207,7 @@ fn test_horizontal_scroll_left() {
 }
 
 #[test]
-fn test_horizontal_scroll_line_change() {
+fn test_editor_horizontal_scroll_line_change() {
     let mut editor = Editor::new(None);
     editor.document.lines = vec![
         "a very long line to test scrolling".to_string(), // len = 34
@@ -682,7 +682,7 @@ fn test_editor_yank_empty_kill_buffer() {
 }
 
 #[test]
-fn test_search_mode_enter_and_exit() {
+fn test_editor_search_mode_enter_and_exit() {
     let mut editor = Editor::new(None);
     editor.document.lines = vec!["test line one".to_string(), "test line two".to_string()];
     editor.set_message("Initial message.");
@@ -709,7 +709,7 @@ fn test_search_mode_enter_and_exit() {
 }
 
 #[test]
-fn test_search_mode_escape_exit() {
+fn test_editor_search_mode_escape_exit() {
     let mut editor = Editor::new(None);
     editor.document.lines = vec!["test line one".to_string()];
     editor.set_message("Another initial message.");
@@ -733,7 +733,7 @@ fn test_search_mode_escape_exit() {
 }
 
 #[test]
-fn test_search_next_and_previous_match() {
+fn test_editor_search_next_and_previous_match() {
     let mut editor = Editor::new(None);
     editor.document.lines = vec![
         "apple banana apple".to_string(),
@@ -779,7 +779,7 @@ fn test_search_next_and_previous_match() {
 }
 
 #[test]
-fn test_search_no_match() {
+fn test_editor_search_no_match() {
     let mut editor = Editor::new(None);
     editor.document.lines = vec!["line one".to_string(), "line two".to_string()];
     editor.set_message("Ready.");
@@ -802,7 +802,7 @@ fn test_search_no_match() {
 }
 
 #[test]
-fn test_search_empty_query() {
+fn test_editor_search_empty_query() {
     let mut editor = Editor::new(None);
     editor.document.lines = vec!["some text".to_string()];
     editor.set_message("Ready.");
