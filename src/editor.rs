@@ -14,6 +14,12 @@ pub struct Search {
     pub current_match_index: Option<usize>,
 }
 
+impl Default for Search {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Search {
     pub fn new() -> Self {
         Self {
