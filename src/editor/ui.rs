@@ -1,4 +1,4 @@
-use pancurses::{A_DIM, A_REVERSE, Window};
+use pancurses::{A_BOLD, A_DIM, A_REVERSE, Window};
 use unicode_width::UnicodeWidthChar;
 
 use crate::editor::state::Editor;
@@ -97,6 +97,13 @@ impl Editor {
             status_message_str
         );
         window.mvaddstr(window.get_max_y() - 1, 0, &status_bar);
+        window.attron(A_BOLD);
+        window.mvaddstr(
+            window.get_max_y() - 1,
+            0,
+            self.document.filename.as_deref().unwrap_or("[No Name]"),
+        );
+        window.attroff(A_BOLD);
 
         // Move cursor
         let display_cursor_x =
