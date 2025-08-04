@@ -17,10 +17,9 @@ fn test_open_document() {
 #[test]
 fn test_document_save() {
     let filename = "test_save.txt";
-    let doc = Document {
-        filename: Some(filename.to_string()),
-        lines: vec!["line1".to_string(), "line2".to_string()],
-    };
+    let mut doc = Document::new_empty();
+    doc.filename = Some(filename.to_string());
+    doc.lines = vec!["line1".to_string(), "line2".to_string()];
     doc.save().unwrap();
 
     let content = fs::read_to_string(filename).unwrap();
@@ -83,14 +82,12 @@ fn test_document_insert_string() {
 
 #[test]
 fn test_document_swap_lines() {
-    let mut doc = Document {
-        lines: vec![
-            "line1".to_string(),
-            "line2".to_string(),
-            "line3".to_string(),
-        ],
-        ..Default::default()
-    };
+    let mut doc = Document::new_empty();
+    doc.lines = vec![
+        "line1".to_string(),
+        "line2".to_string(),
+        "line3".to_string(),
+    ];
 
     // Swap line1 and line2
     doc.swap_lines(0, 1);
@@ -114,4 +111,59 @@ fn test_document_swap_lines() {
     assert_eq!(doc.lines[0], "line2");
     assert_eq!(doc.lines[1], "line3");
     assert_eq!(doc.lines[2], "line1");
+}
+
+#[test]
+fn test_is_dirty_after_opening_file() {
+    let filename = "test_dirty_check.txt";
+    let content = "line1\nline2\n";
+    fs::write(filename, content).unwrap();
+
+    let doc = Document::open(filename).unwrap();
+    assert!(
+        !doc.is_dirty(),
+        "Document should not be dirty after opening a clean file."
+    );
+
+    fs::remove_file(filename).unwrap();
+}
+
+#[test]
+fn test_is_dirty_after_modification() {
+    let filename = "test_dirty_modification.txt";
+    let content = "line1\nline2\n";
+    fs::write(filename, content).unwrap();
+
+    let mut doc = Document::open(filename).unwrap();
+    doc.insert(0, 0, 'X'); // Modify the document
+    assert!(
+        doc.is_dirty(),
+        "Document should be dirty after modification."
+    );
+
+    fs::remove_file(filename).unwrap();
+}
+
+#[test]
+fn test_is_dirty_after_save() {
+    let filename = "test_dirty_save.txt";
+    let content = "line1\nline2\n";
+    fs::write(filename, content).unwrap();
+
+    let mut doc = Document::open(filename).unwrap();
+    doc.insert(0, 0, 'X'); // Modify the document
+    assert!(doc.is_dirty(), "Document should be dirty before saving.");
+    doc.save().unwrap();
+    assert!(
+        !doc.is_dirty(),
+        "Document should not be dirty after saving."
+    );
+
+    fs::remove_file(filename).unwrap();
+}
+
+#[test]
+fn test_is_dirty_new_file() {
+    let doc = Document::new_empty();
+    assert!(doc.is_dirty(), "New document should be dirty.");
 }

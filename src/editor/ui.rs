@@ -83,11 +83,18 @@ impl Editor {
         }
 
         // Draw status bar
+        let modified_indicator = if self.document.is_dirty() { "*" } else { "" };
+        let status_message_str = if self.status_message.is_empty() {
+            "".to_string()
+        } else {
+            format!(" | {}", self.status_message)
+        };
         let status_bar = format!(
-            "{} - {} lines | {}",
+            "{} - {} lines{}{}",
             self.document.filename.as_deref().unwrap_or("[No Name]"),
             self.document.lines.len(),
-            self.status_message
+            modified_indicator,
+            status_message_str
         );
         window.mvaddstr(window.get_max_y() - 1, 0, &status_bar);
 

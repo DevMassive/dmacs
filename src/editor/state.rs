@@ -30,10 +30,9 @@ impl Editor {
                 if let Ok(doc) = Document::open(&fname) {
                     doc
                 } else {
-                    Document {
-                        lines: vec!["".to_string()],
-                        filename: Some(fname),
-                    }
+                    let mut doc = Document::new_empty();
+                    doc.filename = Some(fname);
+                    doc
                 }
             }
             None => Document::default(),
