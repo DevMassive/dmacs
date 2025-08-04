@@ -20,7 +20,6 @@ pub struct Editor {
     pub screen_rows: usize,
     pub screen_cols: usize,
     pub search: Search,
-    pub previous_status_message: String,
 }
 
 impl Editor {
@@ -53,7 +52,6 @@ impl Editor {
             screen_rows: 0,
             screen_cols: 0,
             search: Search::new(),
-            previous_status_message: String::new(),
         }
     }
 

@@ -5,13 +5,11 @@ use pancurses::Input;
 fn test_editor_search_mode_enter_and_exit() {
     let mut editor = Editor::new(None);
     editor.document.lines = vec!["test line one".to_string(), "test line two".to_string()];
-    editor.set_message("Initial message.");
 
     // Enter search mode
     editor.process_input(Input::Character('\x13'), None, None); // Ctrl+S
     assert!(editor.search.mode);
     assert_eq!(editor.status_message, "Search: ");
-    assert_eq!(editor.previous_status_message, "Initial message.");
 
     // Type a query
     editor.process_input(Input::Character('t'), None, None);
@@ -24,7 +22,7 @@ fn test_editor_search_mode_enter_and_exit() {
     // Exit with Enter
     editor.process_input(Input::Character('\n'), None, None);
     assert!(!editor.search.mode);
-    assert_eq!(editor.status_message, "Initial message."); // Should restore previous message
+    assert_eq!(editor.status_message, ""); // Should be empty
     assert_eq!(editor.search.query, ""); // Query should be cleared
 }
 
@@ -32,13 +30,11 @@ fn test_editor_search_mode_enter_and_exit() {
 fn test_editor_search_mode_escape_exit() {
     let mut editor = Editor::new(None);
     editor.document.lines = vec!["test line one".to_string()];
-    editor.set_message("Another initial message.");
 
     // Enter search mode
     editor.process_input(Input::Character('\x13'), None, None); // Ctrl+S
     assert!(editor.search.mode);
     assert_eq!(editor.status_message, "Search: ");
-    assert_eq!(editor.previous_status_message, "Another initial message.");
 
     // Type a query
     editor.process_input(Input::Character('e'), None, None);
@@ -48,7 +44,7 @@ fn test_editor_search_mode_escape_exit() {
     // Exit with Escape
     editor.process_input(Input::Character('\x1b'), None, None); // Escape
     assert!(!editor.search.mode);
-    assert_eq!(editor.status_message, "Another initial message."); // Should restore previous message
+    assert_eq!(editor.status_message, ""); // Should be empty
     assert_eq!(editor.search.query, ""); // Query should be cleared
 }
 
@@ -59,7 +55,6 @@ fn test_editor_search_next_and_previous_match() {
         "apple banana apple".to_string(),
         "orange apple grape".to_string(),
     ];
-    editor.set_message("Ready.");
 
     // Enter search mode and search for "apple"
     editor.process_input(Input::Character('\x13'), None, None); // Ctrl+S
@@ -95,14 +90,13 @@ fn test_editor_search_next_and_previous_match() {
     // Exit search mode
     editor.process_input(Input::Character('\n'), None, None); // Enter
     assert!(!editor.search.mode);
-    assert_eq!(editor.status_message, "Ready.");
+    assert_eq!(editor.status_message, "");
 }
 
 #[test]
 fn test_editor_search_no_match() {
     let mut editor = Editor::new(None);
     editor.document.lines = vec!["line one".to_string(), "line two".to_string()];
-    editor.set_message("Ready.");
 
     // Enter search mode and search for "xyz" (no match)
     editor.process_input(Input::Character('\x13'), None, None); // Ctrl+S
@@ -118,14 +112,13 @@ fn test_editor_search_no_match() {
     // Exit search mode
     editor.process_input(Input::Character('\n'), None, None); // Enter
     assert!(!editor.search.mode);
-    assert_eq!(editor.status_message, "Ready.");
+    assert_eq!(editor.status_message, "");
 }
 
 #[test]
 fn test_editor_search_empty_query() {
     let mut editor = Editor::new(None);
     editor.document.lines = vec!["some text".to_string()];
-    editor.set_message("Ready.");
 
     // Enter search mode
     editor.process_input(Input::Character('\x13'), None, None); // Ctrl+S
@@ -144,5 +137,5 @@ fn test_editor_search_empty_query() {
     // Exit search mode
     editor.process_input(Input::Character('\n'), None, None); // Enter
     assert!(!editor.search.mode);
-    assert_eq!(editor.status_message, "Ready.");
+    assert_eq!(editor.status_message, "");
 }

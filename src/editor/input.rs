@@ -44,6 +44,7 @@ impl Editor {
     }
 
     pub fn handle_keypress(&mut self, key: Input) {
+        self.status_message.clear();
         match key {
             Input::Character(c) => match c {
                 '\x18' => self.quit(),

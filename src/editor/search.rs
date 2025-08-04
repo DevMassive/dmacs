@@ -30,7 +30,7 @@ impl Editor {
         self.search.query.clear();
         self.search.results.clear();
         self.search.current_match_index = None;
-        self.previous_status_message = self.status_message.clone(); // Save current status message
+
         self.status_message = "Search: ".to_string();
     }
 
@@ -43,7 +43,7 @@ impl Editor {
                     self.search.query.clear();
                     self.search.results.clear();
                     self.search.current_match_index = None;
-                    self.status_message = self.previous_status_message.clone(); // Restore previous status message
+                    self.status_message.clear();
                 }
                 '\x0a' | '\x0d' => {
                     // Enter to confirm search and exit search mode
@@ -51,7 +51,7 @@ impl Editor {
                     self.search.query.clear();
                     self.search.results.clear();
                     self.search.current_match_index = None;
-                    self.status_message = self.previous_status_message.clone(); // Restore previous status message
+                    self.status_message.clear();
                 }
                 '\x13' => {
                     // Ctrl + S for next match
