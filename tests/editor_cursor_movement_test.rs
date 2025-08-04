@@ -118,3 +118,31 @@ fn test_editor_move_cursor_word_right() {
     editor.handle_keypress(Input::Character('\x06')); // Ctrl-F
     assert_eq!(editor.cursor_pos(), (16, 0)); // Should move to end of line
 }
+
+#[test]
+fn test_go_to_start_of_file() {
+    let mut editor = Editor::new(None);
+    editor.handle_keypress(Input::Character('a'));
+    editor.insert_newline();
+    editor.handle_keypress(Input::Character('b'));
+    editor.insert_newline();
+    editor.handle_keypress(Input::Character('c'));
+    editor.go_to_end_of_file(); // Move to end first to ensure it's not already at start
+    assert_eq!(editor.cursor_pos(), (1, 2));
+    editor.go_to_start_of_file();
+    assert_eq!(editor.cursor_pos(), (0, 0));
+    assert_eq!(editor.row_offset, 0);
+    assert_eq!(editor.col_offset, 0);
+}
+
+#[test]
+fn test_go_to_end_of_file() {
+    let mut editor = Editor::new(None);
+    editor.handle_keypress(Input::Character('a'));
+    editor.insert_newline();
+    editor.handle_keypress(Input::Character('b'));
+    editor.insert_newline();
+    editor.handle_keypress(Input::Character('c'));
+    editor.go_to_end_of_file();
+    assert_eq!(editor.cursor_pos(), (1, 2)); // Line 2 (0-indexed), cursor at end of 'c'
+}

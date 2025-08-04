@@ -115,6 +115,8 @@ impl Editor {
                 if let Some(next_key_val) = next_key {
                     match next_key_val {
                         pancurses::Input::Character('v') => self.scroll_page_up(), // Alt/Option + V for page up (often sends ESC v)
+                        pancurses::Input::Character('<') => self.go_to_start_of_file(), // Alt/Option + <
+                        pancurses::Input::Character('>') => self.go_to_end_of_file(), // Alt/Option + >
                         pancurses::Input::Character('b') => self.move_cursor_word_left(), // Alt/Option + Left Arrow (often sends ESC b)
                         pancurses::Input::Character('f') => self.move_cursor_word_right(), // Alt/Option + Right Arrow (often sends ESC f)
                         pancurses::Input::Character('[') => {
@@ -858,6 +860,29 @@ impl Editor {
         let page_height = self.screen_rows.saturating_sub(1).max(1); // Usable screen height, ensure at least 1
         self.row_offset = self.row_offset.saturating_sub(page_height);
         self.cursor_y = self.row_offset; // Set cursor to the top of the new view
+        self.clamp_cursor_x();
+    }
+
+    pub fn go_to_start_of_file(&mut self) {
+        self.last_action_was_kill = false;
+        self.cursor_y = 0;
+        self.cursor_x = 0;
+        self.desired_cursor_x = 0;
+        self.row_offset = 0;
+        self.col_offset = 0;
+    }
+
+    pub fn go_to_end_of_file(&mut self) {
+        self.last_action_was_kill = false;
+        self.cursor_y = self.document.lines.len().saturating_sub(1);
+        self.cursor_x = self.document.lines[self.cursor_y].len();
+        self.desired_cursor_x =
+            self.get_display_width(&self.document.lines[self.cursor_y], self.cursor_x);
+        // Adjust row_offset to show the end of the file
+        let screen_height = self.screen_rows.saturating_sub(1); // Account for status bar
+        if self.cursor_y >= self.row_offset + screen_height {
+            self.row_offset = self.cursor_y.saturating_sub(screen_height) + 1;
+        }
         self.clamp_cursor_x();
     }
 }
