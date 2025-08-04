@@ -689,23 +689,23 @@ fn test_search_mode_enter_and_exit() {
 
     // Enter search mode
     editor.process_input(Input::Character('\x13'), None, None); // Ctrl+S
-    assert!(editor.search_mode);
+    assert!(editor.search.mode);
     assert_eq!(editor.status_message, "Search: ");
     assert_eq!(editor.previous_status_message, "Initial message.");
 
     // Type a query
     editor.process_input(Input::Character('t'), None, None);
-    assert_eq!(editor.search_query, "t");
+    assert_eq!(editor.search.query, "t");
     assert_eq!(editor.status_message, "Search: t");
     editor.process_input(Input::Character('e'), None, None);
-    assert_eq!(editor.search_query, "te");
+    assert_eq!(editor.search.query, "te");
     assert_eq!(editor.status_message, "Search: te");
 
     // Exit with Enter
     editor.process_input(Input::Character('\n'), None, None);
-    assert!(!editor.search_mode);
+    assert!(!editor.search.mode);
     assert_eq!(editor.status_message, "Initial message."); // Should restore previous message
-    assert_eq!(editor.search_query, ""); // Query should be cleared
+    assert_eq!(editor.search.query, ""); // Query should be cleared
 }
 
 #[test]
@@ -716,20 +716,20 @@ fn test_search_mode_escape_exit() {
 
     // Enter search mode
     editor.process_input(Input::Character('\x13'), None, None); // Ctrl+S
-    assert!(editor.search_mode);
+    assert!(editor.search.mode);
     assert_eq!(editor.status_message, "Search: ");
     assert_eq!(editor.previous_status_message, "Another initial message.");
 
     // Type a query
     editor.process_input(Input::Character('e'), None, None);
-    assert_eq!(editor.search_query, "e");
+    assert_eq!(editor.search.query, "e");
     assert_eq!(editor.status_message, "Search: e");
 
     // Exit with Escape
     editor.process_input(Input::Character('\x1b'), None, None); // Escape
-    assert!(!editor.search_mode);
+    assert!(!editor.search.mode);
     assert_eq!(editor.status_message, "Another initial message."); // Should restore previous message
-    assert_eq!(editor.search_query, ""); // Query should be cleared
+    assert_eq!(editor.search.query, ""); // Query should be cleared
 }
 
 #[test]
@@ -774,7 +774,7 @@ fn test_search_next_and_previous_match() {
 
     // Exit search mode
     editor.process_input(Input::Character('\n'), None, None); // Enter
-    assert!(!editor.search_mode);
+    assert!(!editor.search.mode);
     assert_eq!(editor.status_message, "Ready.");
 }
 
@@ -790,14 +790,14 @@ fn test_search_no_match() {
     editor.process_input(Input::Character('y'), None, None);
     editor.process_input(Input::Character('z'), None, None);
 
-    assert_eq!(editor.search_query, "xyz");
+    assert_eq!(editor.search.query, "xyz");
     assert_eq!(editor.status_message, "Search: xyz (No match)");
-    assert!(editor.search_results.is_empty());
-    assert_eq!(editor.current_match_index, None);
+    assert!(editor.search.results.is_empty());
+    assert_eq!(editor.search.current_match_index, None);
 
     // Exit search mode
     editor.process_input(Input::Character('\n'), None, None); // Enter
-    assert!(!editor.search_mode);
+    assert!(!editor.search.mode);
     assert_eq!(editor.status_message, "Ready.");
 }
 
@@ -813,16 +813,16 @@ fn test_search_empty_query() {
 
     // Backspace to empty query
     editor.process_input(Input::Character('e'), None, None);
-    assert_eq!(editor.search_query, "e");
+    assert_eq!(editor.search.query, "e");
     assert_eq!(editor.status_message, "Search: e");
     editor.process_input(Input::Character('\x7f'), None, None); // Backspace
-    assert_eq!(editor.search_query, "");
+    assert_eq!(editor.search.query, "");
     assert_eq!(editor.status_message, "Search: ");
-    assert!(editor.search_results.is_empty());
-    assert_eq!(editor.current_match_index, None);
+    assert!(editor.search.results.is_empty());
+    assert_eq!(editor.search.current_match_index, None);
 
     // Exit search mode
     editor.process_input(Input::Character('\n'), None, None); // Enter
-    assert!(!editor.search_mode);
+    assert!(!editor.search.mode);
     assert_eq!(editor.status_message, "Ready.");
 }
