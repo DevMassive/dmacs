@@ -256,24 +256,30 @@ impl Editor {
             return;
         }
 
-        let mut char_indices = current_line[..new_cursor_x].char_indices().rev();
+        let mut chars_iter = current_line[..new_cursor_x].char_indices().rev();
 
-        // Skip any trailing non-word characters (whitespace, punctuation)
-        for (idx, ch) in char_indices.by_ref() {
+        // Step 1: Skip any non-word characters (including whitespace) to the left
+        // until we hit a word character or the beginning of the line.
+        let mut found_word_char = false;
+        for (idx, ch) in chars_iter.by_ref() {
             if is_word_char(ch) {
-                new_cursor_x = idx + ch.len_utf8(); // Move past the non-word char
+                new_cursor_x = idx; // This is the start of a word
+                found_word_char = true;
                 break;
             }
-            new_cursor_x = idx;
+            new_cursor_x = idx; // Keep moving left
         }
 
-        // Skip word characters
-        for (idx, ch) in char_indices {
-            if !is_word_char(ch) {
-                new_cursor_x = idx + ch.len_utf8(); // Move past the word char
-                break;
+        // Step 2: If we found a word character, now skip all word characters
+        // to find the actual beginning of the word.
+        if found_word_char {
+            for (idx, ch) in chars_iter {
+                if !is_word_char(ch) {
+                    new_cursor_x = idx + ch.len_utf8(); // Found a non-word character, so the word ends here
+                    break;
+                }
+                new_cursor_x = idx; // Keep moving left
             }
-            new_cursor_x = idx;
         }
 
         self.cursor_x = new_cursor_x;
