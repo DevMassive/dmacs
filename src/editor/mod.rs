@@ -556,6 +556,53 @@ impl Editor {
     pub fn set_alt_pressed(&mut self, is_alt_pressed: bool) {
         self.is_alt_pressed = is_alt_pressed;
     }
+
+    pub fn move_to_next_delimiter(&mut self) {
+        self.last_action_was_kill = false;
+        let current_line_idx = self.cursor_y;
+        let num_lines = self.document.lines.len();
+
+        if num_lines == 0 {
+            return; // Nothing to do in an empty document
+        }
+
+        let mut found_delimiter_line_idx = None;
+
+        // Search for the next delimiter starting from the current line
+        for i in current_line_idx..num_lines {
+            if self.document.lines[i] == "---" {
+                found_delimiter_line_idx = Some(i);
+                break;
+            }
+        }
+
+        // If no delimiter found from current position to end, search from beginning
+        if found_delimiter_line_idx.is_none() {
+            for i in 0..current_line_idx {
+                if self.document.lines[i] == "---" {
+                    found_delimiter_line_idx = Some(i);
+                    break;
+                }
+            }
+        }
+
+        if let Some(delimiter_line) = found_delimiter_line_idx {
+            let mut new_cursor_y = delimiter_line + 1;
+            if new_cursor_y >= num_lines {
+                new_cursor_y = 0; // Wrap around to the beginning of the document
+            }
+            self.cursor_y = new_cursor_y;
+            self.cursor_x = 0;
+            self.desired_cursor_x = 0;
+            self.row_offset = self.cursor_y; // Scroll to make cursor at top
+        } else {
+            // If no delimiter found anywhere, go to the beginning of the document
+            self.cursor_y = 0;
+            self.cursor_x = 0;
+            self.desired_cursor_x = 0;
+            self.row_offset = 0;
+        }
+    }
 }
 
 fn find_word_boundary_left(line: &str, current_x: usize) -> usize {
