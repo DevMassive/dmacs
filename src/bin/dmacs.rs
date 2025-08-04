@@ -12,7 +12,9 @@ use std::thread;
 use std::time::Duration;
 
 // Import necessary types and functions from the libc crate
-use libc::{_POSIX_VDISABLE, TCSANOW, VDSUSP, VLNEXT, VSTOP, tcgetattr, tcsetattr, termios};
+use libc::{
+    _POSIX_VDISABLE, TCSANOW, VDSUSP, VLNEXT, VREPRINT, VSTOP, tcgetattr, tcsetattr, termios,
+};
 
 static CTRL_C_COUNT: AtomicUsize = AtomicUsize::new(0);
 
@@ -44,7 +46,8 @@ fn main() -> io::Result<()> {
     // Disable stop character (Ctrl+S)
     termios_settings.c_cc[VSTOP] = _POSIX_VDISABLE;
 
-    // Apply changes
+    // Disable reprint character (Ctrl+R)
+    termios_settings.c_cc[VREPRINT] = _POSIX_VDISABLE;
     if unsafe { tcsetattr(stdin_fd, TCSANOW, &termios_settings) } != 0 {
         return Err(io::Error::last_os_error());
     }

@@ -209,8 +209,8 @@ impl Editor {
                     // Ctrl + N for next match (already handled, but keeping for consistency)
                     self.move_to_next_match();
                 }
-                '\x10' => {
-                    // Ctrl + P for previous match
+                '\x12' => {
+                    // Ctrl + R for previous match
                     self.move_to_prev_match();
                 }
                 '\x7f' | '\x08' => {

@@ -84,12 +84,12 @@ fn test_editor_search_next_and_previous_match() {
     editor.process_input(Input::Character('\x13'), None, None); // Ctrl+S
     assert_eq!(editor.cursor_pos(), (0, 0)); // First "apple" on first line again
 
-    // Move to previous match (Ctrl+P)
-    editor.process_input(Input::Character('\x10'), None, None); // Ctrl+P
+    // Move to previous match (Ctrl+R)
+    editor.process_input(Input::Character('\x12'), None, None); // Ctrl+R
     assert_eq!(editor.cursor_pos(), (7, 1)); // First "apple" on second line
 
-    // Move to previous match (Ctrl+P)
-    editor.process_input(Input::Character('\x10'), None, None); // Ctrl+P
+    // Move to previous match (Ctrl+R)
+    editor.process_input(Input::Character('\x12'), None, None); // Ctrl+R
     assert_eq!(editor.cursor_pos(), (13, 0)); // Second "apple" on first line
 
     // Exit search mode
