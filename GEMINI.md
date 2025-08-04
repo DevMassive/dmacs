@@ -5,4 +5,8 @@ replace callせずになるべくfindとsedで一気にやる
 
 # タスク
 
-testで editor.handle_keypress を呼び出しているところは editor.process_input に統一したい。 handle_keypress はprivateにできるのではないか？
+以下の新機能を追加して
+
+- このエディタでは「---」を特別な区切りとして扱う
+- 「---」があるばあい、「―――」として表示する
+- 「----」とか「--」は表示を変えない。3つの-のみを変える

@@ -6,6 +6,10 @@ use crate::editor::Editor;
 const TAB_STOP: usize = 4;
 
 impl Editor {
+    pub fn is_separator_line(line: &str) -> bool {
+        line == "---"
+    }
+
     pub fn draw(&mut self, window: &Window) {
         let screen_rows = window.get_max_y() as usize;
         let screen_cols = window.get_max_x() as usize;
@@ -28,6 +32,27 @@ impl Editor {
             let is_comment = line.trim_start().starts_with('#');
             if is_comment {
                 window.attron(A_DIM);
+            }
+
+            if Self::is_separator_line(line) {
+                // Ensure A_DIM is off for this special line, in case it was turned on by is_comment
+                if is_comment {
+                    window.attroff(A_DIM);
+                }
+
+                let replacement_char_chtype = pancurses::ACS_HLINE();
+                for i in 0..screen_cols {
+                    if i < 3 {
+                        // First three characters, no dim
+                        window.mvaddch(row as i32, i as i32, replacement_char_chtype);
+                    } else {
+                        // Remaining characters, with dim
+                        window.attron(A_DIM);
+                        window.mvaddch(row as i32, i as i32, replacement_char_chtype);
+                        window.attroff(A_DIM); // Turn off immediately after drawing
+                    }
+                }
+                continue;
             }
 
             let mut display_x = 0;

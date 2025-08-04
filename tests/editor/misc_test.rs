@@ -33,3 +33,22 @@ fn test_editor_with_tabs() {
     // cursor byte position is 1 (tab) + 1 (a) = 2
     assert_eq!(editor.cursor_pos(), (2, 0));
 }
+
+#[test]
+fn test_is_separator_line() {
+    // Test exact match
+    assert!(Editor::is_separator_line("---"));
+
+    // Test with leading/trailing whitespace (should be false)
+    assert!(!Editor::is_separator_line(" ---"));
+    assert!(!Editor::is_separator_line("--- "));
+    assert!(!Editor::is_separator_line(" ---"));
+
+    // Test with other characters
+    assert!(!Editor::is_separator_line("-----"));
+    assert!(!Editor::is_separator_line("--"));
+    assert!(!Editor::is_separator_line("abc---"));
+    assert!(!Editor::is_separator_line("---abc"));
+    assert!(!Editor::is_separator_line(""));
+    assert!(!Editor::is_separator_line("hello"));
+}
