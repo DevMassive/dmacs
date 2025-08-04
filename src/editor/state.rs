@@ -283,10 +283,9 @@ impl Editor {
     pub fn move_cursor_word_right(&mut self) {
         self.last_action_was_kill = false;
         let current_line = &self.document.lines[self.cursor_y];
-        let mut new_cursor_x = self.cursor_x;
         let line_len = current_line.len();
 
-        if new_cursor_x == line_len {
+        if self.cursor_x == line_len {
             if self.cursor_y < self.document.lines.len() - 1 {
                 self.cursor_y += 1;
                 self.cursor_x = 0;
@@ -295,34 +294,34 @@ impl Editor {
             return;
         }
 
-        // Find the start of the next word
-        let mut found_word_start = false;
-        for (idx, ch) in current_line[new_cursor_x..].char_indices() {
-            if is_word_char(ch) {
-                new_cursor_x += idx;
-                found_word_start = true;
-                break;
+        let mut current_byte_idx = self.cursor_x;
+
+        // If we are currently on a non-word character, skip until we hit a word character.
+        if current_byte_idx < line_len
+            && !is_word_char(current_line[current_byte_idx..].chars().next().unwrap())
+        {
+            for ch in current_line[current_byte_idx..].chars() {
+                if is_word_char(ch) {
+                    break;
+                }
+                current_byte_idx += ch.len_utf8();
             }
-            new_cursor_x += ch.len_utf8();
         }
 
-        // If no word found after current position, move to end of line
-        if !found_word_start {
-            self.cursor_x = line_len;
-            self.desired_cursor_x = self.get_display_width(current_line, self.cursor_x);
-            return;
-        }
-
-        // Find the end of the current word
-        let chars_from_word_start = current_line[new_cursor_x..].chars();
-        for ch in chars_from_word_start {
-            if !is_word_char(ch) {
-                break;
+        // Now, current_byte_idx is either at the start of a word, or at the end of the line.
+        // If it's at the start of a word, skip until we hit a non-word character or end of line.
+        if current_byte_idx < line_len
+            && is_word_char(current_line[current_byte_idx..].chars().next().unwrap())
+        {
+            for ch in current_line[current_byte_idx..].chars() {
+                if !is_word_char(ch) {
+                    break;
+                }
+                current_byte_idx += ch.len_utf8();
             }
-            new_cursor_x += ch.len_utf8();
         }
 
-        self.cursor_x = new_cursor_x;
+        self.cursor_x = current_byte_idx;
         self.desired_cursor_x = self.get_display_width(current_line, self.cursor_x);
     }
 
@@ -581,5 +580,5 @@ fn find_word_boundary_left(line: &str, current_x: usize) -> usize {
 }
 
 fn is_word_char(ch: char) -> bool {
-    ch.is_alphanumeric() || ch == '_'
+    ch.is_alphanumeric() || ch == '_' || ch.is_alphabetic()
 }
