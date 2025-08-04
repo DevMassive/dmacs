@@ -1,4 +1,4 @@
-use dmacs::editor::Editor;
+use dmacs::editor::state::Editor;
 use pancurses::Input;
 
 #[test]

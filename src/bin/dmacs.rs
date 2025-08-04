@@ -1,4 +1,4 @@
-use dmacs::editor::Editor;
+use dmacs::editor::state::Editor;
 use pancurses::{
     COLOR_BLACK, COLOR_WHITE, curs_set, endwin, init_pair, initscr, noecho, start_color,
     use_default_colors,
