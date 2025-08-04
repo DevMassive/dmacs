@@ -15,9 +15,7 @@ simplelog = "0.12.2"
 [dev-dependencies]
 tempfile = "3.10.1"
 
-[[bin]]
-name = "dmacs"
-path = "src/bin/dmacs.rs"
+
 
 [lib]
 name = "dmacs"

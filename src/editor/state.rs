@@ -12,13 +12,14 @@ pub struct Editor {
     pub cursor_y: usize,
     pub desired_cursor_x: usize, // column index
     pub status_message: String,
-    pub row_offset: usize,                     // public for tests
-    pub col_offset: usize,                     // public for tests
+    pub row_offset: usize, // public for tests
+    pub col_offset: usize, // public for tests
+    pub screen_rows: usize,
+    pub screen_cols: usize,
     undo_stack: Vec<(Document, usize, usize)>, // Stores (Document, cursor_x, cursor_y)
     pub kill_buffer: String,
     pub last_action_was_kill: bool,
-    pub screen_rows: usize,
-    pub screen_cols: usize,
+    pub is_alt_pressed: bool,
     pub search: Search,
 }
 
@@ -46,13 +47,19 @@ impl Editor {
             status_message: "".to_string(),
             row_offset: 0,
             col_offset: 0,
+            screen_rows: 0,
+            screen_cols: 0,
             undo_stack: Vec::new(),
             kill_buffer: String::new(),
             last_action_was_kill: false,
-            screen_rows: 0,
-            screen_cols: 0,
+            is_alt_pressed: false,
             search: Search::new(),
         }
+    }
+
+    pub fn update_screen_size(&mut self, screen_rows: usize, screen_cols: usize) {
+        self.screen_rows = screen_rows;
+        self.screen_cols = screen_cols;
     }
 
     pub fn save_state_for_undo(&mut self) {
@@ -272,7 +279,7 @@ impl Editor {
         if found_word_char {
             for (idx, ch) in chars_iter {
                 if !is_word_char(ch) {
-                    new_cursor_x = idx + ch.len_utf8(); // Found a non-word character, so the word ends here
+                    new_cursor_x = idx + ch.len_utf8();
                     break;
                 }
                 new_cursor_x = idx; // Keep moving left
@@ -406,11 +413,6 @@ impl Editor {
         self.status_message = message.to_string();
     }
 
-    pub fn update_screen_size(&mut self, rows: usize, cols: usize) {
-        self.screen_rows = rows;
-        self.screen_cols = cols;
-    }
-
     pub fn move_line_up(&mut self) {
         self.last_action_was_kill = false;
         if self.cursor_y > 0 {
@@ -426,8 +428,8 @@ impl Editor {
         self.last_action_was_kill = false;
         if self.cursor_y < self.document.lines.len() - 1 {
             self.save_state_for_undo();
+            self.document.swap_lines(self.cursor_y, self.cursor_y + 1);
             self.cursor_y += 1;
-            self.document.swap_lines(self.cursor_y - 1, self.cursor_y);
         } else {
             self.status_message = "Cannot move line down further.".to_string();
         }
@@ -528,6 +530,10 @@ impl Editor {
             self.cursor_x = 0;
             self.desired_cursor_x = 0;
         }
+    }
+
+    pub fn set_alt_pressed(&mut self, is_alt_pressed: bool) {
+        self.is_alt_pressed = is_alt_pressed;
     }
 }
 

@@ -91,21 +91,21 @@ fn test_editor_hungry_delete() {
     // Test deleting word and preceding whitespace
     editor.document.lines[0] = "    hello".to_string();
     editor.set_cursor_pos(9, 0);
-    editor.process_input(Input::Character('\x1b'), Some(Input::KeyBackspace), None);
+    editor.process_input(Input::KeyBackspace, true);
     assert_eq!(editor.document.lines[0], "");
     assert_eq!(editor.cursor_pos(), (0, 0));
 
     // Test deleting word
     editor.document.lines[0] = "hello world".to_string();
     editor.set_cursor_pos(11, 0);
-    editor.process_input(Input::Character('\x1b'), Some(Input::KeyBackspace), None);
+    editor.process_input(Input::KeyBackspace, true);
     assert_eq!(editor.document.lines[0], "hello");
     assert_eq!(editor.cursor_pos(), (5, 0));
 
     // Test deleting across lines (joining lines)
     editor.document.lines = vec!["line1".to_string(), "    line2".to_string()];
     editor.set_cursor_pos(0, 1);
-    editor.process_input(Input::Character('\x1b'), Some(Input::KeyBackspace), None);
+    editor.process_input(Input::KeyBackspace, true);
     assert_eq!(editor.document.lines.len(), 1);
     assert_eq!(editor.document.lines[0], "line1    line2");
     assert_eq!(editor.cursor_pos(), (5, 0));
@@ -113,14 +113,14 @@ fn test_editor_hungry_delete() {
     // Test deleting word with leading whitespace
     editor.document.lines[0] = "  foo bar".to_string();
     editor.set_cursor_pos(9, 0);
-    editor.process_input(Input::Character('\x1b'), Some(Input::KeyBackspace), None);
+    editor.process_input(Input::KeyBackspace, true);
     assert_eq!(editor.document.lines[0], "  foo");
     assert_eq!(editor.cursor_pos(), (5, 0));
 
     // Test deleting only whitespace
     editor.document.lines[0] = "  ".to_string();
     editor.set_cursor_pos(2, 0);
-    editor.process_input(Input::Character('\x1b'), Some(Input::KeyBackspace), None);
+    editor.process_input(Input::KeyBackspace, true);
     assert_eq!(editor.document.lines[0], "");
     assert_eq!(editor.cursor_pos(), (0, 0));
 }

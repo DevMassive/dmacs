@@ -10,22 +10,14 @@ fn test_editor_move_line_up() {
         "line3".to_string(),
     ];
     editor.set_cursor_pos(0, 1); // Cursor on line2
-    editor.process_input(
-        Input::Character('\x1b'),
-        Some(Input::Character('[')),
-        Some(Input::Character('A')),
-    );
+    editor.process_input(Input::KeyUp, true);
     assert_eq!(editor.document.lines[0], "line2");
     assert_eq!(editor.document.lines[1], "line1");
     assert_eq!(editor.document.lines[2], "line3");
     assert_eq!(editor.cursor_pos(), (0, 0)); // Cursor should move up with the line
 
     // Try moving up from the first line (should not change document, only status message)
-    editor.process_input(
-        Input::Character('\x1b'),
-        Some(Input::Character('[')),
-        Some(Input::Character('A')),
-    );
+    editor.process_input(Input::KeyUp, true);
     assert_eq!(editor.document.lines[0], "line2");
     assert_eq!(editor.document.lines[1], "line1");
     assert_eq!(editor.document.lines[2], "line3");
@@ -41,22 +33,14 @@ fn test_editor_move_line_down() {
         "line3".to_string(),
     ];
     editor.set_cursor_pos(0, 1); // Cursor on line2
-    editor.process_input(
-        Input::Character('\x1b'),
-        Some(Input::Character('[')),
-        Some(Input::Character('B')),
-    );
+    editor.process_input(Input::KeyDown, true);
     assert_eq!(editor.document.lines[0], "line1");
     assert_eq!(editor.document.lines[1], "line3");
     assert_eq!(editor.document.lines[2], "line2");
     assert_eq!(editor.cursor_pos(), (0, 2)); // Cursor should move down with the line
 
     // Try moving down from the last line (should not change document, only status message)
-    editor.process_input(
-        Input::Character('\x1b'),
-        Some(Input::Character('[')),
-        Some(Input::Character('B')),
-    );
+    editor.process_input(Input::KeyDown, true);
     assert_eq!(editor.document.lines[0], "line1");
     assert_eq!(editor.document.lines[1], "line3");
     assert_eq!(editor.document.lines[2], "line2");

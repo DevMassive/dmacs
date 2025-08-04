@@ -7,7 +7,10 @@ const TAB_STOP: usize = 4;
 
 impl Editor {
     pub fn draw(&mut self, window: &Window) {
-        self.scroll(self.screen_cols, self.screen_rows - 2);
+        let screen_rows = window.get_max_y() as usize;
+        let screen_cols = window.get_max_x() as usize;
+
+        self.scroll();
 
         window.erase();
 
@@ -17,7 +20,7 @@ impl Editor {
                 continue;
             }
             let row = index - self.row_offset;
-            if row >= self.screen_rows.saturating_sub(2) {
+            if row >= screen_rows.saturating_sub(2) {
                 // Account for status bar and horizontal line
                 break;
             }
@@ -53,11 +56,11 @@ impl Editor {
                 // Draw character
                 if display_x > self.col_offset {
                     let screen_x = char_start_display_x.saturating_sub(self.col_offset);
-                    if screen_x < self.screen_cols {
+                    if screen_x < screen_cols {
                         if ch == '\x09' {
                             // Draw a tab as spaces
                             for i in 0..char_width {
-                                if screen_x + i < self.screen_cols {
+                                if screen_x + i < screen_cols {
                                     window.mvaddch(row as i32, (screen_x + i) as i32, ' ');
                                 }
                             }
@@ -68,7 +71,7 @@ impl Editor {
                     }
                 }
                 // Stop drawing if we reach the end of the screen
-                if char_start_display_x.saturating_sub(self.col_offset) >= self.screen_cols {
+                if char_start_display_x.saturating_sub(self.col_offset) >= screen_cols {
                     break;
                 }
 
@@ -98,7 +101,7 @@ impl Editor {
         );
         // Draw horizontal line above status bar
         window.attron(A_DIM);
-        for i in 0..self.screen_cols {
+        for i in 0..screen_cols {
             window.mvaddch(window.get_max_y() - 2, i as i32, pancurses::ACS_HLINE());
         }
         window.attroff(A_DIM);
@@ -122,13 +125,13 @@ impl Editor {
         window.refresh();
     }
 
-    pub fn scroll(&mut self, screen_cols: usize, screen_rows: usize) {
+    pub fn scroll(&mut self) {
         // Vertical scroll
         if self.cursor_y < self.row_offset {
             self.row_offset = self.cursor_y;
         }
-        if self.cursor_y >= self.row_offset + screen_rows {
-            self.row_offset = self.cursor_y - screen_rows + 1;
+        if self.cursor_y >= self.row_offset + self.screen_rows {
+            self.row_offset = self.cursor_y - self.screen_rows + 1;
         }
 
         // Horizontal scroll
@@ -137,8 +140,8 @@ impl Editor {
         if display_cursor_x < self.col_offset {
             self.col_offset = display_cursor_x;
         }
-        if display_cursor_x >= self.col_offset + screen_cols {
-            self.col_offset = display_cursor_x - screen_cols + 1;
+        if display_cursor_x >= self.col_offset + self.screen_cols {
+            self.col_offset = display_cursor_x.saturating_sub(self.screen_cols) + 1;
         }
     }
 }
