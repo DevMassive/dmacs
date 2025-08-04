@@ -21,3 +21,7 @@ tempfile = "3.10.1"
 [lib]
 name = "dmacs"
 path = "src/lib.rs"
+
+[[test]]
+name = "editor_tests"
+path = "tests/editor/mod.rs"
