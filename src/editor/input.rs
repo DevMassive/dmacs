@@ -57,6 +57,20 @@ impl Editor {
                 '\x02' => self.move_cursor_word_left()?, // Ctrl + B
                 '\x06' => self.move_cursor_word_right()?, // Ctrl + F
                 '\x1f' => self.undo(),                   // Ctrl + _ for undo
+                '\x03' | // Ctrl+C
+                '\x07' | // Ctrl+G
+                '\x0c' | // Ctrl+L
+                '\x0f' | // Ctrl+O
+                '\x11' | // Ctrl+Q
+                '\x12' | // Ctrl+R
+                '\x14' | // Ctrl+T
+                '\x15' | // Ctrl+U
+                '\x17' | // Ctrl+W
+                '\x1a' | // Ctrl+Z
+                '\x1b' | // Ctrl+[ (ESC)
+                '\x1c' | // Ctrl+\
+                '\x1d' | // Ctrl+] 
+                '\x1e' => {}, // Ctrl+^
                 _ => self.insert_char(c)?,
             },
             Input::KeyBackspace => self.delete_char()?,
