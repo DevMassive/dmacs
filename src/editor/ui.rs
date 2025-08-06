@@ -226,8 +226,8 @@ impl Editor {
         if self.cursor_y < self.row_offset {
             self.row_offset = self.cursor_y;
         }
-        if self.cursor_y >= self.row_offset + self.screen_rows {
-            self.row_offset = self.cursor_y - self.screen_rows + 1;
+        if self.cursor_y >= self.row_offset + self.screen_rows - 3 {
+            self.row_offset = self.cursor_y - (self.screen_rows - 3);
         }
 
         // Horizontal scroll
