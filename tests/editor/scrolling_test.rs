@@ -166,3 +166,66 @@ fn test_editor_scroll_page_up() {
     assert_eq!(editor.cursor_pos().1, 11); // 34 - 23
     assert_eq!(editor.row_offset, 11);
 }
+
+#[test]
+fn test_editor_vertical_scroll_down() {
+    let mut editor = Editor::new(None);
+    for _ in 0..50 {
+        editor.document.lines.push("test line".to_string());
+    }
+    editor.update_screen_size(10, 80); // screen_rows = 10, usable height = 8
+
+    // Initial state
+    assert_eq!(editor.cursor_pos().1, 0);
+    assert_eq!(editor.row_offset, 0);
+
+    // Move cursor down line by line, beyond the screen height
+    for i in 0..15 {
+        editor.process_input(Input::KeyDown, false).unwrap();
+        editor.scroll();
+
+        let (_, y) = editor.cursor_pos();
+        assert_eq!(y, i + 1);
+
+        if (i + 1) < editor.screen_rows - 2 {
+            // Still within the screen, no scroll
+            assert_eq!(editor.row_offset, 0);
+        } else {
+            // Scrolled past the screen edge
+            assert_eq!(
+                editor.row_offset,
+                ((i + 1) as isize - (editor.screen_rows as isize - 2) + 1).max(0) as usize
+            );
+        }
+    }
+    assert_eq!(editor.cursor_pos(), (0, 15));
+    assert_eq!(editor.row_offset, 8);
+}
+
+#[test]
+fn test_editor_vertical_scroll_up() {
+    let mut editor = Editor::new(None);
+    for _ in 0..50 {
+        editor.document.lines.push("test line".to_string());
+    }
+    editor.update_screen_size(10, 80); // screen_rows = 10, usable height = 8
+
+    // First, scroll down to simulate being in the middle of the document
+    for _ in 0..20 {
+        editor.process_input(Input::KeyDown, false).unwrap();
+    }
+    editor.scroll();
+    assert_eq!(editor.cursor_pos(), (0, 20));
+    assert_eq!(editor.row_offset, 13);
+
+    // Now, move cursor up line by line, back into the scrolled area
+    for i in 0..10 {
+        editor.process_input(Input::KeyUp, false).unwrap();
+        editor.scroll();
+
+        let (_, y) = editor.cursor_pos();
+        assert_eq!(y, 19 - i);
+    }
+    assert_eq!(editor.cursor_pos(), (0, 10));
+    assert_eq!(editor.row_offset, 10);
+}
