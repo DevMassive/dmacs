@@ -12,14 +12,9 @@ pub enum Event {
 
 use editor::Editor;
 use error::Result;
-use std::env;
 use terminal::Terminal;
 
-pub fn run_editor() -> Result<()> {
-    let args: Vec<String> = env::args().collect();
-    let filename = args.get(1).cloned();
-
-    let terminal = Terminal::new()?;
+pub fn run_editor(terminal: &Terminal, filename: Option<String>) -> Result<()> {
     let (screen_rows, screen_cols) = terminal.size();
     let mut editor = Editor::new(filename);
     editor.update_screen_size(screen_rows, screen_cols);
