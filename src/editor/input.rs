@@ -1,3 +1,4 @@
+use log::debug;
 use pancurses::Input;
 
 use crate::editor::Editor;
@@ -5,6 +6,9 @@ use crate::error::Result;
 
 impl Editor {
     pub fn process_input(&mut self, key: Input, is_alt_pressed: bool) -> Result<()> {
+        debug!(
+            "Processing input: {key:?}, Alt pressed: {is_alt_pressed}"
+        );
         self.set_alt_pressed(is_alt_pressed);
 
         if self.search.mode {

@@ -1,3 +1,4 @@
+use log::debug;
 use unicode_width::UnicodeWidthChar;
 
 use crate::document::Document;
@@ -364,6 +365,7 @@ impl Editor {
         self.last_action_was_kill = false;
         self.document.save()?;
         self.status_message = "File saved successfully.".to_string();
+        debug!("Document saved.");
         Ok(())
     }
 
@@ -371,6 +373,7 @@ impl Editor {
         self.last_action_was_kill = false;
         self.document.save()?;
         self.should_quit = true;
+        debug!("Editor quitting.");
         Ok(())
     }
 
@@ -577,6 +580,7 @@ impl Editor {
             .selection
             .cut_selection(&mut self.document, cursor_pos)?;
         self.status_message = "Selection cut.".to_string();
+        debug!("Selection cut. Kill buffer: '{}'", self.kill_buffer);
 
         // Adjust cursor position after cut to ensure it's within bounds
         let new_max_y = self.document.lines.len().saturating_sub(1);
@@ -591,6 +595,7 @@ impl Editor {
         let cursor_pos = self.cursor_pos();
         self.kill_buffer = self.selection.copy_selection(&self.document, cursor_pos)?;
         self.status_message = "Selection copied.".to_string();
+        debug!("Selection copied. Kill buffer: '{}'", self.kill_buffer);
         Ok(())
     }
 
