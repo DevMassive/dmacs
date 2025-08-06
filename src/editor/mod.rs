@@ -577,7 +577,13 @@ impl Editor {
             .selection
             .cut_selection(&mut self.document, cursor_pos)?;
         self.status_message = "Selection cut.".to_string();
-        self.set_cursor_pos(cursor_pos.0, cursor_pos.1);
+
+        // Adjust cursor position after cut to ensure it's within bounds
+        let new_max_y = self.document.lines.len().saturating_sub(1);
+        self.cursor_y = self.cursor_y.min(new_max_y);
+        self.cursor_x = self.document.lines[self.cursor_y].len(); // Move to end of the line
+        self.desired_cursor_x =
+            self.get_display_width(&self.document.lines[self.cursor_y], self.cursor_x);
         Ok(())
     }
 
