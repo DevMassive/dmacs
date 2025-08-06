@@ -5,4 +5,7 @@ replace callせずになるべくfindとsedで一気にやる
 
 # タスク
 
-- dmacsの終了が正常に行われないとき以降terminalの改行表示がおかしくなる。
+- バージョンをアプデしたい
+      Adding isatty v0.1.9 (available: v0.2.0)
+      Adding thiserror v1.0.69 (available: v2.0.12)
+      Adding unicode-width v0.1.14 (available: v0.2.1)
