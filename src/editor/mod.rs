@@ -9,6 +9,7 @@ pub mod input;
 pub mod search;
 pub mod selection;
 pub mod ui;
+use crate::editor::ui::STATUS_BAR_HEIGHT;
 
 const TAB_STOP: usize = 4;
 
@@ -464,7 +465,7 @@ impl Editor {
 
     pub fn scroll_page_down(&mut self) {
         self.last_action_was_kill = false;
-        let page_height = self.screen_rows.saturating_sub(2).max(1);
+        let page_height = self.screen_rows.saturating_sub(STATUS_BAR_HEIGHT).max(1);
         self.row_offset = self.row_offset.saturating_add(page_height);
         self.row_offset = self
             .row_offset
@@ -475,7 +476,7 @@ impl Editor {
 
     pub fn scroll_page_up(&mut self) {
         self.last_action_was_kill = false;
-        let page_height = self.screen_rows.saturating_sub(2).max(1);
+        let page_height = self.screen_rows.saturating_sub(STATUS_BAR_HEIGHT).max(1);
         self.row_offset = self.row_offset.saturating_sub(page_height);
         self.cursor_y = self.row_offset;
         self.clamp_cursor_x();

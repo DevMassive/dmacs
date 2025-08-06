@@ -4,6 +4,7 @@ use unicode_width::UnicodeWidthChar;
 use crate::editor::Editor;
 
 const TAB_STOP: usize = 4;
+pub const STATUS_BAR_HEIGHT: usize = 2;
 
 impl Editor {
     pub fn is_separator_line(line: &str) -> bool {
@@ -26,8 +27,7 @@ impl Editor {
                 continue;
             }
             let row = index - self.row_offset;
-            if row >= screen_rows.saturating_sub(2) {
-                // Account for status bar and horizontal line
+            if row >= screen_rows.saturating_sub(STATUS_BAR_HEIGHT) {
                 break;
             }
 
@@ -172,7 +172,11 @@ impl Editor {
         // Draw horizontal line above status bar
         window.attron(A_DIM);
         for i in 0..screen_cols {
-            window.mvaddch(window.get_max_y() - 2, i as i32, pancurses::ACS_HLINE());
+            window.mvaddch(
+                window.get_max_y() - STATUS_BAR_HEIGHT as i32,
+                i as i32,
+                pancurses::ACS_HLINE(),
+            );
         }
         window.attroff(A_DIM);
 
@@ -181,7 +185,11 @@ impl Editor {
         let modified_indicator = if self.document.is_dirty() { "*" } else { "" };
         let filename_and_modified = format!("{filename_display}{modified_indicator}");
         window.attron(A_BOLD);
-        window.mvaddstr(window.get_max_y() - 1, 0, &filename_and_modified);
+        window.mvaddstr(
+            window.get_max_y() - (STATUS_BAR_HEIGHT as i32 - 1),
+            0,
+            &filename_and_modified,
+        );
         window.attroff(A_BOLD);
 
         // Calculate the display width of the filename and modified indicator
@@ -192,7 +200,11 @@ impl Editor {
 
         // Draw line count
         let line_count_str = format!(" - {} lines", self.document.lines.len());
-        window.mvaddstr(window.get_max_y() - 1, current_col as i32, &line_count_str);
+        window.mvaddstr(
+            window.get_max_y() - (STATUS_BAR_HEIGHT as i32 - 1),
+            current_col as i32,
+            &line_count_str,
+        );
         for ch in line_count_str.chars() {
             current_col += ch.width().unwrap_or(0);
         }
@@ -205,7 +217,7 @@ impl Editor {
             }
             let message_start_col = screen_cols.saturating_sub(message_display_width);
             window.mvaddstr(
-                window.get_max_y() - 1,
+                window.get_max_y() - (STATUS_BAR_HEIGHT as i32 - 1),
                 message_start_col as i32,
                 &self.status_message,
             );
@@ -222,12 +234,14 @@ impl Editor {
     }
 
     pub fn scroll(&mut self) {
+        let visible_content_height = self.screen_rows.saturating_sub(STATUS_BAR_HEIGHT);
+
         // Vertical scroll
         if self.cursor_y < self.row_offset {
             self.row_offset = self.cursor_y;
         }
-        if self.cursor_y >= self.row_offset + self.screen_rows - 3 {
-            self.row_offset = self.cursor_y - (self.screen_rows - 3);
+        if self.cursor_y >= self.row_offset + visible_content_height {
+            self.row_offset = self.cursor_y - visible_content_height + 1;
         }
 
         // Horizontal scroll

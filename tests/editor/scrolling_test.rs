@@ -1,4 +1,5 @@
 use dmacs::editor::Editor;
+use dmacs::editor::ui::STATUS_BAR_HEIGHT;
 use pancurses::Input;
 
 #[test]
@@ -102,21 +103,23 @@ fn test_editor_scroll_page_down() {
         // Create 50 lines
         editor.document.lines.push("test line".to_string());
     }
-    editor.update_screen_size(25, 80); // screen_rows = 25, usable height = 23
+    editor.update_screen_size(25, 80); // screen_rows = 25, usable height = 25 - STATUS_BAR_HEIGHT
 
     // Initial state
     assert_eq!(editor.cursor_pos().1, 0);
     assert_eq!(editor.row_offset, 0);
 
+    let usable_height = editor.screen_rows.saturating_sub(STATUS_BAR_HEIGHT);
+
     // Scroll down one page
     editor.scroll_page_down();
-    assert_eq!(editor.cursor_pos().1, 23); // Should move to the top of the next page
-    assert_eq!(editor.row_offset, 23);
+    assert_eq!(editor.cursor_pos().1, usable_height); // Should move to the top of the next page
+    assert_eq!(editor.row_offset, usable_height);
 
     // Scroll down another page
     editor.scroll_page_down();
-    assert_eq!(editor.cursor_pos().1, 46);
-    assert_eq!(editor.row_offset, 46);
+    assert_eq!(editor.cursor_pos().1, usable_height * 2);
+    assert_eq!(editor.row_offset, usable_height * 2);
 
     // Scroll down beyond document end
     editor.scroll_page_down();
@@ -127,8 +130,8 @@ fn test_editor_scroll_page_down() {
     editor.set_cursor_pos(0, 10);
     editor.row_offset = 10;
     editor.scroll_page_down();
-    assert_eq!(editor.cursor_pos().1, 33); // 10 + 23
-    assert_eq!(editor.row_offset, 33);
+    assert_eq!(editor.cursor_pos().1, 10 + usable_height); // 10 + usable_height
+    assert_eq!(editor.row_offset, 10 + usable_height);
 }
 
 #[test]
@@ -138,16 +141,18 @@ fn test_editor_scroll_page_up() {
         // Create 50 lines
         editor.document.lines.push("test line".to_string());
     }
-    editor.update_screen_size(25, 80); // screen_rows = 25, usable height = 23
+    editor.update_screen_size(25, 80); // screen_rows = 25, usable height = 25 - STATUS_BAR_HEIGHT
+
+    let usable_height = editor.screen_rows.saturating_sub(STATUS_BAR_HEIGHT);
 
     // First, scroll down to simulate being in the middle of the document
-    editor.set_cursor_pos(0, 46);
-    editor.row_offset = 46;
+    editor.set_cursor_pos(0, usable_height * 2);
+    editor.row_offset = usable_height * 2;
 
     // Scroll up one page
     editor.scroll_page_up();
-    assert_eq!(editor.cursor_pos().1, 23); // Should move to the top of the previous page
-    assert_eq!(editor.row_offset, 23);
+    assert_eq!(editor.cursor_pos().1, usable_height); // Should move to the top of the previous page
+    assert_eq!(editor.row_offset, usable_height);
 
     // Scroll up another page
     editor.scroll_page_up();
@@ -160,10 +165,10 @@ fn test_editor_scroll_page_up() {
     assert_eq!(editor.row_offset, 0);
 
     // Test with cursor not at 0
-    editor.set_cursor_pos(0, 34);
-    editor.row_offset = 34;
+    editor.set_cursor_pos(0, usable_height + 11);
+    editor.row_offset = usable_height + 11;
     editor.scroll_page_up();
-    assert_eq!(editor.cursor_pos().1, 11); // 34 - 23
+    assert_eq!(editor.cursor_pos().1, 11); // (usable_height + 11) - usable_height
     assert_eq!(editor.row_offset, 11);
 }
 
@@ -173,11 +178,13 @@ fn test_editor_vertical_scroll_down() {
     for _ in 0..50 {
         editor.document.lines.push("test line".to_string());
     }
-    editor.update_screen_size(10, 80); // screen_rows = 10, usable height = 8
+    editor.update_screen_size(10, 80); // screen_rows = 10, usable height = 10 - STATUS_BAR_HEIGHT
 
     // Initial state
     assert_eq!(editor.cursor_pos().1, 0);
     assert_eq!(editor.row_offset, 0);
+
+    let usable_height = editor.screen_rows.saturating_sub(STATUS_BAR_HEIGHT);
 
     // Move cursor down line by line, beyond the screen height
     for i in 0..15 {
@@ -187,19 +194,19 @@ fn test_editor_vertical_scroll_down() {
         let (_, y) = editor.cursor_pos();
         assert_eq!(y, i + 1);
 
-        if (i + 1) < editor.screen_rows - 2 {
+        if (i + 1) < usable_height {
             // Still within the screen, no scroll
             assert_eq!(editor.row_offset, 0);
         } else {
             // Scrolled past the screen edge
             assert_eq!(
                 editor.row_offset,
-                ((i + 1) as isize - (editor.screen_rows as isize - 2) + 1).max(0) as usize
+                ((i + 1) as isize - usable_height as isize + 1).max(0) as usize
             );
         }
     }
     assert_eq!(editor.cursor_pos(), (0, 15));
-    assert_eq!(editor.row_offset, 8);
+    assert_eq!(editor.row_offset, 15 - usable_height + 1);
 }
 
 #[test]
@@ -208,7 +215,9 @@ fn test_editor_vertical_scroll_up() {
     for _ in 0..50 {
         editor.document.lines.push("test line".to_string());
     }
-    editor.update_screen_size(10, 80); // screen_rows = 10, usable height = 8
+    editor.update_screen_size(10, 80); // screen_rows = 10, usable height = 10 - STATUS_BAR_HEIGHT
+
+    let usable_height = editor.screen_rows.saturating_sub(STATUS_BAR_HEIGHT);
 
     // First, scroll down to simulate being in the middle of the document
     for _ in 0..20 {
@@ -216,7 +225,7 @@ fn test_editor_vertical_scroll_up() {
     }
     editor.scroll();
     assert_eq!(editor.cursor_pos(), (0, 20));
-    assert_eq!(editor.row_offset, 13);
+    assert_eq!(editor.row_offset, 20 - usable_height + 1);
 
     // Now, move cursor up line by line, back into the scrolled area
     for i in 0..10 {
