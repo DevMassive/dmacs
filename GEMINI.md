@@ -5,7 +5,14 @@ replace callせずになるべくfindとsedで一気にやる
 
 # タスク
 
-- バージョンをアプデしたい
-      Adding isatty v0.1.9 (available: v0.2.0)
-      Adding thiserror v1.0.69 (available: v2.0.12)
-      Adding unicode-width v0.1.14 (available: v0.2.1)
+範囲選択してcut/copyする機能を追加して
+
+- control + spaceでカーソル位置にmarkerをおく
+- contorl + W でmarkerからカーソル位置までをcut (killと同じでcontrol + Yで貼り付け)
+- option + W でcopy
+- markerからカーソル位置まではハイライト表示
+- contorl + G でmarkerを解除
+
+# 制約事項
+
+まずtestsから書いて

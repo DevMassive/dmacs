@@ -29,6 +29,7 @@ impl Editor {
             Input::KeyDown if is_alt_pressed => self.move_line_down(),
             // Alt/Option + Backspace
             Input::KeyBackspace if is_alt_pressed => self.hungry_delete(),
+            Input::Character('w') if is_alt_pressed => self.copy_selection_action()?, // Option-W
             _ => self.handle_keypress(key)?,
         }
         Ok(())
@@ -53,19 +54,19 @@ impl Editor {
                 '\x10' => self.move_to_previous_delimiter(), // Ctrl + P
                 '\x7f' | '\x08' => self.delete_char()?,      // Backspace
                 '\x0a' | '\x0d' => self.insert_newline()?,
-                '\x00' => {}
                 '\x02' => self.move_cursor_word_left()?, // Ctrl + B
                 '\x06' => self.move_cursor_word_right()?, // Ctrl + F
                 '\x1f' => self.undo(),                   // Ctrl + _ for undo
                 '\x03' | // Ctrl+C
-                '\x07' | // Ctrl+G
                 '\x0c' | // Ctrl+L
                 '\x0f' | // Ctrl+O
                 '\x11' | // Ctrl+Q
                 '\x12' | // Ctrl+R
                 '\x14' | // Ctrl+T
                 '\x15' | // Ctrl+U
-                '\x17' | // Ctrl+W
+                '\x17' => self.cut_selection_action()?, // Ctrl+W
+                '\x00' => self.set_marker_action(), // Ctrl+Space
+                '\x07' => self.clear_marker_action(), // Ctrl+G
                 '\x1a' | // Ctrl+Z
                 '\x1b' | // Ctrl+[ (ESC)
                 '\x1c' | // Ctrl+\

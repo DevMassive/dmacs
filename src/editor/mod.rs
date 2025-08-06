@@ -6,6 +6,7 @@ use crate::error::{DmacsError, Result};
 
 pub mod input;
 pub mod search;
+pub mod selection;
 pub mod ui;
 
 const TAB_STOP: usize = 4;
@@ -26,6 +27,7 @@ pub struct Editor {
     pub last_action_was_kill: bool,
     pub is_alt_pressed: bool,
     pub search: Search,
+    pub selection: selection::Selection,
 }
 
 impl Editor {
@@ -59,6 +61,7 @@ impl Editor {
             last_action_was_kill: false,
             is_alt_pressed: false,
             search: Search::new(),
+            selection: selection::Selection::new(),
         }
     }
 
@@ -555,6 +558,34 @@ impl Editor {
 
     pub fn set_alt_pressed(&mut self, is_alt_pressed: bool) {
         self.is_alt_pressed = is_alt_pressed;
+    }
+
+    pub fn set_marker_action(&mut self) {
+        self.selection.set_marker(self.cursor_pos());
+        self.status_message = "Marker set.".to_string();
+    }
+
+    pub fn clear_marker_action(&mut self) {
+        self.selection.clear_marker();
+        self.status_message = "Marker cleared.".to_string();
+    }
+
+    pub fn cut_selection_action(&mut self) -> Result<()> {
+        self.save_state_for_undo();
+        let cursor_pos = self.cursor_pos();
+        self.kill_buffer = self
+            .selection
+            .cut_selection(&mut self.document, cursor_pos)?;
+        self.status_message = "Selection cut.".to_string();
+        self.set_cursor_pos(cursor_pos.0, cursor_pos.1);
+        Ok(())
+    }
+
+    pub fn copy_selection_action(&mut self) -> Result<()> {
+        let cursor_pos = self.cursor_pos();
+        self.kill_buffer = self.selection.copy_selection(&self.document, cursor_pos)?;
+        self.status_message = "Selection copied.".to_string();
+        Ok(())
     }
 
     pub fn move_to_next_delimiter(&mut self) {

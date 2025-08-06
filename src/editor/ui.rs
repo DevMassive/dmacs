@@ -18,6 +18,8 @@ impl Editor {
 
         window.erase();
 
+        let selection_range = self.selection.get_selection_range(self.cursor_pos());
+
         // Draw text
         for (index, line) in self.document.lines.iter().enumerate() {
             if index < self.row_offset {
@@ -57,6 +59,7 @@ impl Editor {
 
             let mut display_x = 0;
             let mut byte_idx = 0;
+            let line_len = line.len();
             for ch in line.chars() {
                 let char_start_display_x = display_x;
 
@@ -74,7 +77,34 @@ impl Editor {
                         r == index && byte_idx >= c && byte_idx < c + self.search.query.len()
                     });
 
-                if is_highlighted {
+                let is_selected =
+                    if let Some(((sel_start_x, sel_start_y), (sel_end_x, sel_end_y))) =
+                        self.selection.get_selection_range(self.cursor_pos())
+                    {
+                        // Check if the current line is within the selection range
+                        if index >= sel_start_y && index <= sel_end_y {
+                            // If it's the start line, check from sel_start_x
+                            if index == sel_start_y && index == sel_end_y {
+                                // Single line selection
+                                byte_idx >= sel_start_x && byte_idx < sel_end_x
+                            } else if index == sel_start_y {
+                                // Start of multi-line selection
+                                byte_idx >= sel_start_x
+                            } else if index == sel_end_y {
+                                // End of multi-line selection
+                                byte_idx < sel_end_x
+                            } else {
+                                // Full line in between multi-line selection
+                                true
+                            }
+                        } else {
+                            false
+                        }
+                    } else {
+                        false
+                    };
+
+                if is_highlighted || is_selected {
                     window.attron(A_REVERSE);
                 }
 
@@ -100,11 +130,40 @@ impl Editor {
                     break;
                 }
 
-                if is_highlighted {
+                if is_highlighted || is_selected {
                     window.attroff(A_REVERSE);
                 }
                 byte_idx += ch.len_utf8();
             }
+
+            // Handle the virtual end-of-line character for selection highlighting
+            if let Some(((_sel_start_x, sel_start_y), (sel_end_x, sel_end_y))) = selection_range {
+                let highlight_eol_char = if index == sel_start_y && index == sel_end_y {
+                    // Single line selection: highlight only if selection ends at the end of the line
+                    sel_end_x == line_len
+                } else if index == sel_start_y && index < sel_end_y {
+                    // Start of multi-line selection: always highlight the newline
+                    true
+                } else if index > sel_start_y && index < sel_end_y {
+                    // Full line in between multi-line selection: always highlight the newline
+                    true
+                } else if index == sel_end_y && index > sel_start_y {
+                    // End of multi-line selection: highlight only if selection ends at the end of the line
+                    sel_end_x == line_len
+                } else {
+                    false
+                };
+
+                if highlight_eol_char {
+                    let eol_screen_x = display_x.saturating_sub(self.col_offset);
+                    if eol_screen_x < screen_cols {
+                        window.attron(A_REVERSE);
+                        window.mvaddch(row as i32, eol_screen_x as i32, ' '); // Draw a reversed space
+                        window.attroff(A_REVERSE);
+                    }
+                }
+            }
+
             if is_comment {
                 window.attroff(A_DIM);
             }

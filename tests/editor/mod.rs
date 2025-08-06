@@ -8,4 +8,5 @@ mod line_movement_test;
 mod misc_test;
 mod scrolling_test;
 mod search_test;
+mod selection_test;
 mod undo_test;
