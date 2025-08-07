@@ -1,6 +1,13 @@
 use log::debug;
+use std::time::Duration;
+
+#[cfg(feature = "test")]
+use mock_instant::thread_local::Instant;
+
+#[cfg(not(feature = "test"))]
+use std::time::Instant;
+
 use unicode_width::UnicodeWidthChar;
-use std::time::{Duration, Instant};
 
 use crate::document::Document;
 use crate::editor::search::Search;
@@ -34,7 +41,7 @@ pub struct Editor {
     pub col_offset: usize, // public for tests
     pub screen_rows: usize,
     pub screen_cols: usize,
-    undo_stack: Vec<(Document, usize, usize)>, // Stores (Document, cursor_x, cursor_y)
+    pub undo_stack: Vec<(Document, usize, usize)>,
     pub kill_buffer: String,
     pub last_action_was_kill: bool,
     pub is_alt_pressed: bool,
@@ -82,7 +89,6 @@ impl Editor {
             last_action_type: LastActionType::None,
         };
         // Save the initial state for undo after construction
-        editor.save_state_for_undo(LastActionType::Other);
         editor
     }
 
@@ -95,37 +101,34 @@ impl Editor {
         const DEBOUNCE_THRESHOLD_MS: u64 = 500;
         let now = Instant::now();
 
-        let should_group = self.last_action_time.is_some()
-            && self.last_action_type == current_action_type
-            && now.duration_since(self.last_action_time.unwrap()) < Duration::from_millis(DEBOUNCE_THRESHOLD_MS);
+        let is_new_group = self.last_action_time.is_none() // First action
+            || self.last_action_type != current_action_type // Action type changed
+            || now.duration_since(self.last_action_time.unwrap()) >= Duration::from_millis(DEBOUNCE_THRESHOLD_MS); // Debounce threshold exceeded
 
-        debug!("save_state_for_undo: current_action_type={:?}, last_action_type={:?}, last_action_time={:?}, now={:?}, duration_since={:?}, should_group={}",
-            current_action_type,
-            self.last_action_type,
-            self.last_action_time,
-            now,
-            self.last_action_time.map(|t| now.duration_since(t)),
-            should_group
-        );
+        let should_start_new_group = self.last_action_time.is_none() // First action ever
+            || self.last_action_type != current_action_type // Action type changed
+            || now.duration_since(self.last_action_time.unwrap()) >= Duration::from_millis(DEBOUNCE_THRESHOLD_MS); // Debounce time exceeded
 
-        // Only push a new undo state if we are not grouping the current action with the previous one.
-        // If should_group is true, it means the previous action was part of the same group,
-        // and the state *before* that group started is already on the stack.
-        if !should_group {
-            // Push a new undo state only if we are not grouping the current action with the previous one.
+        if should_start_new_group {
             self.undo_stack
                 .push((self.document.clone(), self.cursor_x, self.cursor_y));
         }
-
         self.last_action_time = Some(now);
         self.last_action_type = current_action_type;
     }
 
     pub fn undo(&mut self) {
         self.last_action_was_kill = false;
-        debug!("Undo called. Current undo_stack length: {}. Current document: {:?}", self.undo_stack.len(), self.document.lines);
+        debug!(
+            "Undo called. Current undo_stack length: {}. Current document: {:?}",
+            self.undo_stack.len(),
+            self.document.lines
+        );
         if let Some((prev_document, prev_cursor_x, prev_cursor_y)) = self.undo_stack.pop() {
-            debug!("Popped state: document lines: {:?}, cursor_x: {}, cursor_y: {}", prev_document.lines, prev_cursor_x, prev_cursor_y);
+            debug!(
+                "Popped state: document lines: {:?}, cursor_x: {}, cursor_y: {}",
+                prev_document.lines, prev_cursor_x, prev_cursor_y
+            );
             self.document = prev_document;
             debug!("Document after assignment: {:?}", self.document.lines);
             self.cursor_x = prev_cursor_x;
