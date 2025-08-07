@@ -1,5 +1,6 @@
 use log::debug;
 use unicode_width::UnicodeWidthChar;
+use std::time::{Duration, Instant};
 
 use crate::document::Document;
 use crate::editor::search::Search;
@@ -12,6 +13,15 @@ pub mod ui;
 use crate::editor::ui::STATUS_BAR_HEIGHT;
 
 const TAB_STOP: usize = 4;
+
+#[derive(PartialEq, Debug)]
+pub enum LastActionType {
+    None,
+    Insertion,
+    Deletion,
+    Newline,
+    Other, // For actions like kill_line, yank, etc.
+}
 
 pub struct Editor {
     pub should_quit: bool,
@@ -30,6 +40,9 @@ pub struct Editor {
     pub is_alt_pressed: bool,
     pub search: Search,
     pub selection: selection::Selection,
+    // New fields for debouncing
+    last_action_time: Option<Instant>,
+    last_action_type: LastActionType,
 }
 
 impl Editor {
@@ -47,7 +60,7 @@ impl Editor {
             None => Document::default(),
         };
 
-        Self {
+        let mut editor = Self {
             should_quit: false,
             document,
             cursor_x: 0,
@@ -64,7 +77,13 @@ impl Editor {
             is_alt_pressed: false,
             search: Search::new(),
             selection: selection::Selection::new(),
-        }
+            // Initialize new fields
+            last_action_time: None,
+            last_action_type: LastActionType::None,
+        };
+        // Save the initial state for undo after construction
+        editor.save_state_for_undo(LastActionType::Other);
+        editor
     }
 
     pub fn update_screen_size(&mut self, screen_rows: usize, screen_cols: usize) {
@@ -72,28 +91,58 @@ impl Editor {
         self.screen_cols = screen_cols;
     }
 
-    pub fn save_state_for_undo(&mut self) {
-        self.undo_stack
-            .push((self.document.clone(), self.cursor_x, self.cursor_y));
+    pub fn save_state_for_undo(&mut self, current_action_type: LastActionType) {
+        const DEBOUNCE_THRESHOLD_MS: u64 = 500;
+        let now = Instant::now();
+
+        let should_group = self.last_action_time.is_some()
+            && self.last_action_type == current_action_type
+            && now.duration_since(self.last_action_time.unwrap()) < Duration::from_millis(DEBOUNCE_THRESHOLD_MS);
+
+        debug!("save_state_for_undo: current_action_type={:?}, last_action_type={:?}, last_action_time={:?}, now={:?}, duration_since={:?}, should_group={}",
+            current_action_type,
+            self.last_action_type,
+            self.last_action_time,
+            now,
+            self.last_action_time.map(|t| now.duration_since(t)),
+            should_group
+        );
+
+        // Only push a new undo state if we are not grouping the current action with the previous one.
+        // If should_group is true, it means the previous action was part of the same group,
+        // and the state *before* that group started is already on the stack.
+        if !should_group {
+            // Push a new undo state only if we are not grouping the current action with the previous one.
+            self.undo_stack
+                .push((self.document.clone(), self.cursor_x, self.cursor_y));
+        }
+
+        self.last_action_time = Some(now);
+        self.last_action_type = current_action_type;
     }
 
     pub fn undo(&mut self) {
         self.last_action_was_kill = false;
+        debug!("Undo called. Current undo_stack length: {}. Current document: {:?}", self.undo_stack.len(), self.document.lines);
         if let Some((prev_document, prev_cursor_x, prev_cursor_y)) = self.undo_stack.pop() {
+            debug!("Popped state: document lines: {:?}, cursor_x: {}, cursor_y: {}", prev_document.lines, prev_cursor_x, prev_cursor_y);
             self.document = prev_document;
+            debug!("Document after assignment: {:?}", self.document.lines);
             self.cursor_x = prev_cursor_x;
             self.cursor_y = prev_cursor_y;
             self.desired_cursor_x =
                 self.get_display_width(&self.document.lines[self.cursor_y], self.cursor_x);
             self.status_message = "Undo successful.".to_string();
+            debug!("Document after undo: {:?}", self.document.lines);
         } else {
             self.status_message = "Nothing to undo.".to_string();
+            debug!("Undo stack is empty. Nothing to undo.");
         }
     }
 
     pub fn insert_char(&mut self, c: char) -> Result<()> {
         self.last_action_was_kill = false;
-        self.save_state_for_undo();
+        self.save_state_for_undo(LastActionType::Insertion);
         self.document.insert(self.cursor_x, self.cursor_y, c)?;
         self.cursor_x += c.len_utf8();
         self.desired_cursor_x =
@@ -105,7 +154,7 @@ impl Editor {
     pub fn delete_char(&mut self) -> Result<()> {
         self.last_action_was_kill = false;
         // Backspace
-        self.save_state_for_undo();
+        self.save_state_for_undo(LastActionType::Deletion);
         if self.cursor_x > 0 {
             self.move_cursor_left();
             self.document.delete(self.cursor_x, self.cursor_y)?;
@@ -124,7 +173,7 @@ impl Editor {
     pub fn delete_forward_char(&mut self) -> Result<()> {
         self.last_action_was_kill = false;
         // Ctrl-D
-        self.save_state_for_undo();
+        self.save_state_for_undo(LastActionType::Deletion);
         let y = self.cursor_y;
         let x = self.cursor_x;
         let line_len = self.document.lines.get(y).map_or(0, |l| l.len());
@@ -139,7 +188,7 @@ impl Editor {
 
     pub fn insert_newline(&mut self) -> Result<()> {
         self.last_action_was_kill = false;
-        self.save_state_for_undo();
+        self.save_state_for_undo(LastActionType::Newline);
         self.document.insert_newline(self.cursor_x, self.cursor_y)?;
         self.cursor_y += 1;
         self.cursor_x = 0;
@@ -148,7 +197,7 @@ impl Editor {
     }
 
     pub fn kill_line(&mut self) {
-        self.save_state_for_undo();
+        self.save_state_for_undo(LastActionType::Other);
         let y = self.cursor_y;
         let x = self.cursor_x;
         if y >= self.document.lines.len() {
@@ -179,11 +228,12 @@ impl Editor {
             self.kill_buffer.push_str(&next_line_content);
         }
         self.last_action_was_kill = true;
+        self.save_state_for_undo(LastActionType::Other);
     }
 
     pub fn yank(&mut self) -> Result<()> {
         self.last_action_was_kill = false;
-        self.save_state_for_undo();
+        self.save_state_for_undo(LastActionType::Other);
         let text_to_yank = self.kill_buffer.clone();
         let mut current_x = self.cursor_x;
         let mut current_y = self.cursor_y;
@@ -213,11 +263,12 @@ impl Editor {
         self.cursor_y = current_y;
         self.desired_cursor_x =
             self.get_display_width(&self.document.lines[self.cursor_y], self.cursor_x);
+        self.save_state_for_undo(LastActionType::Other);
         Ok(())
     }
 
     pub fn hungry_delete(&mut self) {
-        self.save_state_for_undo();
+        self.save_state_for_undo(LastActionType::Deletion);
         let (x, y) = (self.cursor_x, self.cursor_y);
         if y >= self.document.lines.len() {
             return;
@@ -444,9 +495,10 @@ impl Editor {
     pub fn move_line_up(&mut self) {
         self.last_action_was_kill = false;
         if self.cursor_y > 0 {
-            self.save_state_for_undo();
+            self.save_state_for_undo(LastActionType::Other);
             self.cursor_y -= 1;
             self.document.swap_lines(self.cursor_y, self.cursor_y + 1);
+            self.save_state_for_undo(LastActionType::Other);
         } else {
             self.status_message = "Cannot move line up further.".to_string();
         }
@@ -455,9 +507,10 @@ impl Editor {
     pub fn move_line_down(&mut self) {
         self.last_action_was_kill = false;
         if self.cursor_y < self.document.lines.len() - 1 {
-            self.save_state_for_undo();
+            self.save_state_for_undo(LastActionType::Other);
             self.document.swap_lines(self.cursor_y, self.cursor_y + 1);
             self.cursor_y += 1;
+            self.save_state_for_undo(LastActionType::Other);
         } else {
             self.status_message = "Cannot move line down further.".to_string();
         }
@@ -575,7 +628,7 @@ impl Editor {
     }
 
     pub fn cut_selection_action(&mut self) -> Result<()> {
-        self.save_state_for_undo();
+        self.save_state_for_undo(LastActionType::Other);
         let cursor_pos = self.cursor_pos();
         self.kill_buffer = self
             .selection
@@ -589,6 +642,7 @@ impl Editor {
         self.cursor_x = self.document.lines[self.cursor_y].len(); // Move to end of the line
         self.desired_cursor_x =
             self.get_display_width(&self.document.lines[self.cursor_y], self.cursor_x);
+        self.save_state_for_undo(LastActionType::Other);
         Ok(())
     }
 
