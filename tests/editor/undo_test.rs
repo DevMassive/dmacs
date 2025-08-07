@@ -3,7 +3,6 @@ use pancurses::Input;
 
 #[test]
 fn test_debounced_undo_insertion() {
-
     let mut editor = Editor::new(None);
     editor.set_undo_debounce_threshold(1);
 
@@ -57,7 +56,6 @@ fn test_debounced_undo_insertion() {
 
 #[test]
 fn test_debounced_undo_deletion() {
-
     let mut editor = Editor::new(None);
     editor.set_undo_debounce_threshold(1);
 
@@ -120,7 +118,6 @@ fn test_debounced_undo_deletion() {
 
 #[test]
 fn test_debounced_undo_newline() {
-
     let mut editor = Editor::new(None);
     editor.set_undo_debounce_threshold(1);
 
@@ -165,7 +162,6 @@ fn test_debounced_undo_newline() {
 
 #[test]
 fn test_debounced_undo_mixed_actions() {
-
     let mut editor = Editor::new(None);
     editor.set_undo_debounce_threshold(1);
 
@@ -200,7 +196,6 @@ fn test_debounced_undo_mixed_actions() {
 
 #[test]
 fn test_initial_state_undo() {
-
     let mut editor = Editor::new(None);
     editor.set_undo_debounce_threshold(1);
 
