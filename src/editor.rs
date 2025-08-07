@@ -1,12 +1,5 @@
 use log::debug;
-use std::time::Duration;
-
-#[cfg(feature = "test")]
-use mock_instant::thread_local::Instant;
-
-#[cfg(not(feature = "test"))]
-use std::time::Instant;
-
+use std::time::{Duration, Instant};
 use unicode_width::UnicodeWidthChar;
 
 use crate::document::Document;
@@ -50,6 +43,7 @@ pub struct Editor {
     // New fields for debouncing
     last_action_time: Option<Instant>,
     last_action_type: LastActionType,
+    undo_debounce_threshold: Duration,
 }
 
 impl Editor {
@@ -88,6 +82,7 @@ impl Editor {
             // Initialize new fields
             last_action_time: None,
             last_action_type: LastActionType::None,
+            undo_debounce_threshold: Duration::from_millis(500),
         }
     }
 
@@ -97,12 +92,11 @@ impl Editor {
     }
 
     pub fn save_state_for_undo(&mut self, current_action_type: LastActionType) {
-        const DEBOUNCE_THRESHOLD_MS: u64 = 500;
         let now = Instant::now();
 
         let should_start_new_group = self.last_action_time.is_none() // First action ever
             || self.last_action_type != current_action_type // Action type changed
-            || now.duration_since(self.last_action_time.unwrap()) >= Duration::from_millis(DEBOUNCE_THRESHOLD_MS); // Debounce time exceeded
+            || now.duration_since(self.last_action_time.unwrap()) >= self.undo_debounce_threshold; // Debounce time exceeded
 
         if should_start_new_group {
             self.undo_stack
@@ -731,6 +725,10 @@ impl Editor {
             self.desired_cursor_x = 0;
             self.row_offset = self.cursor_y; // Scroll to make cursor at top
         }
+    }
+
+    pub fn set_undo_debounce_threshold(&mut self, threshold_ms: u64) {
+        self.undo_debounce_threshold = Duration::from_millis(threshold_ms);
     }
 }
 
