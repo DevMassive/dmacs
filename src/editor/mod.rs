@@ -67,7 +67,8 @@ impl Editor {
             None => Document::default(),
         };
 
-        let mut editor = Self {
+        // Save the initial state for undo after construction
+        Self {
             should_quit: false,
             document,
             cursor_x: 0,
@@ -87,9 +88,7 @@ impl Editor {
             // Initialize new fields
             last_action_time: None,
             last_action_type: LastActionType::None,
-        };
-        // Save the initial state for undo after construction
-        editor
+        }
     }
 
     pub fn update_screen_size(&mut self, screen_rows: usize, screen_cols: usize) {
@@ -100,10 +99,6 @@ impl Editor {
     pub fn save_state_for_undo(&mut self, current_action_type: LastActionType) {
         const DEBOUNCE_THRESHOLD_MS: u64 = 500;
         let now = Instant::now();
-
-        let is_new_group = self.last_action_time.is_none() // First action
-            || self.last_action_type != current_action_type // Action type changed
-            || now.duration_since(self.last_action_time.unwrap()) >= Duration::from_millis(DEBOUNCE_THRESHOLD_MS); // Debounce threshold exceeded
 
         let should_start_new_group = self.last_action_time.is_none() // First action ever
             || self.last_action_type != current_action_type // Action type changed
