@@ -1,7 +1,5 @@
 mod cursor_movement_test;
-
 mod delimiter_movement_test;
-
 mod insertion_deletion_test;
 mod kill_yank_test;
 mod line_movement_test;
