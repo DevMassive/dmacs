@@ -60,33 +60,23 @@ impl Document {
         if at_y == self.lines.len() {
             self.lines.push(String::new());
         }
-        let line = self
-            .lines
-            .get_mut(at_y)
-            .ok_or(DmacsError::Document(format!("Invalid line index: {at_y}")))?;
-        if at_x > line.len() {
-            line.push(c);
-        } else {
-            line.insert(at_x, c);
-        }
-        Ok(())
+        self.modify(at_x, at_y, &c.to_string(), "", false)
+            .map(|_| ())
     }
 
     pub fn delete(&mut self, at_x: usize, at_y: usize) -> Result<()> {
         if at_y >= self.lines.len() {
             return Err(DmacsError::Document(format!("Invalid line index: {at_y}")));
         }
-        let line = self
-            .lines
-            .get_mut(at_y)
-            .ok_or(DmacsError::Document(format!("Invalid line index: {at_y}")))?;
+        let line = &self.lines[at_y];
         if at_x >= line.len() {
             return Err(DmacsError::Document(format!(
                 "Invalid column index: {at_x}"
             )));
         }
-        line.remove(at_x);
-        Ok(())
+        let char_to_delete = line.chars().nth(at_x).unwrap().to_string();
+        self.modify(at_x, at_y, "", &char_to_delete, false)
+            .map(|_| ())
     }
 
     pub fn insert_newline(&mut self, at_x: usize, at_y: usize) -> Result<()> {
@@ -107,12 +97,7 @@ impl Document {
     }
 
     pub fn insert_string(&mut self, at_x: usize, at_y: usize, s: &str) -> Result<()> {
-        if at_y >= self.lines.len() {
-            return Err(DmacsError::Document(format!("Invalid line index: {at_y}")));
-        }
-        let line = &mut self.lines[at_y];
-        line.insert_str(at_x, s);
-        Ok(())
+        self.modify(at_x, at_y, s, "", false).map(|_| ())
     }
 
     pub fn swap_lines(&mut self, y1: usize, y2: usize) {
@@ -173,15 +158,74 @@ impl Document {
                 "Invalid line index for delete_range: {at_y}"
             )));
         }
-        let line = &mut self.lines[at_y];
+        let line = &self.lines[at_y];
         if at_x > line.len() || end_x > line.len() || at_x > end_x {
             return Err(DmacsError::Document(format!(
                 "Invalid range for delete_range: ({at_x}, {end_x}) on line length {}",
                 line.len()
             )));
         }
-        line.replace_range(at_x..end_x, "");
-        Ok(())
+        let deleted_text = line[at_x..end_x].to_string();
+        self.modify(at_x, at_y, "", &deleted_text, false)
+            .map(|_| ())
+    }
+
+    pub fn modify(
+        &mut self,
+        x: usize,
+        y: usize,
+        added_text: &str,
+        deleted_text: &str,
+        is_undo: bool,
+    ) -> Result<(usize, usize)> {
+        let (add, delete) = if is_undo {
+            (deleted_text, added_text)
+        } else {
+            (added_text, deleted_text)
+        };
+
+        if y >= self.lines.len() {
+            return Err(DmacsError::Document(format!("Invalid line index: {y}")));
+        }
+
+        let line = &mut self.lines[y];
+
+        // Handle deletion
+        if !delete.is_empty() {
+            let delete_len = delete.len();
+            if x + delete_len > line.len() {
+                return Err(DmacsError::Document(format!(
+                    "Deletion out of bounds: x={x}, delete_len={delete_len}, line_len={}",
+                    line.len()
+                )));
+            }
+            if line[x..].starts_with(delete) {
+                line.replace_range(x..(x + delete_len), "");
+            } else {
+                return Err(DmacsError::Document(format!(
+                    "Text to delete does not match: expected \"{}\", found \"{}\"",
+                    delete,
+                    &line[x..(x + delete_len)]
+                )));
+            }
+        }
+
+        // Handle insertion
+        if !add.is_empty() {
+            if x > line.len() {
+                // If inserting beyond the current line length, pad with spaces
+                // This might not be the desired behavior for all cases, but it's a start.
+                // Consider if this should be an error or if the line should be extended.
+                line.push_str(&" ".repeat(x - line.len()));
+            }
+            line.insert_str(x, add);
+        }
+
+        // Calculate new cursor position
+        let new_x = x + add.len();
+        let new_y = y;
+
+        Ok((new_x, new_y))
     }
 }
 
