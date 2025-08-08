@@ -106,17 +106,6 @@ impl Document {
         }
     }
 
-    pub fn join_line_with_previous(&mut self, at_y: usize) -> Result<()> {
-        if at_y == 0 || at_y >= self.lines.len() {
-            return Err(DmacsError::Document(format!(
-                "Cannot join line {at_y} with previous line."
-            )));
-        }
-        let current_line = self.lines.remove(at_y);
-        self.lines[at_y - 1].push_str(&current_line);
-        Ok(())
-    }
-
     pub fn join_line_with_next(&mut self, at_y: usize) -> Result<()> {
         if at_y >= self.lines.len().saturating_sub(1) {
             return Err(DmacsError::Document(format!(
@@ -188,42 +177,58 @@ impl Document {
             return Err(DmacsError::Document(format!("Invalid line index: {y}")));
         }
 
-        let line = &mut self.lines[y];
+        let new_x;
+        let new_y;
 
-        // Handle deletion
-        if !delete.is_empty() {
-            let delete_len = delete.len();
-            if x + delete_len > line.len() {
+        if delete == "\n" {
+            if y == 0 || y >= self.lines.len() {
                 return Err(DmacsError::Document(format!(
-                    "Deletion out of bounds: x={x}, delete_len={delete_len}, line_len={}",
-                    line.len()
+                    "Cannot join line {y} with previous line."
                 )));
             }
-            if line[x..].starts_with(delete) {
-                line.replace_range(x..(x + delete_len), "");
-            } else {
-                return Err(DmacsError::Document(format!(
-                    "Text to delete does not match: expected \"{}\", found \"{}\"",
-                    delete,
-                    &line[x..(x + delete_len)]
-                )));
-            }
-        }
+            let current_line = self.lines.remove(y);
+            let prev_line_len = self.lines[y - 1].len();
+            self.lines[y - 1].push_str(&current_line);
+            new_x = prev_line_len;
+            new_y = y - 1;
+        } else {
+            let line = &mut self.lines[y];
 
-        // Handle insertion
-        if !add.is_empty() {
-            if x > line.len() {
-                // If inserting beyond the current line length, pad with spaces
-                // This might not be the desired behavior for all cases, but it's a start.
-                // Consider if this should be an error or if the line should be extended.
-                line.push_str(&" ".repeat(x - line.len()));
+            // Handle deletion
+            if !delete.is_empty() {
+                let delete_len = delete.len();
+                if x + delete_len > line.len() {
+                    return Err(DmacsError::Document(format!(
+                        "Deletion out of bounds: x={x}, delete_len={delete_len}, line_len={}",
+                        line.len()
+                    )));
+                }
+                if line[x..].starts_with(delete) {
+                    line.replace_range(x..(x + delete_len), "");
+                } else {
+                    return Err(DmacsError::Document(format!(
+                        "Text to delete does not match: expected \"{}\", found \"{}\"",
+                        delete,
+                        &line[x..(x + delete_len)]
+                    )));
+                }
             }
-            line.insert_str(x, add);
-        }
 
-        // Calculate new cursor position
-        let new_x = x + add.len();
-        let new_y = y;
+            // Handle insertion
+            if !add.is_empty() {
+                if x > line.len() {
+                    // If inserting beyond the current line length, pad with spaces
+                    // This might not be the desired behavior for all cases, but it's a start.
+                    // Consider if this should be an error or if the line should be extended.
+                    line.push_str(&" ".repeat(x - line.len()));
+                }
+                line.insert_str(x, add);
+            }
+
+            // Calculate new cursor position
+            new_x = x + add.len();
+            new_y = y;
+        }
 
         Ok((new_x, new_y))
     }

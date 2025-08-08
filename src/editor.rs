@@ -175,7 +175,9 @@ impl Editor {
     pub fn insert_char(&mut self, c: char) -> Result<()> {
         self.last_action_was_kill = false;
         self.save_state_for_undo(LastActionType::Insertion);
-        let (new_x, new_y) = self.document.modify(self.cursor_x, self.cursor_y, &c.to_string(), "", false)?;
+        let (new_x, new_y) =
+            self.document
+                .modify(self.cursor_x, self.cursor_y, &c.to_string(), "", false)?;
         self.cursor_x = new_x;
         self.cursor_y = new_y;
         self.desired_cursor_x =
@@ -197,15 +199,15 @@ impl Editor {
                 char_to_delete = ch.to_string();
                 char_start_byte = idx;
             }
-            let (new_x, new_y) = self.document
-                .modify(char_start_byte, self.cursor_y, "", &char_to_delete, false)?;
+            let (new_x, new_y) =
+                self.document
+                    .modify(char_start_byte, self.cursor_y, "", &char_to_delete, false)?;
             self.cursor_x = new_x;
             self.cursor_y = new_y;
         } else if self.cursor_y > 0 {
-            let prev_line_len = self.document.lines[self.cursor_y - 1].len();
-            self.document.join_line_with_previous(self.cursor_y)?;
-            self.cursor_y -= 1;
-            self.cursor_x = prev_line_len;
+            let (new_x, new_y) = self.document.modify(0, self.cursor_y, "", "\n", false)?;
+            self.cursor_x = new_x;
+            self.cursor_y = new_y;
             self.desired_cursor_x =
                 self.get_display_width(&self.document.lines[self.cursor_y], self.cursor_x);
         }
@@ -228,8 +230,9 @@ impl Editor {
                 char_to_delete = ch.to_string();
                 char_start_byte = x + idx;
             }
-            let (_new_x, new_y) = self.document
-                .modify(char_start_byte, y, "", &char_to_delete, false)?;
+            let (_new_x, new_y) =
+                self.document
+                    .modify(char_start_byte, y, "", &char_to_delete, false)?;
             // Cursor position does not change for delete_forward_char, but update y in case modify changes it
             self.cursor_y = new_y;
         } else if y < self.document.lines.len() - 1 {
@@ -331,10 +334,9 @@ impl Editor {
         if x == 0 {
             // If at the beginning of a line, join with previous line if available
             if y > 0 {
-                let prev_line_len = self.document.lines[y - 1].len();
-                self.document.join_line_with_previous(y).unwrap();
-                self.cursor_y -= 1;
-                self.cursor_x = prev_line_len;
+                let (new_x, new_y) = self.document.modify(0, y, "", "\n", false).unwrap();
+                self.cursor_x = new_x;
+                self.cursor_y = new_y;
                 self.desired_cursor_x =
                     self.get_display_width(&self.document.lines[self.cursor_y], self.cursor_x);
             }
@@ -344,7 +346,8 @@ impl Editor {
         let start_delete_byte = find_word_boundary_left(current_line, x);
 
         let deleted_text = current_line[start_delete_byte..x].to_string();
-        let (new_x, new_y) = self.document
+        let (new_x, new_y) = self
+            .document
             .modify(start_delete_byte, y, "", &deleted_text, false)
             .unwrap();
         self.cursor_x = new_x;
