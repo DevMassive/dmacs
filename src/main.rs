@@ -15,9 +15,7 @@ fn main() -> Result<()> {
             .payload()
             .downcast_ref::<&str>()
             .unwrap_or(&"<unknown panic>");
-        log::error!(
-            "Panic occurred in file '{filename}' at line {line}: {message}"
-        );
+        log::error!("Panic occurred in file '{filename}' at line {line}: {message}");
     }));
 
     let args: Vec<String> = env::args().collect();

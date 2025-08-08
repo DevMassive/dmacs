@@ -30,6 +30,7 @@ impl Editor {
             if row >= screen_rows.saturating_sub(STATUS_BAR_HEIGHT) {
                 break;
             }
+            let row = row + STATUS_BAR_HEIGHT;
 
             let is_comment = line.trim_start().starts_with('#');
             if is_comment {
@@ -169,28 +170,24 @@ impl Editor {
             }
         }
 
-        // Draw horizontal line above status bar
-        window.attron(A_DIM);
-        for i in 0..screen_cols {
-            window.mvaddch(
-                window.get_max_y() - STATUS_BAR_HEIGHT as i32,
-                i as i32,
-                pancurses::ACS_HLINE(),
-            );
-        }
-        window.attroff(A_DIM);
-
         // Draw filename (bold) and modified indicator
         let filename_display = self.document.filename.as_deref().unwrap_or("[No Name]");
         let modified_indicator = if self.document.is_dirty() { "*" } else { "" };
         let filename_and_modified = format!("{filename_display}{modified_indicator}");
         window.attron(A_BOLD);
-        window.mvaddstr(
-            window.get_max_y() - (STATUS_BAR_HEIGHT as i32 - 1),
-            0,
-            &filename_and_modified,
-        );
+        window.mvaddstr(0, 0, &filename_and_modified);
         window.attroff(A_BOLD);
+
+        // Draw horizontal line below status bar content
+        window.attron(A_DIM);
+        for i in 0..screen_cols {
+            window.mvaddch(
+                STATUS_BAR_HEIGHT as i32 - 1,
+                i as i32,
+                pancurses::ACS_HLINE(),
+            );
+        }
+        window.attroff(A_DIM);
 
         // Calculate the display width of the filename and modified indicator
         let mut current_col = 0;
@@ -200,11 +197,7 @@ impl Editor {
 
         // Draw line count
         let line_count_str = format!(" - {} lines", self.document.lines.len());
-        window.mvaddstr(
-            window.get_max_y() - (STATUS_BAR_HEIGHT as i32 - 1),
-            current_col as i32,
-            &line_count_str,
-        );
+        window.mvaddstr(0, current_col as i32, &line_count_str);
         for ch in line_count_str.chars() {
             current_col += ch.width().unwrap_or(0);
         }
@@ -216,18 +209,14 @@ impl Editor {
                 message_display_width += ch.width().unwrap_or(0);
             }
             let message_start_col = screen_cols.saturating_sub(message_display_width);
-            window.mvaddstr(
-                window.get_max_y() - (STATUS_BAR_HEIGHT as i32 - 1),
-                message_start_col as i32,
-                &self.status_message,
-            );
+            window.mvaddstr(0, message_start_col as i32, &self.status_message);
         }
 
         // Move cursor
         let display_cursor_x =
             self.get_display_width(&self.document.lines[self.cursor_y], self.cursor_x);
         window.mv(
-            (self.cursor_y - self.row_offset) as i32,
+            (self.cursor_y - self.row_offset + STATUS_BAR_HEIGHT) as i32,
             (display_cursor_x - self.col_offset) as i32,
         );
         window.refresh();
