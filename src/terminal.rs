@@ -179,8 +179,11 @@ impl Terminal {
 impl Drop for Terminal {
     fn drop(&mut self) {
         let stdin_fd = stdin().as_raw_fd();
-        unsafe {
-            tcsetattr(stdin_fd, TCSANOW, &self.original_termios);
+        if unsafe { tcsetattr(stdin_fd, TCSANOW, &self.original_termios) } != 0 {
+            eprintln!(
+                "Error restoring terminal settings: {}",
+                DmacsError::Io(io::Error::last_os_error())
+            );
         }
         endwin();
     }
