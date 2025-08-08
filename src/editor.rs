@@ -236,7 +236,8 @@ impl Editor {
             // Cursor position does not change for delete_forward_char, but update y in case modify changes it
             self.cursor_y = new_y;
         } else if y < self.document.lines.len() - 1 {
-            self.document.join_line_with_next(y)?;
+            let x = self.document.lines[y].len();
+            self.document.modify(x, y, "", "\n", false)?;
         }
         Ok(())
     }
@@ -244,9 +245,11 @@ impl Editor {
     pub fn insert_newline(&mut self) -> Result<()> {
         self.last_action_was_kill = false;
         self.save_state_for_undo(LastActionType::Newline);
-        self.document.insert_newline(self.cursor_x, self.cursor_y)?;
-        self.cursor_y += 1;
-        self.cursor_x = 0;
+        let (new_x, new_y) = self
+            .document
+            .modify(self.cursor_x, self.cursor_y, "\n", "", false)?;
+        self.cursor_y = new_y;
+        self.cursor_x = new_x;
         self.desired_cursor_x = 0;
         Ok(())
     }
@@ -306,9 +309,11 @@ impl Editor {
 
         // Insert subsequent lines
         for line_to_yank in lines_to_yank.iter().skip(1) {
-            self.document.insert_newline(current_x, current_y)?;
-            current_y += 1;
-            current_x = 0;
+            let (new_x_after_newline, new_y_after_newline) = self
+                .document
+                .modify(current_x, current_y, "\n", "", false)?;
+            current_y = new_y_after_newline;
+            current_x = new_x_after_newline;
             self.document
                 .insert_string(current_x, current_y, line_to_yank)?;
             current_x += line_to_yank.len();

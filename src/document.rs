@@ -79,23 +79,6 @@ impl Document {
             .map(|_| ())
     }
 
-    pub fn insert_newline(&mut self, at_x: usize, at_y: usize) -> Result<()> {
-        if at_y > self.lines.len() {
-            return Err(DmacsError::Document(format!("Invalid line index: {at_y}")));
-        }
-        if at_y == self.lines.len() {
-            self.lines.push(String::new());
-            return Ok(());
-        }
-        let current_line = self
-            .lines
-            .get_mut(at_y)
-            .ok_or(DmacsError::Document(format!("Invalid line index: {at_y}")))?;
-        let new_line = current_line.split_off(at_x);
-        self.lines.insert(at_y + 1, new_line);
-        Ok(())
-    }
-
     pub fn insert_string(&mut self, at_x: usize, at_y: usize, s: &str) -> Result<()> {
         self.modify(at_x, at_y, s, "", false).map(|_| ())
     }
@@ -104,17 +87,6 @@ impl Document {
         if y1 < self.lines.len() && y2 < self.lines.len() {
             self.lines.swap(y1, y2);
         }
-    }
-
-    pub fn join_line_with_next(&mut self, at_y: usize) -> Result<()> {
-        if at_y >= self.lines.len().saturating_sub(1) {
-            return Err(DmacsError::Document(format!(
-                "Cannot join line {at_y} with next line."
-            )));
-        }
-        let next_line = self.lines.remove(at_y + 1);
-        self.lines[at_y].push_str(&next_line);
-        Ok(())
     }
 
     pub fn remove_line(&mut self, at_y: usize) -> Result<String> {
@@ -180,18 +152,56 @@ impl Document {
         let new_x;
         let new_y;
 
-        if delete == "\n" {
-            if y == 0 || y >= self.lines.len() {
+        // Handle newline insertion (splitting a line)
+        if add == "\n" {
+            if y > self.lines.len() {
                 return Err(DmacsError::Document(format!(
-                    "Cannot join line {y} with previous line."
+                    "Invalid line index for newline insertion: {y}"
                 )));
             }
-            let current_line = self.lines.remove(y);
-            let prev_line_len = self.lines[y - 1].len();
-            self.lines[y - 1].push_str(&current_line);
-            new_x = prev_line_len;
-            new_y = y - 1;
-        } else {
+            if y == self.lines.len() {
+                self.lines.push(String::new());
+            } else {
+                let current_line = self
+                    .lines
+                    .get_mut(y)
+                    .ok_or(DmacsError::Document(format!("Invalid line index: {y}")))?;
+                let new_line = current_line.split_off(x);
+                self.lines.insert(y + 1, new_line);
+            }
+            new_x = 0;
+            new_y = y + 1;
+        }
+        // Handle newline deletion (joining lines)
+        else if delete == "\n" {
+            if x == 0 {
+                // Backspace at the beginning of a line, join with previous
+                if y == 0 {
+                    return Err(DmacsError::Document(
+                        "Cannot join first line with previous.".to_string(),
+                    ));
+                }
+                let current_line = self.lines.remove(y);
+                let prev_line_len = self.lines[y - 1].len();
+                self.lines[y - 1].push_str(&current_line);
+                new_x = prev_line_len;
+                new_y = y - 1;
+            } else {
+                // Delete at the end of a line, join with next
+                if y >= self.lines.len().saturating_sub(1) {
+                    return Err(DmacsError::Document(format!(
+                        "Cannot join line {y} with next line."
+                    )));
+                }
+                let next_line = self.lines.remove(y + 1);
+                let current_line_len = self.lines[y].len();
+                self.lines[y].push_str(&next_line);
+                new_x = current_line_len;
+                new_y = y;
+            }
+        }
+        // Handle regular text insertion/deletion
+        else {
             let line = &mut self.lines[y];
 
             // Handle deletion

@@ -49,7 +49,7 @@ fn test_document_delete() {
 fn test_insert_newline() {
     let mut doc = Document::default();
     doc.lines[0] = "abcdef".to_string();
-    doc.insert_newline(3, 0).unwrap();
+    doc.modify(3, 0, "\n", "", false).unwrap();
     assert_eq!(doc.lines.len(), 2);
     assert_eq!(doc.lines[0], "abc");
     assert_eq!(doc.lines[1], "def");

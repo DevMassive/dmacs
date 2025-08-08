@@ -5,5 +5,9 @@ Rust製テキストエディタ
 
 # タスク
 
-documentのjoin_line_with_previousを
-document.modify(x, y, "added_text", "deleted_text", false/* isUndo */) に統一したいです。
+> documentのjoin_line_with_next, insert_newlineを
+> document.modify(x, y, "added_text", "deleted_text", false/* isUndo */) に統一したいです。
+上記、完了しました
+
+documentのinsert_newlineを削除し、
+editorからはdocument.modifyを直接呼ぶようにしてください
