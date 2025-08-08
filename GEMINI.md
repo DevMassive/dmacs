@@ -5,10 +5,10 @@ Rust製テキストエディタ
 
 # タスク
 
-documentのsplit_line_fromを
+documentのremove_lineを
 document.modify(x, y, "added_text", "deleted_text", false/* isUndo */) に統一したいです。
 
 統一後、テストを通してください。
 
-その後、documentのsplit_line_fromを削除し、
+その後、documentのremove_lineを削除し、
 editorからはdocument.modifyを直接呼ぶようにしてください

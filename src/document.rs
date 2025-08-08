@@ -89,15 +89,6 @@ impl Document {
         }
     }
 
-    pub fn remove_line(&mut self, at_y: usize) -> Result<String> {
-        if at_y >= self.lines.len() {
-            return Err(DmacsError::Document(format!(
-                "Invalid line index for removal: {at_y}"
-            )));
-        }
-        Ok(self.lines.remove(at_y))
-    }
-
     pub fn delete_range(&mut self, at_x: usize, at_y: usize, end_x: usize) -> Result<()> {
         if at_y >= self.lines.len() {
             return Err(DmacsError::Document(format!(
@@ -162,15 +153,26 @@ impl Document {
             if x == 0 {
                 // Backspace at the beginning of a line, join with previous
                 if y == 0 {
-                    return Err(DmacsError::Document(
-                        "Cannot join first line with previous.".to_string(),
-                    ));
+                    // If it's the first line and we're deleting a newline at x=0,
+                    // it means we're effectively removing the first line.
+                    // This happens when you delete the newline *after* the first line.
+                    if self.lines.len() > 1 {
+                        self.lines.remove(y); // Remove the first line
+                        new_x = 0; // Cursor moves to the beginning of the new first line
+                        new_y = 0;
+                    } else {
+                        // If it's the only line, just clear it.
+                        self.lines[y].clear();
+                        new_x = 0;
+                        new_y = 0;
+                    }
+                } else {
+                    let current_line = self.lines.remove(y);
+                    let prev_line_len = self.lines[y - 1].len();
+                    self.lines[y - 1].push_str(&current_line);
+                    new_x = prev_line_len;
+                    new_y = y - 1;
                 }
-                let current_line = self.lines.remove(y);
-                let prev_line_len = self.lines[y - 1].len();
-                self.lines[y - 1].push_str(&current_line);
-                new_x = prev_line_len;
-                new_y = y - 1;
             } else {
                 // Delete at the end of a line, join with next
                 if y >= self.lines.len().saturating_sub(1) {

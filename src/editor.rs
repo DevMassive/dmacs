@@ -270,7 +270,7 @@ impl Editor {
         if x == 0 && current_line_len == 0 && y < self.document.lines.len() - 1 {
             // Case 3: Cursor is at the beginning of an empty line, and it's not the last line
             // Kill the newline and remove the empty line
-            self.document.remove_line(y).unwrap(); // Remove the empty line
+            self.document.modify(0, y, "", "\n", false).unwrap();
             self.kill_buffer.push('\x0a');
         } else if x < current_line_len {
             // Case 1: Cursor is within the line (not at the very end)
@@ -282,8 +282,8 @@ impl Editor {
         } else if x == current_line_len && y < self.document.lines.len() - 1 {
             // Case 2: Cursor is at the end of the line, and it's not the last line
             // Kill the newline and join with the next line
-            let next_line_content = self.document.remove_line(y + 1).unwrap();
-            self.document.lines[y].push_str(&next_line_content);
+            let next_line_content = self.document.lines[y + 1].clone(); // Get content before modify
+            self.document.modify(x, y, "", "\n", false).unwrap();
             self.kill_buffer.push('\x0a');
             self.kill_buffer.push_str(&next_line_content);
         }
