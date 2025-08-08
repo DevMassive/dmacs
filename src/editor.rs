@@ -275,7 +275,9 @@ impl Editor {
         } else if x < current_line_len {
             // Case 1: Cursor is within the line (not at the very end)
             // Kill from cursor to end of line
-            let killed_text = self.document.split_line_from(x, y).unwrap();
+            let current_line = &self.document.lines[y];
+            let killed_text = current_line[x..].to_string();
+            self.document.modify(x, y, "", &killed_text, false).unwrap();
             self.kill_buffer.push_str(&killed_text);
         } else if x == current_line_len && y < self.document.lines.len() - 1 {
             // Case 2: Cursor is at the end of the line, and it's not the last line

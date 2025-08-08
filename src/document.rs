@@ -98,21 +98,6 @@ impl Document {
         Ok(self.lines.remove(at_y))
     }
 
-    pub fn split_line_from(&mut self, at_x: usize, at_y: usize) -> Result<String> {
-        if at_y >= self.lines.len() {
-            return Err(DmacsError::Document(format!(
-                "Invalid line index for split: {at_y}"
-            )));
-        }
-        let line = &mut self.lines[at_y];
-        if at_x > line.len() {
-            return Err(DmacsError::Document(format!(
-                "Invalid column index for split: {at_x}"
-            )));
-        }
-        Ok(line.split_off(at_x))
-    }
-
     pub fn delete_range(&mut self, at_x: usize, at_y: usize, end_x: usize) -> Result<()> {
         if at_y >= self.lines.len() {
             return Err(DmacsError::Document(format!(

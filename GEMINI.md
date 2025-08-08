@@ -5,9 +5,10 @@ Rust製テキストエディタ
 
 # タスク
 
-> documentのjoin_line_with_next, insert_newlineを
-> document.modify(x, y, "added_text", "deleted_text", false/* isUndo */) に統一したいです。
-上記、完了しました
+documentのsplit_line_fromを
+document.modify(x, y, "added_text", "deleted_text", false/* isUndo */) に統一したいです。
 
-documentのinsert_newlineを削除し、
+統一後、テストを通してください。
+
+その後、documentのsplit_line_fromを削除し、
 editorからはdocument.modifyを直接呼ぶようにしてください
