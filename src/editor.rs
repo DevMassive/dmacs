@@ -35,6 +35,7 @@ pub struct Editor {
     pub screen_rows: usize,
     pub screen_cols: usize,
     pub undo_stack: Vec<(Document, usize, usize)>,
+    pub redo_stack: Vec<(Document, usize, usize)>,
     pub kill_buffer: String,
     pub last_action_was_kill: bool,
     pub is_alt_pressed: bool,
@@ -74,6 +75,7 @@ impl Editor {
             screen_rows: 0,
             screen_cols: 0,
             undo_stack: Vec::new(),
+            redo_stack: Vec::new(),
             kill_buffer: String::new(),
             last_action_was_kill: false,
             is_alt_pressed: false,
@@ -101,6 +103,7 @@ impl Editor {
         if should_start_new_group {
             self.undo_stack
                 .push((self.document.clone(), self.cursor_x, self.cursor_y));
+            self.redo_stack.clear(); // Clear redo stack on new action
         }
         self.last_action_time = Some(now);
         self.last_action_type = current_action_type;
@@ -114,6 +117,10 @@ impl Editor {
             self.document.lines
         );
         if let Some((prev_document, prev_cursor_x, prev_cursor_y)) = self.undo_stack.pop() {
+            // Save current state to redo stack before undoing
+            self.redo_stack
+                .push((self.document.clone(), self.cursor_x, self.cursor_y));
+
             debug!(
                 "Popped state: document lines: {:?}, cursor_x: {}, cursor_y: {}",
                 prev_document.lines, prev_cursor_x, prev_cursor_y
@@ -129,6 +136,39 @@ impl Editor {
         } else {
             self.status_message = "Nothing to undo.".to_string();
             debug!("Undo stack is empty. Nothing to undo.");
+        }
+    }
+
+    pub fn redo(&mut self) {
+        self.last_action_was_kill = false;
+        debug!(
+            "Redo called. Current redo_stack length: {}. Current document: {:?}",
+            self.redo_stack.len(),
+            self.document.lines
+        );
+        if let Some((next_document, next_cursor_x, next_cursor_y)) = self.redo_stack.pop() {
+            // Save current state to undo stack before redoing
+            self.undo_stack
+                .push((self.document.clone(), self.cursor_x, self.cursor_y));
+
+            debug!(
+                "Popped state for redo: document lines: {:?}, cursor_x: {}, cursor_y: {}",
+                next_document.lines, next_cursor_x, next_cursor_y
+            );
+            self.document = next_document;
+            debug!(
+                "Document after assignment for redo: {:?}",
+                self.document.lines
+            );
+            self.cursor_x = next_cursor_x;
+            self.cursor_y = next_cursor_y;
+            self.desired_cursor_x =
+                self.get_display_width(&self.document.lines[self.cursor_y], self.cursor_x);
+            self.status_message = "Redo successful.".to_string();
+            debug!("Document after redo: {:?}", self.document.lines);
+        } else {
+            self.status_message = "Nothing to redo.".to_string();
+            debug!("Redo stack is empty. Nothing to redo.");
         }
     }
 

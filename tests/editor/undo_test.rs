@@ -219,3 +219,87 @@ fn test_initial_state_undo() {
     assert_eq!(editor.undo_stack.len(), 0);
     assert_eq!(editor.status_message, "Nothing to undo.");
 }
+
+#[test]
+fn test_redo() {
+    let mut editor = Editor::new(None);
+    editor.set_undo_debounce_threshold(1);
+
+    // Perform some actions
+    editor.process_input(Input::Character('a'), false).unwrap();
+    editor.process_input(Input::Character('b'), false).unwrap();
+    editor.process_input(Input::Character('c'), false).unwrap();
+    editor.set_undo_debounce_threshold(0); // Ensure 'd' is a separate undo entry
+    editor.process_input(Input::Character('d'), false).unwrap();
+    editor.process_input(Input::Character('\n'), false).unwrap();
+    editor.process_input(Input::Character('e'), false).unwrap();
+
+    assert_eq!(editor.document.lines[0], "abcd");
+    assert_eq!(editor.document.lines[1], "e");
+    assert_eq!(editor.undo_stack.len(), 4); // 'abc', 'd', newline, 'e'
+    assert_eq!(editor.redo_stack.len(), 0);
+
+    // Undo 'e'
+    editor.undo();
+    assert_eq!(editor.document.lines[0], "abcd");
+    assert_eq!(editor.document.lines.len(), 2); // Document should have 2 lines after undoing 'e'
+    assert_eq!(editor.undo_stack.len(), 3);
+    assert_eq!(editor.redo_stack.len(), 1); // 'e' should be in redo stack
+
+    // Undo newline
+    editor.undo();
+    assert_eq!(editor.document.lines[0], "abcd");
+    assert_eq!(editor.document.lines.len(), 1);
+    assert_eq!(editor.undo_stack.len(), 2);
+    assert_eq!(editor.redo_stack.len(), 2); // newline should be in redo stack
+
+    // Undo 'd'
+    editor.undo();
+    assert_eq!(editor.document.lines[0], "abc");
+    assert_eq!(editor.undo_stack.len(), 1);
+    assert_eq!(editor.redo_stack.len(), 3); // 'd' should be in redo stack
+
+    // Redo 'd'
+    editor.redo();
+    assert_eq!(editor.document.lines[0], "abcd");
+    assert_eq!(editor.undo_stack.len(), 2);
+    assert_eq!(editor.redo_stack.len(), 2); // newline should be in redo stack
+
+    // Redo newline
+    editor.redo();
+    assert_eq!(editor.document.lines[0], "abcd");
+    assert_eq!(editor.document.lines.len(), 2);
+    assert_eq!(editor.undo_stack.len(), 3);
+    assert_eq!(editor.redo_stack.len(), 1); // 'e' should be in redo stack
+
+    // Redo 'e'
+    editor.redo();
+    assert_eq!(editor.document.lines[0], "abcd");
+    assert_eq!(editor.document.lines[1], "e");
+    assert_eq!(editor.undo_stack.len(), 4);
+    assert_eq!(editor.redo_stack.len(), 0);
+
+    // Try to redo when redo stack is empty
+    editor.redo();
+    assert_eq!(editor.status_message, "Nothing to redo.");
+    assert_eq!(editor.undo_stack.len(), 4);
+    assert_eq!(editor.redo_stack.len(), 0);
+
+    // Perform a new action after undoing, then try to redo (should not work)
+    editor.undo(); // Undo 'e'
+    assert_eq!(editor.document.lines[0], "abcd");
+    assert_eq!(editor.document.lines.len(), 2);
+    assert_eq!(editor.undo_stack.len(), 3);
+    assert_eq!(editor.redo_stack.len(), 1);
+
+    editor.process_input(Input::Character('f'), false).unwrap(); // New action
+    assert_eq!(editor.document.lines[0], "abcd");
+    assert_eq!(editor.document.lines[1], "f");
+    assert_eq!(editor.undo_stack.len(), 4);
+    assert_eq!(editor.redo_stack.len(), 0); // Redo stack should be cleared
+
+    editor.redo(); // Should not redo 'e'
+    assert_eq!(editor.status_message, "Nothing to redo.");
+    assert_eq!(editor.document.lines[0], "abcd");
+    assert_eq!(editor.document.lines[1], "f");
+}
