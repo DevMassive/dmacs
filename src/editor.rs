@@ -192,8 +192,7 @@ impl Editor {
             self.document.delete(self.cursor_x, self.cursor_y)?;
         } else if self.cursor_y > 0 {
             let prev_line_len = self.document.lines[self.cursor_y - 1].len();
-            let current_line = self.document.lines.remove(self.cursor_y);
-            self.document.lines[self.cursor_y - 1].push_str(&current_line);
+            self.document.join_line_with_previous(self.cursor_y)?;
             self.cursor_y -= 1;
             self.cursor_x = prev_line_len;
             self.desired_cursor_x =
@@ -212,8 +211,7 @@ impl Editor {
         if x < line_len {
             self.document.delete(x, y)?;
         } else if y < self.document.lines.len() - 1 {
-            let next_line = self.document.lines.remove(y + 1);
-            self.document.lines[y].push_str(&next_line);
+            self.document.join_line_with_next(y)?;
         }
         Ok(())
     }
@@ -244,17 +242,17 @@ impl Editor {
         if x == 0 && current_line_len == 0 && y < self.document.lines.len() - 1 {
             // Case 3: Cursor is at the beginning of an empty line, and it's not the last line
             // Kill the newline and remove the empty line
-            self.document.lines.remove(y); // Remove the empty line
+            self.document.remove_line(y).unwrap(); // Remove the empty line
             self.kill_buffer.push('\x0a');
         } else if x < current_line_len {
             // Case 1: Cursor is within the line (not at the very end)
             // Kill from cursor to end of line
-            let killed_text = self.document.lines[y].split_off(x);
+            let killed_text = self.document.split_line_from(x, y).unwrap();
             self.kill_buffer.push_str(&killed_text);
         } else if x == current_line_len && y < self.document.lines.len() - 1 {
             // Case 2: Cursor is at the end of the line, and it's not the last line
             // Kill the newline and join with the next line
-            let next_line_content = self.document.lines.remove(y + 1);
+            let next_line_content = self.document.remove_line(y + 1).unwrap();
             self.document.lines[y].push_str(&next_line_content);
             self.kill_buffer.push('\x0a');
             self.kill_buffer.push_str(&next_line_content);
@@ -312,8 +310,7 @@ impl Editor {
             // If at the beginning of a line, join with previous line if available
             if y > 0 {
                 let prev_line_len = self.document.lines[y - 1].len();
-                let current_line_content = self.document.lines.remove(y);
-                self.document.lines[y - 1].push_str(&current_line_content);
+                self.document.join_line_with_previous(y).unwrap();
                 self.cursor_y -= 1;
                 self.cursor_x = prev_line_len;
                 self.desired_cursor_x =
@@ -324,7 +321,7 @@ impl Editor {
 
         let start_delete_byte = find_word_boundary_left(current_line, x);
 
-        current_line.replace_range(start_delete_byte..x, "");
+        self.document.delete_range(start_delete_byte, y, x).unwrap();
         self.cursor_x = start_delete_byte;
         self.desired_cursor_x =
             self.get_display_width(&self.document.lines[self.cursor_y], self.cursor_x);

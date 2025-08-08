@@ -120,6 +120,69 @@ impl Document {
             self.lines.swap(y1, y2);
         }
     }
+
+    pub fn join_line_with_previous(&mut self, at_y: usize) -> Result<()> {
+        if at_y == 0 || at_y >= self.lines.len() {
+            return Err(DmacsError::Document(format!(
+                "Cannot join line {at_y} with previous line."
+            )));
+        }
+        let current_line = self.lines.remove(at_y);
+        self.lines[at_y - 1].push_str(&current_line);
+        Ok(())
+    }
+
+    pub fn join_line_with_next(&mut self, at_y: usize) -> Result<()> {
+        if at_y >= self.lines.len().saturating_sub(1) {
+            return Err(DmacsError::Document(format!(
+                "Cannot join line {at_y} with next line."
+            )));
+        }
+        let next_line = self.lines.remove(at_y + 1);
+        self.lines[at_y].push_str(&next_line);
+        Ok(())
+    }
+
+    pub fn remove_line(&mut self, at_y: usize) -> Result<String> {
+        if at_y >= self.lines.len() {
+            return Err(DmacsError::Document(format!(
+                "Invalid line index for removal: {at_y}"
+            )));
+        }
+        Ok(self.lines.remove(at_y))
+    }
+
+    pub fn split_line_from(&mut self, at_x: usize, at_y: usize) -> Result<String> {
+        if at_y >= self.lines.len() {
+            return Err(DmacsError::Document(format!(
+                "Invalid line index for split: {at_y}"
+            )));
+        }
+        let line = &mut self.lines[at_y];
+        if at_x > line.len() {
+            return Err(DmacsError::Document(format!(
+                "Invalid column index for split: {at_x}"
+            )));
+        }
+        Ok(line.split_off(at_x))
+    }
+
+    pub fn delete_range(&mut self, at_x: usize, at_y: usize, end_x: usize) -> Result<()> {
+        if at_y >= self.lines.len() {
+            return Err(DmacsError::Document(format!(
+                "Invalid line index for delete_range: {at_y}"
+            )));
+        }
+        let line = &mut self.lines[at_y];
+        if at_x > line.len() || end_x > line.len() || at_x > end_x {
+            return Err(DmacsError::Document(format!(
+                "Invalid range for delete_range: ({at_x}, {end_x}) on line length {}",
+                line.len()
+            )));
+        }
+        line.replace_range(at_x..end_x, "");
+        Ok(())
+    }
 }
 
 impl Default for Document {
