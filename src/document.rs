@@ -89,24 +89,6 @@ impl Document {
         }
     }
 
-    pub fn delete_range(&mut self, at_x: usize, at_y: usize, end_x: usize) -> Result<()> {
-        if at_y >= self.lines.len() {
-            return Err(DmacsError::Document(format!(
-                "Invalid line index for delete_range: {at_y}"
-            )));
-        }
-        let line = &self.lines[at_y];
-        if at_x > line.len() || end_x > line.len() || at_x > end_x {
-            return Err(DmacsError::Document(format!(
-                "Invalid range for delete_range: ({at_x}, {end_x}) on line length {}",
-                line.len()
-            )));
-        }
-        let deleted_text = line[at_x..end_x].to_string();
-        self.modify(at_x, at_y, "", &deleted_text, false)
-            .map(|_| ())
-    }
-
     pub fn modify(
         &mut self,
         x: usize,
