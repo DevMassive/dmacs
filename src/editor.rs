@@ -139,6 +139,7 @@ impl Editor {
                     }
                 }
             }
+            actions_for_redo.reverse();
             self.redo_stack.push(actions_for_redo);
 
             self.cursor_x = current_cursor_x;

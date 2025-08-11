@@ -146,10 +146,11 @@ impl Document {
         // Handle insertion
         if !add.is_empty() {
             if diff.x > line.len() {
-                // If inserting beyond the current line length, pad with spaces
-                // This might not be the desired behavior for all cases, but it's a start.
-                // Consider if this should be an error or if the line should be extended.
-                line.push_str(&" ".repeat(diff.x - line.len()));
+                return Err(DmacsError::Document(format!(
+                    "Insertion out of bounds: x={}, line_len={}",
+                    diff.x,
+                    line.len()
+                )));
             }
             line.insert_str(diff.x, add);
         }

@@ -238,6 +238,8 @@ fn test_redo() {
     assert_eq!(editor.document.lines[1], "e");
     assert_eq!(editor.undo_stack.len(), 4); // 'abc', 'd', newline, 'e'
     assert_eq!(editor.redo_stack.len(), 0);
+    assert_eq!(editor.cursor_y, 1);
+    assert_eq!(editor.cursor_x, 1);
 
     // Undo 'e'
     editor.undo();
@@ -245,6 +247,8 @@ fn test_redo() {
     assert_eq!(editor.document.lines.len(), 2); // Document should have 2 lines after undoing 'e'
     assert_eq!(editor.undo_stack.len(), 3);
     assert_eq!(editor.redo_stack.len(), 1); // 'e' should be in redo stack
+    assert_eq!(editor.cursor_y, 1);
+    assert_eq!(editor.cursor_x, 0);
 
     // Undo newline
     editor.undo();
@@ -252,18 +256,24 @@ fn test_redo() {
     assert_eq!(editor.document.lines.len(), 1);
     assert_eq!(editor.undo_stack.len(), 2);
     assert_eq!(editor.redo_stack.len(), 2); // newline should be in redo stack
+    assert_eq!(editor.cursor_y, 0);
+    assert_eq!(editor.cursor_x, 4);
 
     // Undo 'd'
     editor.undo();
     assert_eq!(editor.document.lines[0], "abc");
     assert_eq!(editor.undo_stack.len(), 1);
     assert_eq!(editor.redo_stack.len(), 3); // 'd' should be in redo stack
+    assert_eq!(editor.cursor_y, 0);
+    assert_eq!(editor.cursor_x, 3);
 
     // Redo 'd'
     editor.redo();
     assert_eq!(editor.document.lines[0], "abcd");
     assert_eq!(editor.undo_stack.len(), 2);
     assert_eq!(editor.redo_stack.len(), 2); // newline should be in redo stack
+    assert_eq!(editor.cursor_y, 0);
+    assert_eq!(editor.cursor_x, 4);
 
     // Redo newline
     editor.redo();
@@ -271,6 +281,8 @@ fn test_redo() {
     assert_eq!(editor.document.lines.len(), 2);
     assert_eq!(editor.undo_stack.len(), 3);
     assert_eq!(editor.redo_stack.len(), 1); // 'e' should be in redo stack
+    assert_eq!(editor.cursor_y, 1);
+    assert_eq!(editor.cursor_x, 0);
 
     // Redo 'e'
     editor.redo();
@@ -278,12 +290,16 @@ fn test_redo() {
     assert_eq!(editor.document.lines[1], "e");
     assert_eq!(editor.undo_stack.len(), 4);
     assert_eq!(editor.redo_stack.len(), 0);
+    assert_eq!(editor.cursor_y, 1);
+    assert_eq!(editor.cursor_x, 1);
 
     // Try to redo when redo stack is empty
     editor.redo();
     assert_eq!(editor.status_message, "Nothing to redo.");
     assert_eq!(editor.undo_stack.len(), 4);
     assert_eq!(editor.redo_stack.len(), 0);
+    assert_eq!(editor.cursor_y, 1);
+    assert_eq!(editor.cursor_x, 1);
 
     // Perform a new action after undoing, then try to redo (should not work)
     editor.undo(); // Undo 'e'
@@ -291,15 +307,55 @@ fn test_redo() {
     assert_eq!(editor.document.lines.len(), 2);
     assert_eq!(editor.undo_stack.len(), 3);
     assert_eq!(editor.redo_stack.len(), 1);
+    assert_eq!(editor.cursor_y, 1);
+    assert_eq!(editor.cursor_x, 0);
 
     editor.process_input(Input::Character('f'), false).unwrap(); // New action
     assert_eq!(editor.document.lines[0], "abcd");
     assert_eq!(editor.document.lines[1], "f");
     assert_eq!(editor.undo_stack.len(), 4);
     assert_eq!(editor.redo_stack.len(), 0); // Redo stack should be cleared
+    assert_eq!(editor.cursor_y, 1);
+    assert_eq!(editor.cursor_x, 1);
 
     editor.redo(); // Should not redo 'e'
     assert_eq!(editor.status_message, "Nothing to redo.");
     assert_eq!(editor.document.lines[0], "abcd");
     assert_eq!(editor.document.lines[1], "f");
+    assert_eq!(editor.cursor_y, 1);
+    assert_eq!(editor.cursor_x, 1);
 }
+
+#[test]
+fn test_redo_simple() {
+    let mut editor = Editor::new(None);
+    editor.set_undo_debounce_threshold(1);
+
+    // Perform some actions
+    editor.process_input(Input::Character('a'), false).unwrap();
+    editor.process_input(Input::Character('b'), false).unwrap();
+    editor.process_input(Input::Character('c'), false).unwrap();
+
+    assert_eq!(editor.document.lines[0], "abc");
+    assert_eq!(editor.undo_stack.len(), 1); // 'abc'
+    assert_eq!(editor.redo_stack.len(), 0);
+    assert_eq!(editor.cursor_y, 0);
+    assert_eq!(editor.cursor_x, 3);
+
+    // Undo 'abc'
+    editor.undo();
+    assert_eq!(editor.document.lines[0], "");
+    assert_eq!(editor.undo_stack.len(), 0);
+    assert_eq!(editor.redo_stack.len(), 1); // 'abc' should be in redo stack
+    assert_eq!(editor.cursor_y, 0);
+    assert_eq!(editor.cursor_x, 0);
+
+    // Redo 'abc'
+    editor.redo();
+    assert_eq!(editor.document.lines[0], "abc");
+    assert_eq!(editor.undo_stack.len(), 1);
+    assert_eq!(editor.redo_stack.len(), 0);
+    assert_eq!(editor.cursor_y, 0);
+    assert_eq!(editor.cursor_x, 3);
+}
+
