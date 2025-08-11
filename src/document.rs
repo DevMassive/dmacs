@@ -184,30 +184,32 @@ impl Document {
                         }
                     } else {
                         // Multi-line deletion
-                        // Remove the part from start_x to the end of start_y
+                        let mut remaining_start_line_prefix = String::new();
                         if *start_y < self.lines.len() {
-                            self.lines[*start_y].drain(*start_x..);
+                            let start_line = &mut self.lines[*start_y];
+                            remaining_start_line_prefix = start_line[0..*start_x].to_string();
+                            start_line.drain(*start_x..); // Remove from start_x to end of line
                         }
 
-                        // Remove full lines between start_y and end_y
+                        let mut remaining_end_line_suffix = String::new();
+                        if *end_y < self.lines.len() {
+                            let end_line = &mut self.lines[*end_y];
+                            remaining_end_line_suffix = end_line[*end_x..].to_string();
+                            end_line.drain(0..*end_x); // Remove from beginning to end_x
+                        }
+
+                        // Join the remaining parts
+                        if *start_y < self.lines.len() {
+                            self.lines[*start_y] =
+                                format!("{remaining_start_line_prefix}{remaining_end_line_suffix}");
+                        }
+
+                        // Remove intermediate lines and the end_y line if it's different from start_y
                         // Iterate backwards to avoid index issues
-                        for y_idx in (*start_y + 1..*end_y).rev() {
+                        for y_idx in (*start_y + 1..=*end_y).rev() {
+                            // Iterate from end_y down to start_y + 1
                             if y_idx < self.lines.len() {
                                 self.lines.remove(y_idx);
-                            }
-                        }
-
-                        // Remove the part from the beginning of end_y to end_x
-                        if *end_y < self.lines.len() {
-                            self.lines[*end_y].drain(0..*end_x);
-                        }
-
-                        // Join the remaining part of end_y with start_y
-                        if *start_y < self.lines.len() && *end_y < self.lines.len() {
-                            let remaining_end_line = self.lines[*end_y].clone();
-                            self.lines[*start_y].push_str(&remaining_end_line);
-                            if *start_y != *end_y {
-                                self.lines.remove(*end_y);
                             }
                         }
                     }

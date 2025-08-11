@@ -74,3 +74,92 @@ fn test_highlight_selection() {
         Some(((0, 0), (6, 0)))
     ); // Cursor to marker
 }
+
+#[test]
+fn test_cut_selection_from_start_of_line() {
+    let mut editor = Editor::new(None);
+    editor.document.lines = vec!["hello world".to_string()];
+    editor.set_cursor_pos(5, 0); // Cursor at end of "hello"
+    editor.selection.marker_pos = Some((0, 0)); // Marker at 'h'
+
+    // Cut "hello"
+    editor
+        .process_input(Input::Character('\x17'), true)
+        .unwrap(); // Ctrl-W
+    assert_eq!(editor.document.lines[0], " world");
+    assert_eq!(editor.kill_buffer, "hello");
+    assert_eq!(editor.selection.marker_pos, None);
+    assert_eq!(editor.cursor_pos(), (0, 0));
+}
+
+#[test]
+fn test_cut_selection_to_end_of_line() {
+    let mut editor = Editor::new(None);
+    editor.document.lines = vec!["hello world".to_string()];
+    editor.set_cursor_pos(11, 0); // Cursor at end of "world"
+    editor.selection.marker_pos = Some((6, 0)); // Marker at 'w'
+
+    // Cut "world"
+    editor
+        .process_input(Input::Character('\x17'), true)
+        .unwrap(); // Ctrl-W
+    assert_eq!(editor.document.lines[0], "hello ");
+    assert_eq!(editor.kill_buffer, "world");
+    assert_eq!(editor.selection.marker_pos, None);
+    assert_eq!(editor.cursor_pos(), (6, 0));
+}
+
+#[test]
+fn test_cut_entire_line() {
+    let mut editor = Editor::new(None);
+    editor.document.lines = vec!["hello world".to_string()];
+    editor.set_cursor_pos(11, 0); // Cursor at end of line
+    editor.selection.marker_pos = Some((0, 0)); // Marker at start of line
+
+    // Cut "hello world"
+    editor
+        .process_input(Input::Character('\x17'), true)
+        .unwrap(); // Ctrl-W
+    assert_eq!(editor.document.lines, vec!["".to_string()]); // Line should be empty
+    assert_eq!(editor.kill_buffer, "hello world");
+    assert_eq!(editor.selection.marker_pos, None);
+    assert_eq!(editor.cursor_pos(), (0, 0));
+}
+
+#[test]
+fn test_cut_multiple_lines() {
+    let mut editor = Editor::new(None);
+    editor.document.lines = vec![
+        "line one".to_string(),
+        "line two".to_string(),
+        "line three".to_string(),
+    ];
+    editor.set_cursor_pos(10, 2); // Cursor at end of "line three"
+    editor.selection.marker_pos = Some((0, 0)); // Marker at 'l' in "line one"
+
+    // Cut "line one\nline two\nline three"
+    editor
+        .process_input(Input::Character('\x17'), true)
+        .unwrap(); // Ctrl-W
+    assert_eq!(editor.document.lines, vec!["".to_string()]); // All lines should be cut
+    assert_eq!(editor.kill_buffer, "line one\nline two\nline three");
+    assert_eq!(editor.selection.marker_pos, None);
+    assert_eq!(editor.cursor_pos(), (0, 0));
+}
+
+#[test]
+fn test_cut_selection_marker_after_cursor() {
+    let mut editor = Editor::new(None);
+    editor.document.lines = vec!["hello world".to_string()];
+    editor.set_cursor_pos(6, 0); // Cursor at 'w'
+    editor.selection.marker_pos = Some((11, 0)); // Marker at end of "world"
+
+    // Cut "world"
+    editor
+        .process_input(Input::Character('\x17'), true)
+        .unwrap(); // Ctrl-W
+    assert_eq!(editor.document.lines[0], "hello ");
+    assert_eq!(editor.kill_buffer, "world");
+    assert_eq!(editor.selection.marker_pos, None);
+    assert_eq!(editor.cursor_pos(), (6, 0));
+}
