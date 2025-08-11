@@ -69,69 +69,6 @@ impl Document {
         self.lines != original_lines
     }
 
-    pub fn insert(&mut self, at_x: usize, at_y: usize, c: char) -> Result<()> {
-        if at_y > self.lines.len() {
-            return Err(DmacsError::Document(
-                "Invalid line index: {at_y}".to_string(),
-            ));
-        }
-        if at_y == self.lines.len() {
-            self.lines.push(String::new());
-        }
-        let diff = Diff {
-            x: at_x,
-            y: at_y,
-            added_text: c.to_string(),
-            deleted_text: "".to_string(),
-        };
-        self.modify_single_char(&diff, false).map(|_| ())
-    }
-
-    pub fn delete(&mut self, at_x: usize, at_y: usize) -> Result<()> {
-        if at_y >= self.lines.len() {
-            return Err(DmacsError::Document(
-                "Invalid line index: {at_y}".to_string(),
-            ));
-        }
-        let line = &self.lines[at_y];
-        if at_x >= line.len() {
-            return Err(DmacsError::Document(
-                "Invalid column index: {at_x}".to_string(),
-            ));
-        }
-        let char_to_delete = line.chars().nth(at_x).unwrap().to_string();
-        if char_to_delete == "\n" {
-            self.delete_newline(at_x, at_y).map(|_| ())
-        } else {
-            let diff = Diff {
-                x: at_x,
-                y: at_y,
-                added_text: "".to_string(),
-                deleted_text: char_to_delete,
-            };
-            self.modify_single_char(&diff, false).map(|_| ())
-        }
-    }
-
-    pub fn insert_string(&mut self, mut x: usize, mut y: usize, s: &str) -> Result<()> {
-        for c in s.chars() {
-            let (new_x, new_y) = if c == '\n' {
-                self.insert_newline(x, y)?
-            } else {
-                let diff = Diff {
-                    x,
-                    y,
-                    added_text: c.to_string(),
-                    deleted_text: "".to_string(),
-                };
-                self.modify_single_char(&diff, false)?
-            };
-            x = new_x;
-            y = new_y;
-        }
-        Ok(())
-    }
-
     pub fn swap_lines(&mut self, y1: usize, y2: usize) {
         if y1 < self.lines.len() && y2 < self.lines.len() {
             self.lines.swap(y1, y2);
