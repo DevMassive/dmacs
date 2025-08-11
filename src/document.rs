@@ -10,6 +10,14 @@ pub struct Diff {
     pub deleted_text: String,
 }
 
+#[derive(Clone, Debug)]
+pub enum ActionDiff {
+    CharChange(Diff),
+    NewlineInsertion { x: usize, y: usize },
+    NewlineDeletion { x: usize, y: usize },
+    LineSwap { y1: usize, y2: usize },
+}
+
 #[derive(Clone)]
 pub struct Document {
     pub lines: Vec<String>,
@@ -121,6 +129,29 @@ impl Document {
     pub fn swap_lines(&mut self, y1: usize, y2: usize) {
         if y1 < self.lines.len() && y2 < self.lines.len() {
             self.lines.swap(y1, y2);
+        }
+    }
+
+    pub fn apply_action_diff(&mut self, action_diff: &ActionDiff, is_undo: bool) -> Result<(usize, usize)> {
+        match action_diff {
+            ActionDiff::CharChange(diff) => {
+                self.modify_single_char(diff, is_undo)
+            }
+            ActionDiff::NewlineInsertion { x, y } => {
+                self.insert_newline(*x, *y, is_undo)
+            }
+            ActionDiff::NewlineDeletion { x, y } => {
+                self.delete_newline(*x, *y, is_undo)
+            }
+            ActionDiff::LineSwap { y1, y2 } => {
+                // For undoing a swap, we just swap them back
+                self.swap_lines(*y1, *y2);
+                // Cursor position doesn't change in terms of x,y relative to the swapped lines
+                // but the content at x,y might have moved.
+                // For simplicity, return the original y1, x=0 for now.
+                // A more robust solution might track the cursor's content.
+                Ok((0, *y1))
+            }
         }
     }
 
