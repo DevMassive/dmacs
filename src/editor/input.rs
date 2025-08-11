@@ -30,7 +30,7 @@ impl Editor {
             // Alt/Option + Down Arrow (often sends ESC [B)
             Input::KeyDown if is_alt_pressed => self.move_line_down(),
             // Alt/Option + Backspace
-            Input::KeyBackspace if is_alt_pressed => self.hungry_delete(),
+            Input::KeyBackspace if is_alt_pressed => self.hungry_delete()?,
             Input::Character('w') if is_alt_pressed => self.copy_selection_action()?, // Option-W
             Input::Character('_') if is_alt_pressed => self.redo(), // Alt + _ for redo
             _ => self.handle_keypress(key)?,
@@ -48,7 +48,7 @@ impl Editor {
                 '\x05' => self.go_to_end_of_line(),
                 '\x04' => self.delete_forward_char()?,
                 '\x0b' => {
-                    self.kill_line();
+                    let _ = self.kill_line();
                     self.last_action_was_kill = true;
                 }
                 '\x19' => self.yank()?,                      // Ctrl + Y

@@ -4,7 +4,7 @@ use unicode_width::UnicodeWidthChar;
 
 use crate::document::{ActionDiff, Diff, Document};
 use crate::editor::search::Search;
-use crate::error::{DmacsError, Result};
+use crate::error::Result;
 
 pub mod input;
 pub mod search;
@@ -131,8 +131,8 @@ impl Editor {
                         actions_for_redo.push(action_diff.clone()); // Store for redo
                     }
                     Err(e) => {
-                        self.status_message = format!("Undo failed: {:?}", e);
-                        debug!("Undo failed: {:?}", e);
+                        self.status_message = format!("Undo failed: {e:?}");
+                        debug!("Undo failed: {e:?}");
                         // Re-push the failed transaction back to undo_stack if partial undo is not desired
                         self.undo_stack.push(actions_to_undo);
                         return;
@@ -174,8 +174,8 @@ impl Editor {
                         actions_for_undo.push(action_diff.clone()); // Store for undo
                     }
                     Err(e) => {
-                        self.status_message = format!("Redo failed: {:?}", e);
-                        debug!("Redo failed: {:?}", e);
+                        self.status_message = format!("Redo failed: {e:?}");
+                        debug!("Redo failed: {e:?}");
                         // Re-push the failed transaction back to redo_stack if partial redo is not desired
                         self.redo_stack.push(actions_to_redo);
                         return;
@@ -245,7 +245,10 @@ impl Editor {
             self.cursor_x = new_x;
             self.cursor_y = new_y;
         } else if self.cursor_y > 0 {
-            let action_diff = ActionDiff::NewlineDeletion { x: 0, y: self.cursor_y };
+            let action_diff = ActionDiff::NewlineDeletion {
+                x: 0,
+                y: self.cursor_y,
+            };
             let (new_x, new_y) = self.document.apply_action_diff(&action_diff, false)?;
             if let Some(last_transaction) = self.undo_stack.last_mut() {
                 last_transaction.push(action_diff);
@@ -289,7 +292,10 @@ impl Editor {
             self.cursor_y = new_y;
         } else if y < self.document.lines.len() - 1 {
             let x_for_newline = self.document.lines[y].len();
-            let action_diff = ActionDiff::NewlineDeletion { x: x_for_newline, y };
+            let action_diff = ActionDiff::NewlineDeletion {
+                x: x_for_newline,
+                y,
+            };
             self.document.apply_action_diff(&action_diff, false)?;
             if let Some(last_transaction) = self.undo_stack.last_mut() {
                 last_transaction.push(action_diff);
@@ -301,10 +307,11 @@ impl Editor {
     pub fn insert_newline(&mut self) -> Result<()> {
         self.last_action_was_kill = false;
         self.save_state_for_undo(LastActionType::Newline);
-        let action_diff = ActionDiff::NewlineInsertion { x: self.cursor_x, y: self.cursor_y };
-        let (new_x, new_y) = self
-            .document
-            .apply_action_diff(&action_diff, false)?;
+        let action_diff = ActionDiff::NewlineInsertion {
+            x: self.cursor_x,
+            y: self.cursor_y,
+        };
+        let (new_x, new_y) = self.document.apply_action_diff(&action_diff, false)?;
         if let Some(last_transaction) = self.undo_stack.last_mut() {
             last_transaction.push(action_diff);
         }
@@ -314,35 +321,38 @@ impl Editor {
         Ok(())
     }
 
-    pub fn kill_line(&mut self) {
-        self.last_action_was_kill = false; // Reset for new kill operation
+    pub fn kill_line(&mut self) -> Result<()> {
+        let should_clear_kill_buffer = !self.last_action_was_kill;
         self.save_state_for_undo(LastActionType::Other); // Start a new transaction for kill_line
 
         let y = self.cursor_y;
         let x = self.cursor_x;
         if y >= self.document.lines.len() {
-            return;
+            return Ok(());
         }
 
-        let current_line_len = self.document.lines[y].len();
-        if !self.last_action_was_kill {
+        if should_clear_kill_buffer {
             self.kill_buffer.clear();
         }
 
+        let current_line_len = self.document.lines[y].len();
+
         if x == 0 && current_line_len == 0 && y < self.document.lines.len() - 1 {
             // Case 3: Cursor is at the beginning of an empty line, and it's not the last line
-            // Kill the newline and remove the empty line
-            let action_diff = ActionDiff::NewlineDeletion { x: 0, y };
+            // Kill the empty line and move cursor to the beginning of the next line
             if let Some(last_transaction) = self.undo_stack.last_mut() {
-                if let Ok((_new_x, _new_y)) = self.document.apply_action_diff(&action_diff, false) {
-                    last_transaction.push(action_diff);
-                    self.kill_buffer.push('\x0a');
-                }
+                // To undo this, we need to re-insert the empty line at 'y'
+                let action_diff = ActionDiff::NewlineInsertion { x: 0, y }; // This will be used for undo
+                self.document.lines.remove(y); // Directly remove the line
+                last_transaction.push(action_diff);
+                self.kill_buffer.push('\x0a'); // A newline was killed
+                self.cursor_x = 0; // Cursor moves to beginning of the line
+                // self.cursor_y remains 'y' as the line at 'y' is now the one that was at 'y+1'
             }
         } else if x < current_line_len {
             // Case 1: Cursor is within the line (not at the very end)
             // Kill from cursor to end of line
-            let current_line = self.document.lines[y].clone(); // Clone to avoid borrow checker issues
+            let current_line = self.document.lines[y].clone();
             let killed_text = current_line[x..].to_string();
             let diff = Diff {
                 x,
@@ -352,25 +362,28 @@ impl Editor {
             };
             let action_diff = ActionDiff::CharChange(diff);
             if let Some(last_transaction) = self.undo_stack.last_mut() {
-                if let Ok((_new_x, _new_y)) = self.document.apply_action_diff(&action_diff, false) {
-                    last_transaction.push(action_diff);
-                    self.kill_buffer.push_str(&killed_text);
-                }
+                let (new_x, new_y) = self.document.apply_action_diff(&action_diff, false)?;
+                last_transaction.push(action_diff);
+                self.kill_buffer.push_str(&killed_text);
+                self.cursor_x = new_x;
+                self.cursor_y = new_y;
             }
         } else if x == current_line_len && y < self.document.lines.len() - 1 {
             // Case 2: Cursor is at the end of the line, and it's not the last line
             // Kill the newline and join with the next line
-            let next_line_content = self.document.lines[y + 1].clone(); // Get content before modify
+            let next_line_content = self.document.lines[y + 1].clone();
             let action_diff = ActionDiff::NewlineDeletion { x, y };
             if let Some(last_transaction) = self.undo_stack.last_mut() {
-                if let Ok((_new_x, _new_y)) = self.document.apply_action_diff(&action_diff, false) {
-                    last_transaction.push(action_diff);
-                    self.kill_buffer.push('\x0a');
-                    self.kill_buffer.push_str(&next_line_content);
-                }
+                let (new_x, new_y) = self.document.apply_action_diff(&action_diff, false)?;
+                last_transaction.push(action_diff);
+                self.kill_buffer.push('\x0a');
+                self.kill_buffer.push_str(&next_line_content);
+                self.cursor_x = new_x;
+                self.cursor_y = new_y;
             }
         }
         self.last_action_was_kill = true;
+        Ok(())
     }
 
     pub fn yank(&mut self) -> Result<()> {
@@ -381,11 +394,12 @@ impl Editor {
         let mut current_x = self.cursor_x;
         let mut current_y = self.cursor_y;
 
-        let lines_to_yank: Vec<&str> = text_to_yank.split('\x0a').collect();
-
-        if lines_to_yank.is_empty() {
+        if text_to_yank.is_empty() {
+            self.status_message = "Kill buffer is empty.".to_string();
             return Ok(());
         }
+
+        let lines_to_yank: Vec<&str> = text_to_yank.split('\x0a').collect();
 
         if let Some(last_transaction) = self.undo_stack.last_mut() {
             // Insert the first part of the yanked text into the current line
@@ -405,9 +419,13 @@ impl Editor {
 
             // Insert subsequent lines
             for line_to_yank in lines_to_yank.iter().skip(1) {
-                let action_diff_newline = ActionDiff::NewlineInsertion { x: current_x, y: current_y };
-                let (new_x_after_newline, new_y_after_newline) =
-                    self.document.apply_action_diff(&action_diff_newline, false)?;
+                let action_diff_newline = ActionDiff::NewlineInsertion {
+                    x: current_x,
+                    y: current_y,
+                };
+                let (new_x_after_newline, new_y_after_newline) = self
+                    .document
+                    .apply_action_diff(&action_diff_newline, false)?;
                 last_transaction.push(action_diff_newline);
                 current_y = new_y_after_newline;
                 current_x = new_x_after_newline;
@@ -420,7 +438,8 @@ impl Editor {
                         deleted_text: "".to_string(),
                     };
                     let action_diff_char = ActionDiff::CharChange(diff);
-                    let (new_x, new_y) = self.document.apply_action_diff(&action_diff_char, false)?;
+                    let (new_x, new_y) =
+                        self.document.apply_action_diff(&action_diff_char, false)?;
                     last_transaction.push(action_diff_char);
                     current_x = new_x;
                     current_y = new_y;
@@ -435,11 +454,11 @@ impl Editor {
         Ok(())
     }
 
-    pub fn hungry_delete(&mut self) {
+    pub fn hungry_delete(&mut self) -> Result<()> {
         self.save_state_for_undo(LastActionType::Deletion);
         let (x, y) = (self.cursor_x, self.cursor_y);
         if y >= self.document.lines.len() {
-            return;
+            return Ok(());
         }
 
         let current_line = &mut self.document.lines[y];
@@ -449,15 +468,14 @@ impl Editor {
                 // If at the beginning of a line, join with previous line if available
                 if y > 0 {
                     let action_diff = ActionDiff::NewlineDeletion { x: 0, y };
-                    if let Ok((new_x, new_y)) = self.document.apply_action_diff(&action_diff, false) {
-                        last_transaction.push(action_diff);
-                        self.cursor_x = new_x;
-                        self.cursor_y = new_y;
-                        self.desired_cursor_x =
-                            self.get_display_width(&self.document.lines[self.cursor_y], self.cursor_x);
-                    }
+                    let (new_x, new_y) = self.document.apply_action_diff(&action_diff, false)?;
+                    last_transaction.push(action_diff);
+                    self.cursor_x = new_x;
+                    self.cursor_y = new_y;
+                    self.desired_cursor_x =
+                        self.get_display_width(&self.document.lines[self.cursor_y], self.cursor_x);
                 }
-                return;
+                return Ok(());
             }
 
             let start_delete_byte = find_word_boundary_left(current_line, x);
@@ -472,14 +490,14 @@ impl Editor {
                 deleted_text,
             };
             let action_diff = ActionDiff::CharChange(diff);
-            if let Ok((new_x, new_y)) = self.document.apply_action_diff(&action_diff, false) {
-                last_transaction.push(action_diff);
-                self.cursor_x = new_x;
-                self.cursor_y = new_y;
-                self.desired_cursor_x =
-                    self.get_display_width(&self.document.lines[self.cursor_y], self.cursor_x);
-            }
+            let (new_x, new_y) = self.document.apply_action_diff(&action_diff, false)?;
+            last_transaction.push(action_diff);
+            self.cursor_x = new_x;
+            self.cursor_y = new_y;
+            self.desired_cursor_x =
+                self.get_display_width(&self.document.lines[self.cursor_y], self.cursor_x);
         }
+        Ok(())
     }
 
     pub fn go_to_start_of_line(&mut self) {
@@ -555,44 +573,29 @@ impl Editor {
             return Ok(());
         }
 
-        let mut current_byte_idx = self.cursor_x;
+        let mut new_cursor_x = self.cursor_x;
+        let mut chars_iter = current_line[new_cursor_x..].chars().peekable();
 
-        // If we are currently on a non-word character, skip until we hit a word character.
-        if current_byte_idx < line_len
-            && !is_word_char(
-                current_line[current_byte_idx..]
-                    .chars()
-                    .next()
-                    .ok_or(DmacsError::Editor("Invalid character".to_string()))?,
-            )
-        {
-            for ch in current_line[current_byte_idx..].chars() {
-                if is_word_char(ch) {
-                    break;
-                }
-                current_byte_idx += ch.len_utf8();
+        // Step 1: Skip any non-word characters (including whitespace)
+        // until we hit a word character or the end of the line.
+        while let Some(&ch) = chars_iter.peek() {
+            if is_word_char(ch) {
+                break; // Found start of a word
             }
+            new_cursor_x += ch.len_utf8();
+            chars_iter.next(); // Consume the character
         }
 
-        // Now, current_byte_idx is either at the start of a word, or at the end of the line.
-        // If it's at the start of a word, skip until we hit a non-word character or end of line.
-        if current_byte_idx < line_len
-            && is_word_char(
-                current_line[current_byte_idx..]
-                    .chars()
-                    .next()
-                    .ok_or(DmacsError::Editor("Invalid character".to_string()))?,
-            )
-        {
-            for ch in current_byte_idx..line_len {
-                if !is_word_char(current_line[ch..].chars().next().unwrap()) {
-                    break;
-                }
-                current_byte_idx += current_line[ch..].chars().next().unwrap().len_utf8();
+        // Step 2: Skip all word characters
+        while let Some(&ch) = chars_iter.peek() {
+            if !is_word_char(ch) {
+                break; // Found end of a word
             }
+            new_cursor_x += ch.len_utf8();
+            chars_iter.next(); // Consume the character
         }
 
-        self.cursor_x = current_byte_idx;
+        self.cursor_x = new_cursor_x;
         self.desired_cursor_x = self.get_display_width(current_line, self.cursor_x);
         Ok(())
     }
@@ -680,11 +683,14 @@ impl Editor {
         self.last_action_was_kill = false;
         if self.cursor_y > 0 {
             self.save_state_for_undo(LastActionType::LineMovement);
-            let action_diff = ActionDiff::LineSwap { y1: self.cursor_y - 1, y2: self.cursor_y };
+            let action_diff = ActionDiff::LineSwap {
+                y1: self.cursor_y - 1,
+                y2: self.cursor_y,
+            };
             if let Some(last_transaction) = self.undo_stack.last_mut() {
-                if let Ok((_new_x, new_y)) = self.document.apply_action_diff(&action_diff, false) {
+                if let Ok((_new_x, _new_y)) = self.document.apply_action_diff(&action_diff, false) {
                     last_transaction.push(action_diff);
-                    self.cursor_y = new_y;
+                    self.cursor_y -= 1; // Explicitly move cursor up
                 }
             }
         } else {
@@ -696,11 +702,14 @@ impl Editor {
         self.last_action_was_kill = false;
         if self.cursor_y < self.document.lines.len() - 1 {
             self.save_state_for_undo(LastActionType::LineMovement);
-            let action_diff = ActionDiff::LineSwap { y1: self.cursor_y, y2: self.cursor_y + 1 };
+            let action_diff = ActionDiff::LineSwap {
+                y1: self.cursor_y,
+                y2: self.cursor_y + 1,
+            };
             if let Some(last_transaction) = self.undo_stack.last_mut() {
-                if let Ok((_new_x, new_y)) = self.document.apply_action_diff(&action_diff, false) {
+                if let Ok((_new_x, _new_y)) = self.document.apply_action_diff(&action_diff, false) {
                     last_transaction.push(action_diff);
-                    self.cursor_y = new_y;
+                    self.cursor_y += 1; // Explicitly move cursor down
                 }
             }
         } else {

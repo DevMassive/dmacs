@@ -71,7 +71,9 @@ impl Document {
 
     pub fn insert(&mut self, at_x: usize, at_y: usize, c: char) -> Result<()> {
         if at_y > self.lines.len() {
-            return Err(DmacsError::Document("Invalid line index: {at_y}".to_string()));
+            return Err(DmacsError::Document(
+                "Invalid line index: {at_y}".to_string(),
+            ));
         }
         if at_y == self.lines.len() {
             self.lines.push(String::new());
@@ -87,15 +89,19 @@ impl Document {
 
     pub fn delete(&mut self, at_x: usize, at_y: usize) -> Result<()> {
         if at_y >= self.lines.len() {
-            return Err(DmacsError::Document("Invalid line index: {at_y}".to_string()));
+            return Err(DmacsError::Document(
+                "Invalid line index: {at_y}".to_string(),
+            ));
         }
         let line = &self.lines[at_y];
         if at_x >= line.len() {
-            return Err(DmacsError::Document("Invalid column index: {at_x}".to_string()));
+            return Err(DmacsError::Document(
+                "Invalid column index: {at_x}".to_string(),
+            ));
         }
         let char_to_delete = line.chars().nth(at_x).unwrap().to_string();
         if char_to_delete == "\n" {
-            self.delete_newline(at_x, at_y, false).map(|_| ())
+            self.delete_newline(at_x, at_y).map(|_| ())
         } else {
             let diff = Diff {
                 x: at_x,
@@ -110,7 +116,7 @@ impl Document {
     pub fn insert_string(&mut self, mut x: usize, mut y: usize, s: &str) -> Result<()> {
         for c in s.chars() {
             let (new_x, new_y) = if c == '\n' {
-                self.insert_newline(x, y, false)?
+                self.insert_newline(x, y)?
             } else {
                 let diff = Diff {
                     x,
@@ -132,25 +138,33 @@ impl Document {
         }
     }
 
-    pub fn apply_action_diff(&mut self, action_diff: &ActionDiff, is_undo: bool) -> Result<(usize, usize)> {
+    pub fn apply_action_diff(
+        &mut self,
+        action_diff: &ActionDiff,
+        is_undo: bool,
+    ) -> Result<(usize, usize)> {
         match action_diff {
-            ActionDiff::CharChange(diff) => {
-                self.modify_single_char(diff, is_undo)
-            }
+            ActionDiff::CharChange(diff) => self.modify_single_char(diff, is_undo),
             ActionDiff::NewlineInsertion { x, y } => {
-                self.insert_newline(*x, *y, is_undo)
+                if is_undo {
+                    self.delete_newline(*x, *y) // Undo insertion is deletion
+                } else {
+                    self.insert_newline(*x, *y) // Redo insertion is insertion
+                }
             }
             ActionDiff::NewlineDeletion { x, y } => {
-                self.delete_newline(*x, *y, is_undo)
+                if is_undo {
+                    self.insert_newline(*x, *y) // Undo deletion is insertion
+                } else {
+                    self.delete_newline(*x, *y) // Redo deletion is deletion
+                }
             }
             ActionDiff::LineSwap { y1, y2 } => {
-                // For undoing a swap, we just swap them back
                 self.swap_lines(*y1, *y2);
-                // Cursor position doesn't change in terms of x,y relative to the swapped lines
-                // but the content at x,y might have moved.
-                // For simplicity, return the original y1, x=0 for now.
-                // A more robust solution might track the cursor's content.
-                Ok((0, *y1))
+                // For LineSwap, the cursor position logic is handled by the caller (Editor)
+                // This function just performs the swap.
+                // Return a dummy cursor position, as it's not used by Editor for LineSwap.
+                Ok((0, 0))
             }
         }
     }
@@ -210,80 +224,59 @@ impl Document {
         Ok((new_x, new_y))
     }
 
-    pub fn insert_newline(&mut self, x: usize, y: usize, is_undo: bool) -> Result<(usize, usize)> {
-        let (new_x, new_y) = if is_undo {
-            // Undo newline insertion means joining lines
-            if y == 0 {
-                // Cannot undo newline insertion at the very beginning of the document
-                return Err(DmacsError::Document(
-                    "Cannot undo newline insertion at the beginning of the document.".to_string(),
-                ));
-            }
-            let current_line = self.lines.remove(y);
-            let prev_line_len = self.lines[y - 1].len();
-            self.lines[y - 1].push_str(&current_line);
-            (prev_line_len, y - 1)
+    pub fn insert_newline(&mut self, x: usize, y: usize) -> Result<(usize, usize)> {
+        // Handle newline insertion (splitting a line)
+        if y > self.lines.len() {
+            return Err(DmacsError::Document(format!(
+                "Invalid line index for newline insertion: {y}"
+            )));
+        }
+        if y == self.lines.len() {
+            self.lines.push(String::new());
         } else {
-            // Handle newline insertion (splitting a line)
-            if y > self.lines.len() {
+            let current_line = self
+                .lines
+                .get_mut(y)
+                .ok_or(DmacsError::Document(format!("Invalid line index: {y}")))?;
+            let new_line = current_line.split_off(x);
+            self.lines.insert(y + 1, new_line);
+        }
+        Ok((0, y + 1))
+    }
+    pub fn delete_newline(&mut self, x: usize, y: usize) -> Result<(usize, usize)> {
+        // Handle newline deletion (joining lines)
+        if x == 0 {
+            // Backspace at the beginning of a line, join with previous
+            if y == 0 {
+                // If it's the first line and we're deleting a newline at x=0,
+                // it means we're effectively removing the first line.
+                // This happens when you delete the newline *after* the first line.
+                if self.lines.len() > 1 {
+                    self.lines.remove(y); // Remove the first line
+                    Ok((0, 0)) // Cursor moves to the beginning of the new first line
+                } else {
+                    // If it's the only line, just clear it.
+                    self.lines[y].clear();
+                    Ok((0, 0))
+                }
+            } else {
+                let current_line = self.lines.remove(y);
+                let prev_line_len = self.lines[y - 1].len();
+                self.lines[y - 1].push_str(&current_line);
+                Ok((prev_line_len, y - 1))
+            }
+        } else {
+            // Delete at the end of a line, join with next
+            if y >= self.lines.len().saturating_sub(1) {
                 return Err(DmacsError::Document(format!(
-                    "Invalid line index for newline insertion: {y}"
+                    "Cannot join line {y} with next line."
                 )));
             }
-            if y == self.lines.len() {
-                self.lines.push(String::new());
-            } else {
-                let current_line = self
-                    .lines
-                    .get_mut(y)
-                    .ok_or(DmacsError::Document(format!("Invalid line index: {y}")))?;
-                let new_line = current_line.split_off(x);
-                self.lines.insert(y + 1, new_line);
-            }
-            (0, y + 1)
-        };
-        Ok((new_x, new_y))
-    }
-    pub fn delete_newline(&mut self, x: usize, y: usize, is_undo: bool) -> Result<(usize, usize)> {
-        let (new_x, new_y) = if is_undo {
-            // Undo newline deletion means inserting a newline
-            self.insert_newline(x, y, false)?
-        } else {
-            // Handle newline deletion (joining lines)
-            if x == 0 {
-                // Backspace at the beginning of a line, join with previous
-                if y == 0 {
-                    // If it's the first line and we're deleting a newline at x=0,
-                    // it means we're effectively removing the first line.
-                    // This happens when you delete the newline *after* the first line.
-                    if self.lines.len() > 1 {
-                        self.lines.remove(y); // Remove the first line
-                        (0, 0) // Cursor moves to the beginning of the new first line
-                    } else {
-                        // If it's the only line, just clear it.
-                        self.lines[y].clear();
-                        (0, 0)
-                    }
-                } else {
-                    let current_line = self.lines.remove(y);
-                    let prev_line_len = self.lines[y - 1].len();
-                    self.lines[y - 1].push_str(&current_line);
-                    (prev_line_len, y - 1)
-                }
-            } else {
-                // Delete at the end of a line, join with next
-                if y >= self.lines.len().saturating_sub(1) {
-                    return Err(DmacsError::Document(format!(
-                        "Cannot join line {y} with next line."
-                    )));
-                }
-                let next_line = self.lines.remove(y + 1);
-                let current_line_len = self.lines[y].len();
-                self.lines[y].push_str(&next_line);
-                (current_line_len, y)
-            }
-        };
-        Ok((new_x, new_y))
+            let next_line = self.lines.remove(y + 1);
+            let current_line_len = self.lines[y].len();
+            self.lines[y].push_str(&next_line);
+            Ok((current_line_len, y))
+        }
     }
 }
 
