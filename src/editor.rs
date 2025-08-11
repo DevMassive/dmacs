@@ -175,9 +175,13 @@ impl Editor {
     pub fn insert_char(&mut self, c: char) -> Result<()> {
         self.last_action_was_kill = false;
         self.save_state_for_undo(LastActionType::Insertion);
-        let (new_x, new_y) =
-            self.document
-                .modify(self.cursor_x, self.cursor_y, &c.to_string(), "", false)?;
+        let (new_x, new_y) = self.document.modify_single_char(
+            self.cursor_x,
+            self.cursor_y,
+            &c.to_string(),
+            "",
+            false,
+        )?;
         self.cursor_x = new_x;
         self.cursor_y = new_y;
         self.desired_cursor_x =
@@ -199,13 +203,17 @@ impl Editor {
                 char_to_delete = ch.to_string();
                 char_start_byte = idx;
             }
-            let (new_x, new_y) =
-                self.document
-                    .modify(char_start_byte, self.cursor_y, "", &char_to_delete, false)?;
+            let (new_x, new_y) = self.document.modify_single_char(
+                char_start_byte,
+                self.cursor_y,
+                "",
+                &char_to_delete,
+                false,
+            )?;
             self.cursor_x = new_x;
             self.cursor_y = new_y;
         } else if self.cursor_y > 0 {
-            let (new_x, new_y) = self.document.modify(0, self.cursor_y, "", "\n", false)?;
+            let (new_x, new_y) = self.document.delete_newline(0, self.cursor_y, false)?;
             self.cursor_x = new_x;
             self.cursor_y = new_y;
             self.desired_cursor_x =
@@ -232,12 +240,12 @@ impl Editor {
             }
             let (_new_x, new_y) =
                 self.document
-                    .modify(char_start_byte, y, "", &char_to_delete, false)?;
+                    .modify_single_char(char_start_byte, y, "", &char_to_delete, false)?;
             // Cursor position does not change for delete_forward_char, but update y in case modify changes it
             self.cursor_y = new_y;
         } else if y < self.document.lines.len() - 1 {
             let x = self.document.lines[y].len();
-            self.document.modify(x, y, "", "\n", false)?;
+            self.document.delete_newline(x, y, false)?;
         }
         Ok(())
     }
@@ -247,7 +255,7 @@ impl Editor {
         self.save_state_for_undo(LastActionType::Newline);
         let (new_x, new_y) = self
             .document
-            .modify(self.cursor_x, self.cursor_y, "\n", "", false)?;
+            .insert_newline(self.cursor_x, self.cursor_y, false)?;
         self.cursor_y = new_y;
         self.cursor_x = new_x;
         self.desired_cursor_x = 0;
@@ -270,20 +278,22 @@ impl Editor {
         if x == 0 && current_line_len == 0 && y < self.document.lines.len() - 1 {
             // Case 3: Cursor is at the beginning of an empty line, and it's not the last line
             // Kill the newline and remove the empty line
-            self.document.modify(0, y, "", "\n", false).unwrap();
+            self.document.delete_newline(0, y, false).unwrap();
             self.kill_buffer.push('\x0a');
         } else if x < current_line_len {
             // Case 1: Cursor is within the line (not at the very end)
             // Kill from cursor to end of line
             let current_line = &self.document.lines[y];
             let killed_text = current_line[x..].to_string();
-            self.document.modify(x, y, "", &killed_text, false).unwrap();
+            self.document
+                .modify_single_char(x, y, "", &killed_text, false)
+                .unwrap();
             self.kill_buffer.push_str(&killed_text);
         } else if x == current_line_len && y < self.document.lines.len() - 1 {
             // Case 2: Cursor is at the end of the line, and it's not the last line
             // Kill the newline and join with the next line
             let next_line_content = self.document.lines[y + 1].clone(); // Get content before modify
-            self.document.modify(x, y, "", "\n", false).unwrap();
+            self.document.delete_newline(x, y, false).unwrap();
             self.kill_buffer.push('\x0a');
             self.kill_buffer.push_str(&next_line_content);
         }
@@ -311,9 +321,8 @@ impl Editor {
 
         // Insert subsequent lines
         for line_to_yank in lines_to_yank.iter().skip(1) {
-            let (new_x_after_newline, new_y_after_newline) = self
-                .document
-                .modify(current_x, current_y, "\n", "", false)?;
+            let (new_x_after_newline, new_y_after_newline) =
+                self.document.insert_newline(current_x, current_y, false)?;
             current_y = new_y_after_newline;
             current_x = new_x_after_newline;
             self.document
@@ -341,7 +350,7 @@ impl Editor {
         if x == 0 {
             // If at the beginning of a line, join with previous line if available
             if y > 0 {
-                let (new_x, new_y) = self.document.modify(0, y, "", "\n", false).unwrap();
+                let (new_x, new_y) = self.document.delete_newline(0, y, false).unwrap();
                 self.cursor_x = new_x;
                 self.cursor_y = new_y;
                 self.desired_cursor_x =
@@ -355,7 +364,7 @@ impl Editor {
         let deleted_text = current_line[start_delete_byte..x].to_string();
         let (new_x, new_y) = self
             .document
-            .modify(start_delete_byte, y, "", &deleted_text, false)
+            .modify_single_char(start_delete_byte, y, "", &deleted_text, false)
             .unwrap();
         self.cursor_x = new_x;
         self.cursor_y = new_y;

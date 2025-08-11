@@ -5,10 +5,5 @@ Rust製テキストエディタ
 
 # タスク
 
-documentのremove_lineを
-document.modify(x, y, "added_text", "deleted_text", false/* isUndo */) に統一したいです。
-
-統一後、テストを通してください。
-
-その後、documentのremove_lineを削除し、
-editorからはdocument.modifyを直接呼ぶようにしてください
+いまdocumentのmodifyは`a\nbc`のようなaddやdeleteに対応していません。
+しかし`\n`で分けてforで回せば、addは`a` `\n` `bc` と順番に処理が行われるため、対応できるように思います。

@@ -49,7 +49,7 @@ fn test_document_delete() {
 fn test_insert_newline() {
     let mut doc = Document::default();
     doc.lines[0] = "abcdef".to_string();
-    doc.modify(3, 0, "\n", "", false).unwrap();
+    doc.insert_newline(3, 0, false).unwrap();
     assert_eq!(doc.lines.len(), 2);
     assert_eq!(doc.lines[0], "abc");
     assert_eq!(doc.lines[1], "def");
@@ -181,4 +181,23 @@ fn test_is_dirty_after_opening_file_no_trailing_newline() {
     );
 
     fs::remove_file(filename).unwrap();
+}
+
+#[test]
+fn test_document_insert_string_with_newlines() {
+    let mut doc = Document::default();
+    doc.lines[0] = "start".to_string();
+    doc.insert_string(5, 0, "a\nbc").unwrap();
+    assert_eq!(doc.lines.len(), 2);
+    assert_eq!(doc.lines[0], "starta");
+    assert_eq!(doc.lines[1], "bc");
+
+    let mut doc2 = Document::default();
+    doc2.lines[0] = "line1".to_string();
+    doc2.lines.push("line2".to_string());
+    doc2.insert_string(2, 0, "X\nY").unwrap(); // Insert in the middle of line1
+    assert_eq!(doc2.lines.len(), 3);
+    assert_eq!(doc2.lines[0], "liX");
+    assert_eq!(doc2.lines[1], "Yne1");
+    assert_eq!(doc2.lines[2], "line2");
 }
