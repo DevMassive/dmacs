@@ -359,3 +359,200 @@ fn test_redo_simple() {
     assert_eq!(editor.cursor_x, 3);
 }
 
+#[test]
+fn test_undo_redo_kill_line() {
+    let mut editor = Editor::new(None);
+    editor.set_undo_debounce_threshold(0); // Disable debouncing for clear test cases
+
+    editor.insert_text("Hello World").unwrap();
+    assert_eq!(editor.cursor_x, 11);
+    assert_eq!(editor.cursor_y, 0);
+
+    editor.insert_newline().unwrap();
+    assert_eq!(editor.cursor_x, 0);
+    assert_eq!(editor.cursor_y, 1);
+
+    editor.insert_text("Another Line").unwrap();
+    assert_eq!(editor.cursor_x, 12);
+    assert_eq!(editor.cursor_y, 1);
+
+    editor.go_to_start_of_file();
+    assert_eq!(editor.cursor_x, 0);
+    assert_eq!(editor.cursor_y, 0);
+
+    editor.move_cursor_down(); // Move to "Another Line"
+    assert_eq!(editor.cursor_x, 0);
+    assert_eq!(editor.cursor_y, 1);
+
+    // Kill "Another Line"
+    editor.kill_line().unwrap();
+    assert_eq!(editor.document.lines.len(), 2);
+    assert_eq!(editor.document.lines[0], "Hello World");
+    assert_eq!(editor.document.lines[1], "");
+    assert_eq!(editor.undo_stack.len(), 4); // Insertion, Newline, Insertion, Kill Line
+    assert_eq!(editor.redo_stack.len(), 0);
+    assert_eq!(editor.cursor_x, 0);
+    assert_eq!(editor.cursor_y, 1);
+
+    // Undo kill_line
+    editor.undo();
+    assert_eq!(editor.document.lines.len(), 2);
+    assert_eq!(editor.document.lines[0], "Hello World");
+    assert_eq!(editor.document.lines[1], "Another Line");
+    assert_eq!(editor.undo_stack.len(), 3);
+    assert_eq!(editor.redo_stack.len(), 1);
+    assert_eq!(editor.cursor_x, 12);
+    assert_eq!(editor.cursor_y, 1);
+
+    // Redo kill_line
+    editor.redo();
+    assert_eq!(editor.document.lines.len(), 2);
+    assert_eq!(editor.document.lines[0], "Hello World");
+    assert_eq!(editor.document.lines[1], "");
+    assert_eq!(editor.undo_stack.len(), 4);
+    assert_eq!(editor.redo_stack.len(), 0);
+    assert_eq!(editor.cursor_x, 0);
+    assert_eq!(editor.cursor_y, 1);
+}
+
+#[test]
+fn test_undo_redo_yank() {
+    let mut editor = Editor::new(None);
+    editor.set_undo_debounce_threshold(0);
+
+    editor.insert_text("Yank Me").unwrap();
+    assert_eq!(editor.cursor_x, 7);
+    assert_eq!(editor.cursor_y, 0);
+
+    editor.go_to_start_of_file();
+    assert_eq!(editor.cursor_x, 0);
+    assert_eq!(editor.cursor_y, 0);
+
+    editor.set_marker_action();
+    assert_eq!(editor.cursor_x, 0);
+    assert_eq!(editor.cursor_y, 0);
+
+    editor.go_to_end_of_line();
+    assert_eq!(editor.cursor_x, 7);
+    assert_eq!(editor.cursor_y, 0);
+
+    editor.copy_selection_action().unwrap(); // Copy "Yank Me" to kill buffer
+    assert_eq!(editor.cursor_x, 7);
+    assert_eq!(editor.cursor_y, 0);
+
+    editor.delete_char().unwrap(); // Delete "e" to make a change
+    assert_eq!(editor.cursor_x, 6);
+    assert_eq!(editor.cursor_y, 0);
+
+    editor.delete_char().unwrap(); // Delete "M"
+    assert_eq!(editor.cursor_x, 5);
+    assert_eq!(editor.cursor_y, 0);
+
+    editor.delete_char().unwrap(); // Delete " "
+    assert_eq!(editor.cursor_x, 4);
+    assert_eq!(editor.cursor_y, 0);
+
+    editor.yank().unwrap(); // Yank "Yank Me"
+    assert_eq!(editor.document.lines[0], "YankYank Me");
+    assert_eq!(editor.undo_stack.len(), 5); // Insertion, Del, Del, Del, Yank
+    assert_eq!(editor.redo_stack.len(), 0);
+    assert_eq!(editor.cursor_x, 11);
+    assert_eq!(editor.cursor_y, 0);
+
+    // Undo yank
+    editor.undo();
+    assert_eq!(editor.document.lines[0], "Yank");
+    assert_eq!(editor.undo_stack.len(), 4);
+    assert_eq!(editor.redo_stack.len(), 1);
+    assert_eq!(editor.cursor_x, 4);
+    assert_eq!(editor.cursor_y, 0);
+
+    // Redo yank
+    editor.redo();
+    assert_eq!(editor.document.lines[0], "YankYank Me");
+    assert_eq!(editor.undo_stack.len(), 5);
+    assert_eq!(editor.redo_stack.len(), 0);
+    assert_eq!(editor.cursor_x, 11);
+    assert_eq!(editor.cursor_y, 0);
+}
+
+#[test]
+fn test_undo_redo_cut_selection() {
+    let mut editor = Editor::new(None);
+    editor.set_undo_debounce_threshold(0);
+
+    editor.insert_text("Line One").unwrap();
+    assert_eq!(editor.cursor_x, 8);
+    assert_eq!(editor.cursor_y, 0);
+
+    editor.insert_newline().unwrap();
+    assert_eq!(editor.cursor_x, 0);
+    assert_eq!(editor.cursor_y, 1);
+
+    editor.insert_text("Line Two").unwrap();
+    assert_eq!(editor.cursor_x, 8);
+    assert_eq!(editor.cursor_y, 1);
+
+    editor.insert_newline().unwrap();
+    assert_eq!(editor.cursor_x, 0);
+    assert_eq!(editor.cursor_y, 2);
+
+    editor.insert_text("Line Three").unwrap();
+    assert_eq!(editor.cursor_x, 10);
+    assert_eq!(editor.cursor_y, 2);
+
+    editor.go_to_start_of_file();
+    assert_eq!(editor.cursor_x, 0);
+    assert_eq!(editor.cursor_y, 0);
+
+    editor.move_cursor_down(); // Move to "Line Two"
+    assert_eq!(editor.cursor_x, 0);
+    assert_eq!(editor.cursor_y, 1);
+
+    editor.set_marker_action();
+    assert_eq!(editor.cursor_x, 0);
+    assert_eq!(editor.cursor_y, 1);
+
+    editor.go_to_end_of_line();
+    assert_eq!(editor.cursor_x, 8);
+    assert_eq!(editor.cursor_y, 1);
+
+    editor.move_cursor_down(); // Move to "Line Three"
+    assert_eq!(editor.cursor_x, 8);
+    assert_eq!(editor.cursor_y, 2);
+
+    editor.move_cursor_right(); // Select "Line Thre"
+    assert_eq!(editor.cursor_x, 9);
+    assert_eq!(editor.cursor_y, 2);
+
+    // Cut "Line Two\nLine Thre"
+    editor.cut_selection_action().unwrap();
+    assert_eq!(editor.document.lines.len(), 2);
+    assert_eq!(editor.document.lines[0], "Line One");
+    assert_eq!(editor.document.lines[1], "e");
+    assert_eq!(editor.undo_stack.len(), 6); // Insertion, Newline, Insertion, Newline, Insertion, Cut
+    assert_eq!(editor.redo_stack.len(), 0);
+    assert_eq!(editor.cursor_x, 0);
+    assert_eq!(editor.cursor_y, 1);
+
+    // Undo cut
+    editor.undo();
+    assert_eq!(editor.document.lines.len(), 3);
+    assert_eq!(editor.document.lines[0], "Line One");
+    assert_eq!(editor.document.lines[1], "Line Two");
+    assert_eq!(editor.document.lines[2], "Line Three");
+    assert_eq!(editor.undo_stack.len(), 5);
+    assert_eq!(editor.redo_stack.len(), 1);
+    assert_eq!(editor.cursor_x, 9);
+    assert_eq!(editor.cursor_y, 2);
+
+    // Redo cut
+    editor.redo();
+    assert_eq!(editor.document.lines.len(), 2);
+    assert_eq!(editor.document.lines[0], "Line One");
+    assert_eq!(editor.document.lines[1], "e");
+    assert_eq!(editor.undo_stack.len(), 6);
+    assert_eq!(editor.redo_stack.len(), 0);
+    assert_eq!(editor.cursor_x, 0);
+    assert_eq!(editor.cursor_y, 1);
+}

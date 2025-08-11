@@ -96,12 +96,23 @@ impl Editor {
 
     pub fn save_state_for_undo(&mut self, current_action_type: LastActionType) {
         let now = Instant::now();
+        debug!(
+            "save_state_for_undo: current_action_type={:?}, last_action_type={:?}, undo_debounce_threshold={:?}",
+            current_action_type, self.last_action_type, self.undo_debounce_threshold
+        );
 
-        let should_start_new_group = self.last_action_time.is_none() // First action ever
-            || self.last_action_type != current_action_type // Action type changed
-            || now.duration_since(self.last_action_time.unwrap()) >= self.undo_debounce_threshold; // Debounce time exceeded
+        let should_start_new_group = if self.last_action_time.is_none() {
+            debug!("save_state_for_undo: First action ever");
+            true // Always start new group for the very first action
+        } else {
+            let time_since_last_action = now.duration_since(self.last_action_time.unwrap());
+            debug!("save_state_for_undo: time_since_last_action={time_since_last_action:?}");
+            self.last_action_type != current_action_type // Action type changed
+            || time_since_last_action >= self.undo_debounce_threshold // Debounce time exceeded
+        };
 
         if should_start_new_group {
+            debug!("save_state_for_undo: Pushing new undo group");
             self.undo_stack.push(Vec::new()); // Push a new empty vector for the new transaction
             self.redo_stack.clear(); // Clear redo stack on new action
         }
@@ -324,7 +335,7 @@ impl Editor {
 
     pub fn kill_line(&mut self) -> Result<()> {
         let should_clear_kill_buffer = !self.last_action_was_kill;
-        self.save_state_for_undo(LastActionType::Other); // Start a new transaction for kill_line
+        self.save_state_for_undo(LastActionType::Deletion); // Start a new transaction for kill_line
 
         let y = self.cursor_y;
         let x = self.cursor_x;
@@ -389,7 +400,7 @@ impl Editor {
 
     pub fn yank(&mut self) -> Result<()> {
         self.last_action_was_kill = false;
-        self.save_state_for_undo(LastActionType::Other); // Start a new transaction for yank
+        self.save_state_for_undo(LastActionType::Insertion); // Start a new transaction for yank
 
         let text_to_yank = self.kill_buffer.clone();
 
@@ -828,20 +839,26 @@ impl Editor {
     }
 
     pub fn cut_selection_action(&mut self) -> Result<()> {
-        self.save_state_for_undo(LastActionType::Other);
+        self.save_state_for_undo(LastActionType::Deletion);
         let cursor_pos = self.cursor_pos();
-        self.kill_buffer = self
-            .selection
-            .cut_selection(&mut self.document, cursor_pos)?; // This still clones the document for undo
+        let (killed_text, action_diff_option) =
+            self.selection.cut_selection(&self.document, cursor_pos)?;
+
+        if let Some(action_diff) = action_diff_option {
+            let (new_x, new_y) = self.document.apply_action_diff(&action_diff, false)?;
+            if let Some(last_transaction) = self.undo_stack.last_mut() {
+                last_transaction.push(action_diff);
+            }
+            self.cursor_x = new_x;
+            self.cursor_y = new_y;
+            self.desired_cursor_x =
+                self.get_display_width(&self.document.lines[self.cursor_y], self.cursor_x);
+        }
+
+        self.kill_buffer = killed_text;
         self.status_message = "Selection cut.".to_string();
         debug!("Selection cut. Kill buffer: '{}'", self.kill_buffer);
 
-        // Adjust cursor position after cut to ensure it's within bounds
-        let new_max_y = self.document.lines.len().saturating_sub(1);
-        self.cursor_y = self.cursor_y.min(new_max_y);
-        self.cursor_x = self.document.lines[self.cursor_y].len(); // Move to end of the line
-        self.desired_cursor_x =
-            self.get_display_width(&self.document.lines[self.cursor_y], self.cursor_x);
         Ok(())
     }
 

@@ -308,3 +308,50 @@ fn test_document_insert_string_with_newlines() {
     assert_eq!(doc2.lines[1], "Yne1");
     assert_eq!(doc2.lines[2], "line2");
 }
+
+#[test]
+fn test_delete_range_undo_redo() {
+    let mut doc = Document::new_empty();
+    doc.lines = vec![
+        "Line One".to_string(),
+        "Line Two".to_string(),
+        "Line Three".to_string(),
+    ];
+
+    // Simulate a cut selection from "Line Two" (0,1) to "Line Thre" (9,2)
+    // This means deleting "Line Two\nLine Thre"
+    let deleted_content = vec!["Line Two".to_string(), "Line Thre".to_string()];
+
+    let action_diff = ActionDiff::DeleteRange {
+        start_x: 0,
+        start_y: 1,
+        end_x: 9,
+        end_y: 2,
+        content: deleted_content.clone(),
+    };
+
+    // Apply the deletion (redo)
+    let (new_x, new_y) = doc.apply_action_diff(&action_diff, false).unwrap();
+    assert_eq!(doc.lines.len(), 2);
+    assert_eq!(doc.lines[0], "Line One");
+    assert_eq!(doc.lines[1], "e"); // "Line Three" becomes "e" after "Line Thre" is removed
+    assert_eq!(new_x, 0);
+    assert_eq!(new_y, 1);
+
+    // Undo the deletion
+    let (new_x, new_y) = doc.apply_action_diff(&action_diff, true).unwrap();
+    assert_eq!(doc.lines.len(), 3);
+    assert_eq!(doc.lines[0], "Line One");
+    assert_eq!(doc.lines[1], "Line Two");
+    assert_eq!(doc.lines[2], "Line Three");
+    assert_eq!(new_x, 9); // Cursor should be at the end of the re-inserted text
+    assert_eq!(new_y, 2);
+
+    // Redo the deletion
+    let (new_x, new_y) = doc.apply_action_diff(&action_diff, false).unwrap();
+    assert_eq!(doc.lines.len(), 2);
+    assert_eq!(doc.lines[0], "Line One");
+    assert_eq!(doc.lines[1], "e");
+    assert_eq!(new_x, 0);
+    assert_eq!(new_y, 1);
+}

@@ -13,9 +13,25 @@ pub struct Diff {
 #[derive(Clone, Debug)]
 pub enum ActionDiff {
     CharChange(Diff),
-    NewlineInsertion { x: usize, y: usize },
-    NewlineDeletion { x: usize, y: usize },
-    LineSwap { y1: usize, y2: usize },
+    NewlineInsertion {
+        x: usize,
+        y: usize,
+    },
+    NewlineDeletion {
+        x: usize,
+        y: usize,
+    },
+    LineSwap {
+        y1: usize,
+        y2: usize,
+    },
+    DeleteRange {
+        start_x: usize,
+        start_y: usize,
+        end_x: usize,
+        end_y: usize,
+        content: Vec<String>,
+    },
 }
 
 #[derive(Clone)]
@@ -103,6 +119,101 @@ impl Document {
                 // Return a dummy cursor position, as it's not used by Editor for LineSwap.
                 Ok((0, 0))
             }
+            ActionDiff::DeleteRange {
+                start_x,
+                start_y,
+                end_x,
+                end_y,
+                content,
+            } => {
+                if is_undo {
+                    // Undo: Re-insert the content
+                    let mut current_y = *start_y;
+                    let mut current_x = *start_x;
+
+                    if content.is_empty() {
+                        return Ok((current_x, current_y));
+                    }
+
+                    // If single line deletion
+                    if *start_y == *end_y {
+                        if *start_y < self.lines.len() {
+                            self.lines[*start_y].insert_str(*start_x, &content[0]);
+                        } else {
+                            self.lines.insert(*start_y, content[0].clone());
+                        }
+                    } else {
+                        // Multi-line deletion
+                        // The current line at start_y contains the prefix of the original start_y line
+                        // and the suffix of the original end_y line.
+                        // We need to split it and insert the deleted lines.
+
+                        let original_start_line_prefix =
+                            self.lines[*start_y][0..*start_x].to_string();
+                        let original_end_line_suffix = self.lines[*start_y][*start_x..].to_string();
+
+                        // Reconstruct the start line
+                        self.lines[*start_y] =
+                            format!("{}{}", original_start_line_prefix, content[0]);
+
+                        // Insert the intermediate lines
+                        for (i, line) in content.iter().enumerate().skip(1).take(content.len() - 2)
+                        {
+                            self.lines.insert(*start_y + i, line.clone());
+                        }
+
+                        // Reconstruct the end line
+                        let end_line_idx = *start_y + content.len() - 1;
+                        self.lines.insert(
+                            end_line_idx,
+                            format!("{}{}", content.last().unwrap(), original_end_line_suffix),
+                        );
+                    }
+
+                    // Adjust cursor position
+                    current_x = *end_x;
+                    current_y = *end_y;
+
+                    Ok((current_x, current_y))
+                } else {
+                    // Redo: Perform the deletion again
+                    if *start_y == *end_y {
+                        // Single line deletion
+                        if *start_y < self.lines.len() {
+                            self.lines[*start_y].drain(*start_x..*end_x);
+                        }
+                    } else {
+                        // Multi-line deletion
+                        // Remove the part from start_x to the end of start_y
+                        if *start_y < self.lines.len() {
+                            self.lines[*start_y].drain(*start_x..);
+                        }
+
+                        // Remove full lines between start_y and end_y
+                        // Iterate backwards to avoid index issues
+                        for y_idx in (*start_y + 1..*end_y).rev() {
+                            if y_idx < self.lines.len() {
+                                self.lines.remove(y_idx);
+                            }
+                        }
+
+                        // Remove the part from the beginning of end_y to end_x
+                        if *end_y < self.lines.len() {
+                            self.lines[*end_y].drain(0..*end_x);
+                        }
+
+                        // Join the remaining part of end_y with start_y
+                        if *start_y < self.lines.len() && *end_y < self.lines.len() {
+                            let remaining_end_line = self.lines[*end_y].clone();
+                            self.lines[*start_y].push_str(&remaining_end_line);
+                            if *start_y != *end_y {
+                                self.lines.remove(*end_y);
+                            }
+                        }
+                    }
+                    Ok((*start_x, *start_y))
+                }
+            }
         }
     }
 
@@ -120,7 +231,11 @@ impl Document {
             )));
         }
 
-        let line = &mut self.lines[diff.y];
+        // Calculate new cursor position (initial values)
+        let new_x = diff.x + add.len();
+        let new_y = diff.y; // new_y is not mutable anymore as it's not changed here
+
+        let line = &mut self.lines[diff.y]; // Get mutable reference to the line
 
         // Handle deletion
         if !delete.is_empty() {
@@ -154,10 +269,6 @@ impl Document {
             }
             line.insert_str(diff.x, add);
         }
-
-        // Calculate new cursor position
-        let new_x = diff.x + add.len();
-        let new_y = diff.y;
 
         Ok((new_x, new_y))
     }

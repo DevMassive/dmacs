@@ -1,4 +1,4 @@
-use crate::document::Document;
+use crate::document::{ActionDiff, Document};
 use crate::error::Result;
 
 pub struct Selection {
@@ -45,41 +45,53 @@ impl Selection {
 
     pub fn cut_selection(
         &mut self,
-        document: &mut Document,
+        document: &Document,
         cursor_pos: (usize, usize),
-    ) -> Result<String> {
+    ) -> Result<(String, Option<crate::document::ActionDiff>)> {
         if let Some(((start_x, start_y), (end_x, end_y))) = self.get_selection_range(cursor_pos) {
             let mut killed_text = String::new();
+            let mut deleted_content_lines: Vec<String> = Vec::new();
 
             if start_y == end_y {
                 // Single line selection
-                let line = &mut document.lines[start_y];
-                let removed = line.drain(start_x..end_x).collect::<String>();
+                let line = &document.lines[start_y];
+                let removed = line[start_x..end_x].to_string();
                 killed_text.push_str(&removed);
+                deleted_content_lines.push(removed);
             } else {
                 // Multi-line selection
                 // Part of the start line
-                let start_line = &mut document.lines[start_y];
-                let removed_start = start_line.drain(start_x..).collect::<String>();
+                let start_line = &document.lines[start_y];
+                let removed_start = start_line[start_x..].to_string();
                 killed_text.push_str(&removed_start);
                 killed_text.push('\n');
+                deleted_content_lines.push(removed_start);
 
                 // Full lines in between
-                for _ in (start_y + 1)..end_y {
-                    killed_text.push_str(&document.lines.remove(start_y + 1));
+                for i in (start_y + 1)..end_y {
+                    killed_text.push_str(&document.lines[i]);
                     killed_text.push('\n');
+                    deleted_content_lines.push(document.lines[i].clone());
                 }
 
                 // Part of the end line
-                let end_line = document.lines.remove(start_y + 1);
+                let end_line = &document.lines[end_y];
                 killed_text.push_str(&end_line[..end_x]);
-                document.lines[start_y].push_str(&end_line[end_x..]);
+                deleted_content_lines.push(end_line[..end_x].to_string());
             }
 
             self.clear_marker();
-            Ok(killed_text)
+
+            let action_diff = ActionDiff::DeleteRange {
+                start_x,
+                start_y,
+                end_x,
+                end_y,
+                content: deleted_content_lines,
+            };
+            Ok((killed_text, Some(action_diff)))
         } else {
-            Ok(String::new())
+            Ok((String::new(), None))
         }
     }
 
