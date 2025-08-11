@@ -2,7 +2,7 @@ use log::debug;
 use std::time::{Duration, Instant};
 use unicode_width::UnicodeWidthChar;
 
-use crate::document::Document;
+use crate::document::{Diff, Document};
 use crate::editor::search::Search;
 use crate::error::{DmacsError, Result};
 
@@ -175,13 +175,13 @@ impl Editor {
     pub fn insert_char(&mut self, c: char) -> Result<()> {
         self.last_action_was_kill = false;
         self.save_state_for_undo(LastActionType::Insertion);
-        let (new_x, new_y) = self.document.modify_single_char(
-            self.cursor_x,
-            self.cursor_y,
-            &c.to_string(),
-            "",
-            false,
-        )?;
+        let diff = Diff {
+            x: self.cursor_x,
+            y: self.cursor_y,
+            added_text: c.to_string(),
+            deleted_text: "".to_string(),
+        };
+        let (new_x, new_y) = self.document.modify_single_char(&diff, false)?;
         self.cursor_x = new_x;
         self.cursor_y = new_y;
         self.desired_cursor_x =
@@ -203,13 +203,13 @@ impl Editor {
                 char_to_delete = ch.to_string();
                 char_start_byte = idx;
             }
-            let (new_x, new_y) = self.document.modify_single_char(
-                char_start_byte,
-                self.cursor_y,
-                "",
-                &char_to_delete,
-                false,
-            )?;
+            let diff = Diff {
+                x: char_start_byte,
+                y: self.cursor_y,
+                added_text: "".to_string(),
+                deleted_text: char_to_delete,
+            };
+            let (new_x, new_y) = self.document.modify_single_char(&diff, false)?;
             self.cursor_x = new_x;
             self.cursor_y = new_y;
         } else if self.cursor_y > 0 {
@@ -238,9 +238,13 @@ impl Editor {
                 char_to_delete = ch.to_string();
                 char_start_byte = x + idx;
             }
-            let (_new_x, new_y) =
-                self.document
-                    .modify_single_char(char_start_byte, y, "", &char_to_delete, false)?;
+            let diff = Diff {
+                x: char_start_byte,
+                y,
+                added_text: "".to_string(),
+                deleted_text: char_to_delete,
+            };
+            let (_new_x, new_y) = self.document.modify_single_char(&diff, false)?;
             // Cursor position does not change for delete_forward_char, but update y in case modify changes it
             self.cursor_y = new_y;
         } else if y < self.document.lines.len() - 1 {
@@ -285,9 +289,13 @@ impl Editor {
             // Kill from cursor to end of line
             let current_line = &self.document.lines[y];
             let killed_text = current_line[x..].to_string();
-            self.document
-                .modify_single_char(x, y, "", &killed_text, false)
-                .unwrap();
+            let diff = Diff {
+                x,
+                y,
+                added_text: "".to_string(),
+                deleted_text: killed_text.clone(),
+            };
+            self.document.modify_single_char(&diff, false).unwrap();
             self.kill_buffer.push_str(&killed_text);
         } else if x == current_line_len && y < self.document.lines.len() - 1 {
             // Case 2: Cursor is at the end of the line, and it's not the last line
@@ -362,10 +370,13 @@ impl Editor {
         let start_delete_byte = find_word_boundary_left(current_line, x);
 
         let deleted_text = current_line[start_delete_byte..x].to_string();
-        let (new_x, new_y) = self
-            .document
-            .modify_single_char(start_delete_byte, y, "", &deleted_text, false)
-            .unwrap();
+        let diff = Diff {
+            x: start_delete_byte,
+            y,
+            added_text: "".to_string(),
+            deleted_text,
+        };
+        let (new_x, new_y) = self.document.modify_single_char(&diff, false).unwrap();
         self.cursor_x = new_x;
         self.cursor_y = new_y;
         self.desired_cursor_x =

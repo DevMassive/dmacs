@@ -5,5 +5,5 @@ Rust製テキストエディタ
 
 # タスク
 
-いまdocumentのmodifyは`a\nbc`のようなaddやdeleteに対応していません。
-しかし`\n`で分けてforで回せば、addは`a` `\n` `bc` と順番に処理が行われるため、対応できるように思います。
+いまdocumentのmodify_single_charの引数はまとめてstruct Diffにしてください。
+これは将来的にDiffのstackとしてundo/redo stackを実現するためです。

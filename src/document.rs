@@ -2,6 +2,14 @@ use crate::error::{DmacsError, Result};
 use std::io::Write;
 
 // Document being edited
+#[derive(Clone, Debug)]
+pub struct Diff {
+    pub x: usize,
+    pub y: usize,
+    pub added_text: String,
+    pub deleted_text: String,
+}
+
 #[derive(Clone)]
 pub struct Document {
     pub lines: Vec<String>,
@@ -31,8 +39,8 @@ impl Document {
     pub fn save(&mut self) -> Result<()> {
         if let Some(filename) = &self.filename {
             let mut file = std::fs::File::create(filename).map_err(DmacsError::Io)?;
-            for line in &self.lines {
-                writeln!(file, "{line}").map_err(DmacsError::Io)?;
+            for _line in &self.lines {
+                writeln!(file, "{_line}").map_err(DmacsError::Io)?;
             }
             self.original_content = Some(self.lines.join("\n") + "\n");
         }
@@ -55,31 +63,39 @@ impl Document {
 
     pub fn insert(&mut self, at_x: usize, at_y: usize, c: char) -> Result<()> {
         if at_y > self.lines.len() {
-            return Err(DmacsError::Document(format!("Invalid line index: {at_y}")));
+            return Err(DmacsError::Document("Invalid line index: {at_y}".to_string()));
         }
         if at_y == self.lines.len() {
             self.lines.push(String::new());
         }
-        self.modify_single_char(at_x, at_y, &c.to_string(), "", false)
-            .map(|_| ())
+        let diff = Diff {
+            x: at_x,
+            y: at_y,
+            added_text: c.to_string(),
+            deleted_text: "".to_string(),
+        };
+        self.modify_single_char(&diff, false).map(|_| ())
     }
 
     pub fn delete(&mut self, at_x: usize, at_y: usize) -> Result<()> {
         if at_y >= self.lines.len() {
-            return Err(DmacsError::Document(format!("Invalid line index: {at_y}")));
+            return Err(DmacsError::Document("Invalid line index: {at_y}".to_string()));
         }
         let line = &self.lines[at_y];
         if at_x >= line.len() {
-            return Err(DmacsError::Document(format!(
-                "Invalid column index: {at_x}"
-            )));
+            return Err(DmacsError::Document("Invalid column index: {at_x}".to_string()));
         }
         let char_to_delete = line.chars().nth(at_x).unwrap().to_string();
         if char_to_delete == "\n" {
             self.delete_newline(at_x, at_y, false).map(|_| ())
         } else {
-            self.modify_single_char(at_x, at_y, "", &char_to_delete, false)
-                .map(|_| ())
+            let diff = Diff {
+                x: at_x,
+                y: at_y,
+                added_text: "".to_string(),
+                deleted_text: char_to_delete,
+            };
+            self.modify_single_char(&diff, false).map(|_| ())
         }
     }
 
@@ -88,7 +104,13 @@ impl Document {
             let (new_x, new_y) = if c == '\n' {
                 self.insert_newline(x, y, false)?
             } else {
-                self.modify_single_char(x, y, &c.to_string(), "", false)?
+                let diff = Diff {
+                    x,
+                    y,
+                    added_text: c.to_string(),
+                    deleted_text: "".to_string(),
+                };
+                self.modify_single_char(&diff, false)?
             };
             x = new_x;
             y = new_y;
@@ -102,63 +124,61 @@ impl Document {
         }
     }
 
-    pub fn modify_single_char(
-        &mut self,
-        x: usize,
-        y: usize,
-        added_text: &str,
-        deleted_text: &str,
-        is_undo: bool,
-    ) -> Result<(usize, usize)> {
+    pub fn modify_single_char(&mut self, diff: &Diff, is_undo: bool) -> Result<(usize, usize)> {
         let (add, delete) = if is_undo {
-            (deleted_text, added_text)
+            (&diff.deleted_text, &diff.added_text)
         } else {
-            (added_text, deleted_text)
+            (&diff.added_text, &diff.deleted_text)
         };
 
-        if y >= self.lines.len() {
-            return Err(DmacsError::Document(format!("Invalid line index: {y}")));
+        if diff.y >= self.lines.len() {
+            return Err(DmacsError::Document(format!(
+                "Invalid line index: {}",
+                diff.y
+            )));
         }
 
-        let line = &mut self.lines[y];
+        let line = &mut self.lines[diff.y];
 
         // Handle deletion
         if !delete.is_empty() {
             let delete_len = delete.len();
-            if x + delete_len > line.len() {
+            if diff.x + delete_len > line.len() {
                 return Err(DmacsError::Document(format!(
-                    "Deletion out of bounds: x={x}, delete_len={delete_len}, line_len={}",
+                    "Deletion out of bounds: x={}, delete_len={}, line_len={}",
+                    diff.x,
+                    delete_len,
                     line.len()
                 )));
             }
-            if line[x..].starts_with(delete) {
-                line.replace_range(x..(x + delete_len), "");
+            if line[diff.x..].starts_with(delete) {
+                line.replace_range(diff.x..(diff.x + delete_len), "");
             } else {
+                let found_text = &line[diff.x..(diff.x + delete_len)];
                 return Err(DmacsError::Document(format!(
-                    "Text to delete does not match: expected \"{}}}\", found \"{}}}\"",
-                    delete,
-                    &line[x..(x + delete_len)]
+                    "Text to delete does not match: expected \"{delete}\", found \"{found_text}\""
                 )));
             }
         }
 
         // Handle insertion
         if !add.is_empty() {
-            if x > line.len() {
+            if diff.x > line.len() {
                 // If inserting beyond the current line length, pad with spaces
                 // This might not be the desired behavior for all cases, but it's a start.
                 // Consider if this should be an error or if the line should be extended.
-                line.push_str(&" ".repeat(x - line.len()));
+                line.push_str(&" ".repeat(diff.x - line.len()));
             }
-            line.insert_str(x, add);
+            line.insert_str(diff.x, add);
         }
 
         // Calculate new cursor position
-        let new_x = x + add.len();
-        let new_y = y;
+        let new_x = diff.x + add.len();
+        let new_y = diff.y;
 
         Ok((new_x, new_y))
     }
+
     pub fn insert_newline(&mut self, x: usize, y: usize, is_undo: bool) -> Result<(usize, usize)> {
         let (new_x, new_y) = if is_undo {
             // Undo newline insertion means joining lines
