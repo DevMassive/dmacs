@@ -196,13 +196,13 @@ impl Editor {
         }
     }
 
-    pub fn insert_char(&mut self, c: char) -> Result<()> {
+    pub fn insert_text(&mut self, text: &str) -> Result<()> {
         self.last_action_was_kill = false;
         self.save_state_for_undo(LastActionType::Insertion);
         let diff = Diff {
             x: self.cursor_x,
             y: self.cursor_y,
-            added_text: c.to_string(),
+            added_text: text.to_string(),
             deleted_text: "".to_string(),
         };
         let action_diff = ActionDiff::CharChange(diff);
@@ -391,8 +391,6 @@ impl Editor {
         self.save_state_for_undo(LastActionType::Other); // Start a new transaction for yank
 
         let text_to_yank = self.kill_buffer.clone();
-        let mut current_x = self.cursor_x;
-        let mut current_y = self.cursor_y;
 
         if text_to_yank.is_empty() {
             self.status_message = "Kill buffer is empty.".to_string();
@@ -403,52 +401,52 @@ impl Editor {
 
         if let Some(last_transaction) = self.undo_stack.last_mut() {
             // Insert the first part of the yanked text into the current line
-            for c in lines_to_yank[0].chars() {
-                let diff = Diff {
-                    x: current_x,
-                    y: current_y,
-                    added_text: c.to_string(),
-                    deleted_text: "".to_string(),
-                };
-                let action_diff = ActionDiff::CharChange(diff);
-                let (new_x, new_y) = self.document.apply_action_diff(&action_diff, false)?;
-                last_transaction.push(action_diff);
-                current_x = new_x;
-                current_y = new_y;
+            if let Some(first_line) = lines_to_yank.first() {
+                if !first_line.is_empty() {
+                    let diff = Diff {
+                        x: self.cursor_x,
+                        y: self.cursor_y,
+                        added_text: first_line.to_string(),
+                        deleted_text: "".to_string(),
+                    };
+                    let action_diff = ActionDiff::CharChange(diff);
+                    let (new_x, new_y) = self.document.apply_action_diff(&action_diff, false)?;
+                    last_transaction.push(action_diff);
+                    self.cursor_x = new_x;
+                    self.cursor_y = new_y;
+                }
             }
 
             // Insert subsequent lines
             for line_to_yank in lines_to_yank.iter().skip(1) {
                 let action_diff_newline = ActionDiff::NewlineInsertion {
-                    x: current_x,
-                    y: current_y,
+                    x: self.cursor_x,
+                    y: self.cursor_y,
                 };
                 let (new_x_after_newline, new_y_after_newline) = self
                     .document
                     .apply_action_diff(&action_diff_newline, false)?;
                 last_transaction.push(action_diff_newline);
-                current_y = new_y_after_newline;
-                current_x = new_x_after_newline;
+                self.cursor_y = new_y_after_newline;
+                self.cursor_x = new_x_after_newline;
 
-                for c in line_to_yank.chars() {
+                if !line_to_yank.is_empty() {
                     let diff = Diff {
-                        x: current_x,
-                        y: current_y,
-                        added_text: c.to_string(),
+                        x: self.cursor_x,
+                        y: self.cursor_y,
+                        added_text: line_to_yank.to_string(),
                         deleted_text: "".to_string(),
                     };
                     let action_diff_char = ActionDiff::CharChange(diff);
                     let (new_x, new_y) =
                         self.document.apply_action_diff(&action_diff_char, false)?;
                     last_transaction.push(action_diff_char);
-                    current_x = new_x;
-                    current_y = new_y;
+                    self.cursor_x = new_x;
+                    self.cursor_y = new_y;
                 }
             }
         }
 
-        self.cursor_x = current_x;
-        self.cursor_y = current_y;
         self.desired_cursor_x =
             self.get_display_width(&self.document.lines[self.cursor_y], self.cursor_x);
         Ok(())

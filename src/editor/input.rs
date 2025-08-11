@@ -75,7 +75,7 @@ impl Editor {
                 '\x1c' | // Ctrl+\
                 '\x1d' | // Ctrl+] 
                 '\x1e' => {}, // Ctrl+^
-                _ => self.insert_char(c)?,
+                _ => self.insert_text(&c.to_string())?,
             },
             Input::KeyBackspace => self.delete_char()?,
             Input::KeyUp => self.move_cursor_up(),
