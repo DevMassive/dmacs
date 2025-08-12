@@ -10,11 +10,19 @@ pub struct BackupManager {
 
 impl BackupManager {
     pub fn new() -> Result<Self> {
-        let home_dir = dirs::home_dir().ok_or(DmacsError::Io(std::io::Error::new(
-            std::io::ErrorKind::NotFound,
-            "Home directory not found",
-        )))?;
-        let backup_dir = home_dir.join(".dmacs").join("backup");
+        Self::new_with_base_dir(None)
+    }
+
+    pub fn new_with_base_dir(base_dir: Option<PathBuf>) -> Result<Self> {
+        let base = if let Some(dir) = base_dir {
+            dir
+        } else {
+            dirs::home_dir().ok_or(DmacsError::Io(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                "Home directory not found",
+            )))?
+        };
+        let backup_dir = base.join(".dmacs").join("backup");
         fs::create_dir_all(&backup_dir).map_err(DmacsError::Io)?;
         Ok(Self { backup_dir })
     }
