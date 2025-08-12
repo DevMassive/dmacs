@@ -1,6 +1,9 @@
 use log::debug;
 use crate::error::{DmacsError, Result};
 use std::io::Write;
+use std::fs;
+use std::path::PathBuf;
+use chrono::{Local, DateTime, TimeZone, NaiveDateTime, Duration}; // Added TimeZone
 
 // Document being edited
 #[derive(Clone, Debug)]
@@ -69,11 +72,44 @@ impl Document {
 
     pub fn save(&mut self) -> Result<()> {
         if let Some(filename) = &self.filename {
+            let home_dir = dirs::home_dir().ok_or(DmacsError::Io(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                "Home directory not found",
+            )))?;
+            let backup_dir = home_dir.join(".dmacs").join("backup");
+
+            // Backup original content if it exists
+            if let Some(original_content) = &self.original_content {
+                if !original_content.is_empty() {
+                    fs::create_dir_all(&backup_dir).map_err(DmacsError::Io)?;
+
+                    let original_path = PathBuf::from(filename);
+                    let file_stem = original_path.file_stem().and_then(|s| s.to_str()).unwrap_or("unnamed");
+                    let file_extension = original_path.extension().and_then(|s| s.to_str()).unwrap_or("");
+
+                    let now: DateTime<Local> = Local::now();
+                    let timestamp = now.format("%Y%m%d%H%M%S").to_string();
+
+                    let backup_filename = if file_extension.is_empty() {
+                        format!("{}.{}.bak", file_stem, timestamp)
+                    } else {
+                        format!("{}.{}.{}.bak", file_stem, file_extension, timestamp)
+                    };
+                    let backup_path = backup_dir.join(backup_filename);
+
+                    fs::write(&backup_path, original_content).map_err(DmacsError::Io)?;
+                    debug!("Backed up {} to {}", filename, backup_path.display());
+                }
+            }
+
             let mut file = std::fs::File::create(filename).map_err(DmacsError::Io)?;
             for _line in &self.lines {
                 writeln!(file, "{_line}").map_err(DmacsError::Io)?;
             }
             self.original_content = Some(self.lines.join("\n") + "\n");
+
+            // Clean up old backups
+            self.clean_old_backups(&backup_dir)?;
         }
         Ok(())
     }
@@ -165,8 +201,7 @@ impl Document {
                             format!("{}{}", original_start_line_prefix, content[0]);
 
                         // Insert the intermediate lines
-                        for (i, line) in content.iter().enumerate().skip(1).take(content.len() - 2)
-                        {
+                        for (i, line) in content.iter().enumerate().skip(1).take(content.len() - 2) {
                             self.lines.insert(*start_y + i, line.clone());
                         }
 
@@ -209,10 +244,10 @@ impl Document {
                         // Join the remaining parts
                         if *start_y < self.lines.len() {
                             self.lines[*start_y] =
-                                format!("{remaining_start_line_prefix}{remaining_end_line_suffix}");
+                                format!("{}{}", remaining_start_line_prefix, remaining_end_line_suffix);
                         }
 
-                        // Remove intermediate lines and the end_y line if it's different from start_y
+                        // Remove intermediate lines and the end_y line if it\'s different from start_y
                         // Iterate backwards to avoid index issues
                         for y_idx in (*start_y + 1..=*end_y).rev() {
                             // Iterate from end_y down to start_y + 1
@@ -243,7 +278,7 @@ impl Document {
 
         // Calculate new cursor position (initial values)
         let new_x = diff.x + add.len();
-        let new_y = diff.y; // new_y is not mutable anymore as it's not changed here
+        let new_y = diff.y; // new_y is not mutable anymore as it\'s not changed here
 
         let line = &mut self.lines[diff.y]; // Get mutable reference to the line
 
@@ -327,6 +362,38 @@ impl Document {
             self.lines[y].push_str(&next_line);
             Ok((current_line_len, y))
         }
+    }
+
+    fn clean_old_backups(&self, backup_dir: &PathBuf) -> Result<()> {
+        let now: DateTime<Local> = Local::now();
+        let three_days_ago = now - Duration::days(3);
+
+        for entry in fs::read_dir(backup_dir).map_err(DmacsError::Io)? {
+            let entry = entry.map_err(DmacsError::Io)?;
+            let path = entry.path();
+
+            if path.is_file() {
+                if let Some(filename_str) = path.file_name().and_then(|s| s.to_str()) {
+                    // Expected format: file_stem.extension.timestamp.bak or file_stem.timestamp.bak
+                    let parts: Vec<&str> = filename_str.split('.').collect();
+                    let num_parts = parts.len();
+
+                    if num_parts >= 3 && parts[num_parts - 1] == "bak" {
+                        let timestamp_str = parts[num_parts - 2];
+
+                        if let Ok(naive_datetime) = NaiveDateTime::parse_from_str(timestamp_str, "%Y%m%d%H%M%S") {
+                            if let Some(backup_timestamp) = Local.from_local_datetime(&naive_datetime).single() {
+                                if backup_timestamp < three_days_ago {
+                                    fs::remove_file(&path).map_err(DmacsError::Io)?;
+                                    debug!("Deleted old backup: {}", path.display());
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        Ok(())
     }
 }
 
