@@ -257,16 +257,21 @@ impl Editor {
             self.cursor_x = new_x;
             self.cursor_y = new_y;
         } else if self.cursor_y > 0 {
+            let original_x = 0;
+            let original_y = self.cursor_y;
+            let (undo_x, undo_y) = self.document.delete_newline(original_x, original_y)?;
+
             let action_diff = ActionDiff::NewlineDeletion {
-                x: 0,
-                y: self.cursor_y,
+                original_x,
+                original_y,
+                undo_x,
+                undo_y,
             };
-            let (new_x, new_y) = self.document.apply_action_diff(&action_diff, false)?;
             if let Some(last_transaction) = self.undo_stack.last_mut() {
                 last_transaction.push(action_diff);
             }
-            self.cursor_x = new_x;
-            self.cursor_y = new_y;
+            self.cursor_x = undo_x;
+            self.cursor_y = undo_y;
             self.desired_cursor_x =
                 self.get_display_width(&self.document.lines[self.cursor_y], self.cursor_x);
         }
@@ -303,15 +308,21 @@ impl Editor {
             // Cursor position does not change for delete_forward_char, but update y in case modify changes it
             self.cursor_y = new_y;
         } else if y < self.document.lines.len() - 1 {
-            let x_for_newline = self.document.lines[y].len();
+            let original_x = self.document.lines[y].len();
+            let original_y = y;
+            let (undo_x, undo_y) = self.document.delete_newline(original_x, original_y)?;
+
             let action_diff = ActionDiff::NewlineDeletion {
-                x: x_for_newline,
-                y,
+                original_x,
+                original_y,
+                undo_x,
+                undo_y,
             };
-            self.document.apply_action_diff(&action_diff, false)?;
             if let Some(last_transaction) = self.undo_stack.last_mut() {
                 last_transaction.push(action_diff);
             }
+            self.cursor_x = undo_x;
+            self.cursor_y = undo_y;
         }
         Ok(())
     }
@@ -384,14 +395,22 @@ impl Editor {
             // Case 2: Cursor is at the end of the line, and it's not the last line
             // Kill the newline and join with the next line
             let next_line_content = self.document.lines[y + 1].clone();
-            let action_diff = ActionDiff::NewlineDeletion { x, y };
+            let original_x = x;
+            let original_y = y;
+            let (undo_x, undo_y) = self.document.delete_newline(original_x, original_y)?;
+
+            let action_diff = ActionDiff::NewlineDeletion {
+                original_x,
+                original_y,
+                undo_x,
+                undo_y,
+            };
             if let Some(last_transaction) = self.undo_stack.last_mut() {
-                let (new_x, new_y) = self.document.apply_action_diff(&action_diff, false)?;
                 last_transaction.push(action_diff);
                 self.kill_buffer.push('\x0a');
                 self.kill_buffer.push_str(&next_line_content);
-                self.cursor_x = new_x;
-                self.cursor_y = new_y;
+                self.cursor_x = undo_x;
+                self.cursor_y = undo_y;
             }
         }
         self.last_action_was_kill = true;
@@ -477,13 +496,23 @@ impl Editor {
             if x == 0 {
                 // If at the beginning of a line, join with previous line if available
                 if y > 0 {
-                    let action_diff = ActionDiff::NewlineDeletion { x: 0, y };
-                    let (new_x, new_y) = self.document.apply_action_diff(&action_diff, false)?;
-                    last_transaction.push(action_diff);
-                    self.cursor_x = new_x;
-                    self.cursor_y = new_y;
-                    self.desired_cursor_x =
-                        self.get_display_width(&self.document.lines[self.cursor_y], self.cursor_x);
+                    let original_x = 0;
+                    let original_y = y;
+                    let (undo_x, undo_y) = self.document.delete_newline(original_x, original_y)?;
+
+                    let action_diff = ActionDiff::NewlineDeletion {
+                        original_x,
+                        original_y,
+                        undo_x,
+                        undo_y,
+                    };
+                    if let Some(last_transaction) = self.undo_stack.last_mut() {
+                        last_transaction.push(action_diff);
+                        self.cursor_x = undo_x;
+                        self.cursor_y = undo_y;
+                        self.desired_cursor_x =
+                            self.get_display_width(&self.document.lines[self.cursor_y], self.cursor_x);
+                    }
                 }
                 return Ok(());
             }

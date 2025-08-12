@@ -19,8 +19,10 @@ pub enum ActionDiff {
         y: usize,
     },
     NewlineDeletion {
-        x: usize,
-        y: usize,
+        original_x: usize,
+        original_y: usize,
+        undo_x: usize,
+        undo_y: usize,
     },
     LineSwap {
         y1: usize,
@@ -106,11 +108,11 @@ impl Document {
                     self.insert_newline(*x, *y) // Redo insertion is insertion
                 }
             }
-            ActionDiff::NewlineDeletion { x, y } => {
+            ActionDiff::NewlineDeletion { original_x, original_y, undo_x, undo_y } => {
                 if is_undo {
-                    self.insert_newline(*x, *y) // Undo deletion is insertion
+                    self.insert_newline(*undo_x, *undo_y) // Undo deletion is insertion
                 } else {
-                    self.delete_newline(*x, *y) // Redo deletion is deletion
+                    self.delete_newline(*original_x, *original_y) // Redo deletion is deletion
                 }
             }
             ActionDiff::LineSwap { y1, y2 } => {
