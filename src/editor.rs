@@ -641,7 +641,7 @@ impl Editor {
 
     pub fn save_document(&mut self) -> Result<()> {
         self.last_action_was_kill = false;
-        self.document.save()?;
+        self.document.save(None)?;
         self.status_message = "File saved successfully.".to_string();
         debug!("Document saved.");
         Ok(())
@@ -649,7 +649,7 @@ impl Editor {
 
     pub fn quit(&mut self) -> Result<()> {
         self.last_action_was_kill = false;
-        self.document.save()?;
+        self.document.save(None)?;
         self.should_quit = true;
         debug!("Editor quitting.");
         Ok(())

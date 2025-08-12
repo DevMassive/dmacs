@@ -2,6 +2,7 @@ use crate::backup::BackupManager;
 use crate::error::{DmacsError, Result};
 use log::debug;
 use std::io::Write;
+use std::path::PathBuf;
 
 // Document being edited
 #[derive(Clone, Debug)]
@@ -68,9 +69,9 @@ impl Document {
         }
     }
 
-    pub fn save(&mut self) -> Result<()> {
+    pub fn save(&mut self, base_dir: Option<PathBuf>) -> Result<()> {
         if let Some(filename) = &self.filename {
-            let backup_manager = BackupManager::new()?;
+            let backup_manager = BackupManager::new_with_base_dir(base_dir)?; // Use new_with_base_dir
 
             // Backup original content if it exists
             if let Some(original_content) = &self.original_content {

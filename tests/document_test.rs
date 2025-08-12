@@ -1,6 +1,21 @@
 use dmacs::document::{ActionDiff, Diff, Document};
 use dmacs::error::Result;
 use std::fs;
+use std::path::PathBuf;
+
+// Helper function to create a temporary directory for tests
+fn setup_test_env() -> PathBuf {
+    let temp_dir = PathBuf::from(format!("/tmp/dmacs_test_{}", uuid::Uuid::new_v4()));
+    fs::create_dir_all(&temp_dir).expect("Failed to create temporary test directory");
+    temp_dir
+}
+
+// Helper function to clean up the temporary directory
+fn teardown_test_env(temp_dir: &PathBuf) {
+    if temp_dir.exists() {
+        fs::remove_dir_all(temp_dir).expect("Failed to remove temporary test directory");
+    }
+}
 
 // Helper function for tests
 fn insert_string_via_action_diff(
@@ -52,16 +67,17 @@ fn test_open_document() {
 
 #[test]
 fn test_document_save() {
-    let filename = "test_save.txt";
+    let temp_dir = setup_test_env();
+    let filename = temp_dir.join("test_save.txt");
     let mut doc = Document::new_empty();
-    doc.filename = Some(filename.to_string());
+    doc.filename = Some(filename.to_str().unwrap().to_string());
     doc.lines = vec!["line1".to_string(), "line2".to_string()];
-    doc.save().unwrap();
+    doc.save(Some(temp_dir.clone())).unwrap();
 
-    let content = fs::read_to_string(filename).unwrap();
+    let content = fs::read_to_string(&filename).unwrap();
     assert_eq!(content, "line1\nline2\n");
 
-    fs::remove_file(filename).unwrap();
+    teardown_test_env(&temp_dir);
 }
 
 #[test]
@@ -284,11 +300,12 @@ fn test_is_dirty_after_modification() {
 
 #[test]
 fn test_is_dirty_after_save() {
-    let filename = "test_dirty_save.txt";
+    let temp_dir = setup_test_env();
+    let filename = temp_dir.join("test_dirty_save.txt");
     let content = "line1\nline2\n";
-    fs::write(filename, content).unwrap();
+    fs::write(&filename, content).unwrap();
 
-    let mut doc = Document::open(filename).unwrap();
+    let mut doc = Document::open(filename.to_str().unwrap()).unwrap();
     doc.apply_action_diff(
         &ActionDiff::CharChange(Diff {
             x: 0,
@@ -300,13 +317,13 @@ fn test_is_dirty_after_save() {
     )
     .unwrap(); // Modify the document
     assert!(doc.is_dirty(), "Document should be dirty before saving.");
-    doc.save().unwrap();
+    doc.save(Some(temp_dir.clone())).unwrap();
     assert!(
         !doc.is_dirty(),
         "Document should not be dirty after saving."
     );
 
-    fs::remove_file(filename).unwrap();
+    teardown_test_env(&temp_dir);
 }
 
 #[test]

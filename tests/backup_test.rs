@@ -1,7 +1,7 @@
+use chrono::{Duration, Local};
 use dmacs::backup::BackupManager;
 use std::fs;
 use std::path::PathBuf;
-use chrono::{Local, Duration};
 
 // Helper function to create a temporary directory for tests
 fn setup_test_env() -> PathBuf {
@@ -40,7 +40,15 @@ fn test_save_backup() {
     for entry in fs::read_dir(&backup_dir).unwrap() {
         let entry = entry.unwrap();
         let path = entry.path();
-        if path.is_file() && path.file_name().unwrap().to_str().unwrap().starts_with("test_file.txt.") && path.extension().unwrap() == "bak" {
+        if path.is_file()
+            && path
+                .file_name()
+                .unwrap()
+                .to_str()
+                .unwrap()
+                .starts_with("test_file.txt.")
+            && path.extension().unwrap() == "bak"
+        {
             let saved_content = fs::read_to_string(&path).unwrap();
             assert_eq!(saved_content, content);
             found_backup = true;
@@ -59,17 +67,22 @@ fn test_clean_old_backups() {
 
     // Create a recent backup
     let recent_timestamp = Local::now().format("%Y%m%d%H%M%S").to_string();
-    let recent_backup_path = backup_dir.join(format!("recent_file.{}.bak", recent_timestamp));
+    let recent_backup_path = backup_dir.join(format!("recent_file.{recent_timestamp}.bak"));
     fs::write(&recent_backup_path, "recent content").unwrap();
 
     // Create an old backup (4 days ago)
-    let old_timestamp = (Local::now() - Duration::days(4)).format("%Y%m%d%H%M%S").to_string();
-    let old_backup_path = backup_dir.join(format!("old_file.{}.bak", old_timestamp));
+    let old_timestamp = (Local::now() - Duration::days(4))
+        .format("%Y%m%d%H%M%S")
+        .to_string();
+    let old_backup_path = backup_dir.join(format!("old_file.{old_timestamp}.bak"));
     fs::write(&old_backup_path, "old content").unwrap();
 
     backup_manager.clean_old_backups().unwrap();
 
-    assert!(recent_backup_path.exists(), "Recent backup should not be deleted.");
+    assert!(
+        recent_backup_path.exists(),
+        "Recent backup should not be deleted."
+    );
     assert!(!old_backup_path.exists(), "Old backup should be deleted.");
 
     teardown_test_env(&temp_dir);
@@ -89,11 +102,21 @@ fn test_save_backup_empty_content() {
     for entry in fs::read_dir(&backup_dir).unwrap() {
         let entry = entry.unwrap();
         let path = entry.path();
-        if path.is_file() && path.file_name().unwrap().to_str().unwrap().starts_with("empty_file.txt.") {
+        if path.is_file()
+            && path
+                .file_name()
+                .unwrap()
+                .to_str()
+                .unwrap()
+                .starts_with("empty_file.txt.")
+        {
             found_backup = true;
             break;
         }
     }
-    assert!(!found_backup, "Backup file should not be created for empty content.");
+    assert!(
+        !found_backup,
+        "Backup file should not be created for empty content."
+    );
     teardown_test_env(&temp_dir);
 }
