@@ -510,8 +510,8 @@ impl Editor {
                         last_transaction.push(action_diff);
                         self.cursor_x = undo_x;
                         self.cursor_y = undo_y;
-                        self.desired_cursor_x =
-                            self.get_display_width(&self.document.lines[self.cursor_y], self.cursor_x);
+                        self.desired_cursor_x = self
+                            .get_display_width(&self.document.lines[self.cursor_y], self.cursor_x);
                     }
                 }
                 return Ok(());

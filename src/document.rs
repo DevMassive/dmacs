@@ -1,9 +1,7 @@
-use log::debug;
+use crate::backup::BackupManager;
 use crate::error::{DmacsError, Result};
+use log::debug;
 use std::io::Write;
-use std::fs;
-use std::path::PathBuf;
-use chrono::{Local, DateTime, TimeZone, NaiveDateTime, Duration}; // Added TimeZone
 
 // Document being edited
 #[derive(Clone, Debug)]
@@ -72,34 +70,11 @@ impl Document {
 
     pub fn save(&mut self) -> Result<()> {
         if let Some(filename) = &self.filename {
-            let home_dir = dirs::home_dir().ok_or(DmacsError::Io(std::io::Error::new(
-                std::io::ErrorKind::NotFound,
-                "Home directory not found",
-            )))?;
-            let backup_dir = home_dir.join(".dmacs").join("backup");
+            let backup_manager = BackupManager::new()?;
 
             // Backup original content if it exists
             if let Some(original_content) = &self.original_content {
-                if !original_content.is_empty() {
-                    fs::create_dir_all(&backup_dir).map_err(DmacsError::Io)?;
-
-                    let original_path = PathBuf::from(filename);
-                    let file_stem = original_path.file_stem().and_then(|s| s.to_str()).unwrap_or("unnamed");
-                    let file_extension = original_path.extension().and_then(|s| s.to_str()).unwrap_or("");
-
-                    let now: DateTime<Local> = Local::now();
-                    let timestamp = now.format("%Y%m%d%H%M%S").to_string();
-
-                    let backup_filename = if file_extension.is_empty() {
-                        format!("{}.{}.bak", file_stem, timestamp)
-                    } else {
-                        format!("{}.{}.{}.bak", file_stem, file_extension, timestamp)
-                    };
-                    let backup_path = backup_dir.join(backup_filename);
-
-                    fs::write(&backup_path, original_content).map_err(DmacsError::Io)?;
-                    debug!("Backed up {} to {}", filename, backup_path.display());
-                }
+                backup_manager.save_backup(filename, original_content)?;
             }
 
             let mut file = std::fs::File::create(filename).map_err(DmacsError::Io)?;
@@ -109,7 +84,7 @@ impl Document {
             self.original_content = Some(self.lines.join("\n") + "\n");
 
             // Clean up old backups
-            self.clean_old_backups(&backup_dir)?;
+            backup_manager.clean_old_backups()?;
         }
         Ok(())
     }
@@ -148,14 +123,26 @@ impl Document {
                     self.insert_newline(*x, *y) // Redo insertion is insertion
                 }
             }
-            ActionDiff::NewlineDeletion { original_x, original_y, undo_x, undo_y } => {
+            ActionDiff::NewlineDeletion {
+                original_x,
+                original_y,
+                undo_x,
+                undo_y,
+            } => {
                 if is_undo {
                     self.insert_newline(*undo_x, *undo_y) // Undo deletion is insertion
                 } else {
                     self.delete_newline(*original_x, *original_y) // Redo deletion is deletion
                 }
             }
-            ActionDiff::LineSwap { y1, y2, original_cursor_x, original_cursor_y, new_cursor_x, new_cursor_y } => {
+            ActionDiff::LineSwap {
+                y1,
+                y2,
+                original_cursor_x,
+                original_cursor_y,
+                new_cursor_x,
+                new_cursor_y,
+            } => {
                 self.swap_lines(*y1, *y2);
                 if is_undo {
                     Ok((*original_cursor_x, *original_cursor_y))
@@ -201,7 +188,8 @@ impl Document {
                             format!("{}{}", original_start_line_prefix, content[0]);
 
                         // Insert the intermediate lines
-                        for (i, line) in content.iter().enumerate().skip(1).take(content.len() - 2) {
+                        for (i, line) in content.iter().enumerate().skip(1).take(content.len() - 2)
+                        {
                             self.lines.insert(*start_y + i, line.clone());
                         }
 
@@ -244,7 +232,7 @@ impl Document {
                         // Join the remaining parts
                         if *start_y < self.lines.len() {
                             self.lines[*start_y] =
-                                format!("{}{}", remaining_start_line_prefix, remaining_end_line_suffix);
+                                format!("{remaining_start_line_prefix}{remaining_end_line_suffix}");
                         }
 
                         // Remove intermediate lines and the end_y line if it\'s different from start_y
@@ -362,38 +350,6 @@ impl Document {
             self.lines[y].push_str(&next_line);
             Ok((current_line_len, y))
         }
-    }
-
-    fn clean_old_backups(&self, backup_dir: &PathBuf) -> Result<()> {
-        let now: DateTime<Local> = Local::now();
-        let three_days_ago = now - Duration::days(3);
-
-        for entry in fs::read_dir(backup_dir).map_err(DmacsError::Io)? {
-            let entry = entry.map_err(DmacsError::Io)?;
-            let path = entry.path();
-
-            if path.is_file() {
-                if let Some(filename_str) = path.file_name().and_then(|s| s.to_str()) {
-                    // Expected format: file_stem.extension.timestamp.bak or file_stem.timestamp.bak
-                    let parts: Vec<&str> = filename_str.split('.').collect();
-                    let num_parts = parts.len();
-
-                    if num_parts >= 3 && parts[num_parts - 1] == "bak" {
-                        let timestamp_str = parts[num_parts - 2];
-
-                        if let Ok(naive_datetime) = NaiveDateTime::parse_from_str(timestamp_str, "%Y%m%d%H%M%S") {
-                            if let Some(backup_timestamp) = Local.from_local_datetime(&naive_datetime).single() {
-                                if backup_timestamp < three_days_ago {
-                                    fs::remove_file(&path).map_err(DmacsError::Io)?;
-                                    debug!("Deleted old backup: {}", path.display());
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        Ok(())
     }
 }
 
