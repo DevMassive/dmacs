@@ -725,6 +725,10 @@ impl Editor {
             let action_diff = ActionDiff::LineSwap {
                 y1: self.cursor_y - 1,
                 y2: self.cursor_y,
+                original_cursor_x: self.cursor_x,
+                original_cursor_y: self.cursor_y,
+                new_cursor_x: self.cursor_x,
+                new_cursor_y: self.cursor_y - 1,
             };
             if let Some(last_transaction) = self.undo_stack.last_mut() {
                 if let Ok((_new_x, _new_y)) = self.document.apply_action_diff(&action_diff, false) {
@@ -744,6 +748,10 @@ impl Editor {
             let action_diff = ActionDiff::LineSwap {
                 y1: self.cursor_y,
                 y2: self.cursor_y + 1,
+                original_cursor_x: self.cursor_x,
+                original_cursor_y: self.cursor_y,
+                new_cursor_x: self.cursor_x,
+                new_cursor_y: self.cursor_y + 1,
             };
             if let Some(last_transaction) = self.undo_stack.last_mut() {
                 if let Ok((_new_x, _new_y)) = self.document.apply_action_diff(&action_diff, false) {

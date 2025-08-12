@@ -175,27 +175,27 @@ fn test_document_swap_lines() {
     ];
 
     // Swap line1 and line2
-    doc.apply_action_diff(&ActionDiff::LineSwap { y1: 0, y2: 1 }, false)
+    doc.apply_action_diff(&ActionDiff::LineSwap { y1: 0, y2: 1, original_cursor_x: 0, original_cursor_y: 0, new_cursor_x: 0, new_cursor_y: 1 }, false)
         .unwrap();
     assert_eq!(doc.lines[0], "line2");
     assert_eq!(doc.lines[1], "line1");
     assert_eq!(doc.lines[2], "line3");
 
     // Swap line1 (now at index 1) and line3
-    doc.apply_action_diff(&ActionDiff::LineSwap { y1: 1, y2: 2 }, false)
+    doc.apply_action_diff(&ActionDiff::LineSwap { y1: 1, y2: 2, original_cursor_x: 0, original_cursor_y: 0, new_cursor_x: 0, new_cursor_y: 2 }, false)
         .unwrap();
     assert_eq!(doc.lines[0], "line2");
     assert_eq!(doc.lines[1], "line3");
     assert_eq!(doc.lines[2], "line1");
 
     // Try swapping out of bounds (should do nothing)
-    doc.apply_action_diff(&ActionDiff::LineSwap { y1: 0, y2: 100 }, false)
+    doc.apply_action_diff(&ActionDiff::LineSwap { y1: 0, y2: 100, original_cursor_x: 0, original_cursor_y: 0, new_cursor_x: 0, new_cursor_y: 100 }, false)
         .unwrap();
     assert_eq!(doc.lines[0], "line2");
     assert_eq!(doc.lines[1], "line3");
     assert_eq!(doc.lines[2], "line1");
 
-    doc.apply_action_diff(&ActionDiff::LineSwap { y1: 100, y2: 0 }, false)
+    doc.apply_action_diff(&ActionDiff::LineSwap { y1: 100, y2: 0, original_cursor_x: 0, original_cursor_y: 0, new_cursor_x: 0, new_cursor_y: 0 }, false)
         .unwrap();
     assert_eq!(doc.lines[0], "line2");
     assert_eq!(doc.lines[1], "line3");
