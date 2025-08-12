@@ -1,3 +1,4 @@
+use log::debug;
 use crate::error::{DmacsError, Result};
 use std::io::Write;
 
@@ -292,6 +293,7 @@ impl Document {
             let new_line = current_line.split_off(x);
             self.lines.insert(y + 1, new_line);
         }
+        debug!("Inserted newline at x={x}, y={y}");
         Ok((0, y + 1))
     }
     pub fn delete_newline(&mut self, x: usize, y: usize) -> Result<(usize, usize)> {
@@ -299,17 +301,7 @@ impl Document {
         if x == 0 {
             // Backspace at the beginning of a line, join with previous
             if y == 0 {
-                // If it's the first line and we're deleting a newline at x=0,
-                // it means we're effectively removing the first line.
-                // This happens when you delete the newline *after* the first line.
-                if self.lines.len() > 1 {
-                    self.lines.remove(y); // Remove the first line
-                    Ok((0, 0)) // Cursor moves to the beginning of the new first line
-                } else {
-                    // If it's the only line, just clear it.
-                    self.lines[y].clear();
-                    Ok((0, 0))
-                }
+                Ok((0, 0)) // Cannot join with nothing
             } else {
                 let current_line = self.lines.remove(y);
                 let prev_line_len = self.lines[y - 1].len();
