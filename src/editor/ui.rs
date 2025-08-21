@@ -11,6 +11,14 @@ impl Editor {
         line == "---"
     }
 
+    pub fn is_unchecked_checkbox(line: &str) -> bool {
+        line.trim_start().starts_with("- [ ]")
+    }
+
+    pub fn is_checked_checkbox(line: &str) -> bool {
+        line.trim_start().starts_with("- [x]")
+    }
+
     pub fn draw(&mut self, window: &Window) {
         let screen_rows = window.get_max_y() as usize;
         let screen_cols = window.get_max_x() as usize;
@@ -33,8 +41,14 @@ impl Editor {
             let row = row + STATUS_BAR_HEIGHT;
 
             let is_comment = line.trim_start().starts_with('#');
-            if is_comment {
+            let is_unchecked = Self::is_unchecked_checkbox(line);
+            let is_checked = Self::is_checked_checkbox(line);
+
+            if is_comment || is_checked {
                 window.attron(A_DIM);
+            }
+            if is_unchecked {
+                window.attron(A_BOLD);
             }
 
             if Self::is_separator_line(line) {
@@ -165,8 +179,11 @@ impl Editor {
                 }
             }
 
-            if is_comment {
+            if is_comment || is_checked {
                 window.attroff(A_DIM);
+            }
+            if is_unchecked {
+                window.attroff(A_BOLD);
             }
         }
 

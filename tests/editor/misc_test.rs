@@ -52,3 +52,21 @@ fn test_is_separator_line() {
     assert!(!Editor::is_separator_line(""));
     assert!(!Editor::is_separator_line("hello"));
 }
+
+#[test]
+fn test_is_unchecked_checkbox() {
+    assert!(Editor::is_unchecked_checkbox("- [ ] task"));
+    assert!(Editor::is_unchecked_checkbox("  - [ ] task"));
+    assert!(!Editor::is_unchecked_checkbox("- [] task"));
+    assert!(!Editor::is_unchecked_checkbox("- [x] task"));
+    assert!(!Editor::is_unchecked_checkbox("task - [ ]"));
+}
+
+#[test]
+fn test_is_checked_checkbox() {
+    assert!(Editor::is_checked_checkbox("- [x] task"));
+    assert!(Editor::is_checked_checkbox("  - [x] task"));
+    assert!(!Editor::is_checked_checkbox("- [] task"));
+    assert!(!Editor::is_checked_checkbox("- [ ] task"));
+    assert!(!Editor::is_checked_checkbox("task - [x]"));
+}
