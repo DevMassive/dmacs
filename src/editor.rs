@@ -6,6 +6,7 @@ use crate::document::{ActionDiff, Diff, Document};
 use crate::editor::search::Search;
 use crate::error::Result;
 
+pub mod command;
 pub mod input;
 pub mod search;
 pub mod selection;
@@ -329,6 +330,49 @@ impl Editor {
 
     pub fn insert_newline(&mut self) -> Result<()> {
         self.last_action_was_kill = false;
+
+        let y = self.cursor_y;
+        let x = self.cursor_x;
+        let current_line = self.document.lines[y].clone();
+
+        // Check for command execution
+        if x == current_line.len() {
+            if let Some(command_output) = command::execute_command(&current_line) {
+                self.save_state_for_undo(LastActionType::Other);
+                let delete_diff = Diff {
+                    x: 0,
+                    y,
+                    added_text: "".to_string(),
+                    deleted_text: current_line.clone(),
+                };
+                let delete_action = ActionDiff::CharChange(delete_diff);
+                let (new_x, new_y) = self.document.apply_action_diff(&delete_action, false)?;
+                if let Some(last_transaction) = self.undo_stack.last_mut() {
+                    last_transaction.push(delete_action);
+                }
+                self.cursor_x = new_x;
+                self.cursor_y = new_y;
+
+                let insert_diff = Diff {
+                    x: self.cursor_x,
+                    y: self.cursor_y,
+                    added_text: command_output.clone(),
+                    deleted_text: "".to_string(),
+                };
+                let insert_action = ActionDiff::CharChange(insert_diff);
+                let (new_x, new_y) = self.document.apply_action_diff(&insert_action, false)?;
+                if let Some(last_transaction) = self.undo_stack.last_mut() {
+                    last_transaction.push(insert_action);
+                }
+                self.cursor_x = new_x;
+                self.cursor_y = new_y;
+                self.desired_cursor_x =
+                    self.get_display_width(&self.document.lines[self.cursor_y], self.cursor_x);
+                self.status_message = current_line.to_string();
+                return Ok(());
+            }
+        }
+
         self.save_state_for_undo(LastActionType::Newline);
         let action_diff = ActionDiff::NewlineInsertion {
             x: self.cursor_x,
