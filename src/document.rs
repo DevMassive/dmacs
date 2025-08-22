@@ -34,6 +34,15 @@ pub enum ActionDiff {
         new_cursor_x: usize,
         new_cursor_y: usize,
     },
+    LineChange {
+        y: usize,
+        original_line: String,
+        new_line: String,
+        original_cursor_x: usize,
+        original_cursor_y: usize,
+        new_cursor_x: usize,
+        new_cursor_y: usize,
+    },
     DeleteRange {
         start_x: usize,
         start_y: usize,
@@ -145,6 +154,41 @@ impl Document {
                 new_cursor_y,
             } => {
                 self.swap_lines(*y1, *y2);
+                if is_undo {
+                    Ok((*original_cursor_x, *original_cursor_y))
+                } else {
+                    Ok((*new_cursor_x, *new_cursor_y))
+                }
+            }
+            ActionDiff::LineChange {
+                y,
+                original_line,
+                new_line,
+                original_cursor_x,
+                original_cursor_y,
+                new_cursor_x,
+                new_cursor_y,
+            } => {
+                if *y >= self.lines.len() {
+                    // This case can happen if a line is deleted and then undone.
+                    // To be safe, let's just insert the line if it's out of bounds.
+                    if *y == self.lines.len() {
+                        self.lines.push(if is_undo {
+                            original_line.clone()
+                        } else {
+                            new_line.clone()
+                        });
+                    } else {
+                        return Err(DmacsError::Document(format!("Invalid line index: {y}")));
+                    }
+                } else {
+                    self.lines[*y] = if is_undo {
+                        original_line.clone()
+                    } else {
+                        new_line.clone()
+                    };
+                }
+
                 if is_undo {
                     Ok((*original_cursor_x, *original_cursor_y))
                 } else {

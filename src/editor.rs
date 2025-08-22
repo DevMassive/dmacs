@@ -1050,6 +1050,9 @@ impl Editor {
         }
 
         let original_line = self.document.lines[y].clone();
+        let original_cursor_x = self.cursor_x;
+        let original_cursor_y = self.cursor_y;
+
         let (new_line, cursor_x_change, message) =
             if let Some(stripped) = original_line.strip_prefix("- [x] ") {
                 (stripped.to_string(), -6isize, "Checkbox removed.")
@@ -1059,30 +1062,41 @@ impl Editor {
                 (format!("- [ ] {original_line}"), 6, "Checkbox added.")
             };
 
-        let diff = Diff {
-            x: 0,
+        let mut new_cursor_x = self.cursor_x;
+        if cursor_x_change > 0 {
+            new_cursor_x += cursor_x_change as usize;
+        } else {
+            new_cursor_x = new_cursor_x.saturating_sub(cursor_x_change.unsigned_abs());
+        }
+
+        // Ensure cursor is not beyond the new line length
+        if new_cursor_x > new_line.len() {
+            new_cursor_x = new_line.len();
+        }
+
+        let action_diff = ActionDiff::LineChange {
             y,
-            added_text: new_line,
-            deleted_text: original_line,
+            original_line,
+            new_line,
+            original_cursor_x,
+            original_cursor_y,
+            new_cursor_x,
+            new_cursor_y: self.cursor_y,
         };
-        let action_diff = ActionDiff::CharChange(diff);
 
         if let Some(last_transaction) = self.undo_stack.last_mut() {
-            let (_new_x, new_y) = self.document.apply_action_diff(&action_diff, false)?;
-            last_transaction.push(action_diff);
+            if let Ok((applied_new_x, applied_new_y)) =
+                self.document.apply_action_diff(&action_diff, false)
+            {
+                last_transaction.push(action_diff);
 
-            self.cursor_y = new_y;
-            // Adjust cursor_x based on the change in line length at the beginning
-            if cursor_x_change > 0 {
-                self.cursor_x += cursor_x_change as usize;
-            } else {
-                self.cursor_x = self.cursor_x.saturating_sub(cursor_x_change.unsigned_abs());
+                self.cursor_x = applied_new_x;
+                self.cursor_y = applied_new_y;
+
+                self.desired_cursor_x =
+                    self.get_display_width(&self.document.lines[self.cursor_y], self.cursor_x);
+                self.status_message = message.to_string();
             }
-            // Ensure cursor is not beyond the new line length
-            self.clamp_cursor_x();
-            self.desired_cursor_x =
-                self.get_display_width(&self.document.lines[self.cursor_y], self.cursor_x);
-            self.status_message = message.to_string();
         }
 
         Ok(())
