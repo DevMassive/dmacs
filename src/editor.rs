@@ -369,6 +369,10 @@ impl Editor {
                 self.desired_cursor_x =
                     self.get_display_width(&self.document.lines[self.cursor_y], self.cursor_x);
                 self.status_message = current_line.to_string();
+
+                // Insert a newline after the command output
+                self.insert_newline()?;
+
                 return Ok(());
             }
         }
