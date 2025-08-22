@@ -95,3 +95,47 @@ fn test_toggle_checkbox_undo_redo() {
     assert_eq!(editor.document.lines[0], "Hello world");
     assert_eq!(editor.cursor_pos(), after_uncheck_pos);
 }
+
+#[test]
+fn test_toggle_indented_checkbox_add() {
+    let mut editor = Editor::new(None);
+    editor.insert_text("  Hello world").unwrap();
+    editor.go_to_start_of_line();
+    simulate_ctrl_t(&mut editor);
+    assert_eq!(editor.document.lines[0], "  - [ ] Hello world");
+    assert_eq!(editor.cursor_pos(), (8, 0));
+    assert_eq!(editor.status_message, "Checkbox added.");
+}
+
+#[test]
+fn test_toggle_indented_checkbox_check() {
+    let mut editor = Editor::new(None);
+    editor.insert_text("  - [ ] Hello world").unwrap();
+    editor.go_to_start_of_line();
+    simulate_ctrl_t(&mut editor);
+    assert_eq!(editor.document.lines[0], "  - [x] Hello world");
+    assert_eq!(editor.cursor_pos(), (0, 0));
+    assert_eq!(editor.status_message, "Checkbox checked.");
+}
+
+#[test]
+fn test_toggle_indented_checkbox_uncheck() {
+    let mut editor = Editor::new(None);
+    editor.insert_text("  - [x] Hello world").unwrap();
+    editor.go_to_start_of_line();
+    simulate_ctrl_t(&mut editor);
+    assert_eq!(editor.document.lines[0], "  Hello world");
+    assert_eq!(editor.cursor_pos(), (0, 0));
+    assert_eq!(editor.status_message, "Checkbox removed.");
+}
+
+#[test]
+fn test_toggle_indented_checkbox_add_cursor_middle() {
+    let mut editor = Editor::new(None);
+    editor.insert_text("  Hello world").unwrap();
+    editor.set_cursor_pos(4, 0); // "  He|llo world"
+    simulate_ctrl_t(&mut editor);
+    assert_eq!(editor.document.lines[0], "  - [ ] Hello world");
+    assert_eq!(editor.cursor_pos(), (10, 0)); // "  - [ ] He|llo world"
+    assert_eq!(editor.status_message, "Checkbox added.");
+}

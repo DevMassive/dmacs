@@ -1053,20 +1053,46 @@ impl Editor {
         let original_cursor_x = self.cursor_x;
         let original_cursor_y = self.cursor_y;
 
+        let leading_whitespace_len = original_line.len() - original_line.trim_start().len();
+        let leading_whitespace = &original_line[..leading_whitespace_len];
+        let trimmed_line = original_line.trim_start();
+
         let (new_line, cursor_x_change, message) =
-            if let Some(stripped) = original_line.strip_prefix("- [x] ") {
-                (stripped.to_string(), -6isize, "Checkbox removed.")
-            } else if let Some(stripped) = original_line.strip_prefix("- [ ] ") {
-                (format!("- [x] {stripped}"), 0, "Checkbox checked.")
+            if let Some(stripped) = trimmed_line.strip_prefix("- [x] ") {
+                (
+                    format!("{leading_whitespace}{stripped}"),
+                    -6isize,
+                    "Checkbox removed.",
+                )
+            } else if let Some(stripped) = trimmed_line.strip_prefix("- [ ] ") {
+                (
+                    format!("{leading_whitespace}- [x] {stripped}"),
+                    0,
+                    "Checkbox checked.",
+                )
             } else {
-                (format!("- [ ] {original_line}"), 6, "Checkbox added.")
+                (
+                    format!("{leading_whitespace}- [ ] {trimmed_line}"),
+                    6,
+                    "Checkbox added.",
+                )
             };
 
         let mut new_cursor_x = self.cursor_x;
-        if cursor_x_change > 0 {
-            new_cursor_x += cursor_x_change as usize;
+        if cursor_x_change == 6 {
+            // Add case
+            if self.cursor_x >= leading_whitespace_len {
+                new_cursor_x += 6;
+            } else {
+                new_cursor_x = leading_whitespace_len + 6;
+            }
         } else {
-            new_cursor_x = new_cursor_x.saturating_sub(cursor_x_change.unsigned_abs());
+            // Check/Uncheck cases
+            if cursor_x_change > 0 {
+                new_cursor_x += cursor_x_change as usize;
+            } else {
+                new_cursor_x = new_cursor_x.saturating_sub(cursor_x_change.unsigned_abs());
+            }
         }
 
         // Ensure cursor is not beyond the new line length
