@@ -7,6 +7,7 @@ pub fn execute_command(line: &str) -> Option<String> {
 
     match line.trim() {
         "/today" => Some(Local::now().format("%Y-%m-%d").to_string()),
+        "/now" => Some(Local::now().format("%Y-%m-%d %H:%M").to_string()),
         _ => None,
     }
 }

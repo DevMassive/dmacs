@@ -11,3 +11,14 @@ fn test_today_command() {
     assert_eq!(editor.document.lines[0], expected_date);
     assert_eq!(editor.status_message, "/today");
 }
+
+#[test]
+fn test_now_command() {
+    let mut editor = Editor::new(None);
+    editor.insert_text("/now").unwrap();
+    editor.insert_newline().unwrap();
+
+    let expected_date = Local::now().format("%Y-%m-%d %H:%M").to_string();
+    assert_eq!(editor.document.lines[0], expected_date);
+    assert_eq!(editor.status_message, "/now");
+}
