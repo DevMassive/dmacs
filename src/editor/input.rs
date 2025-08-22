@@ -59,13 +59,13 @@ impl Editor {
                 '\x0a' | '\x0d' => self.insert_newline()?,
                 '\x02' => self.move_cursor_word_left()?, // Ctrl + B
                 '\x06' => self.move_cursor_word_right()?, // Ctrl + F
+                '\x14' => self.toggle_checkbox()?,             // Ctrl + T
                 '\x1f' => self.undo(),                   // Ctrl + _ for undo
                 '\x03' | // Ctrl+C
                 '\x0c' | // Ctrl+L
                 '\x0f' | // Ctrl+O
                 '\x11' | // Ctrl+Q
                 '\x12' | // Ctrl+R
-                '\x14' | // Ctrl+T
                 '\x15' | // Ctrl+U
                 '\x17' => self.cut_selection_action()?, // Ctrl+W
                 '\x00' => self.set_marker_action(), // Ctrl+Space

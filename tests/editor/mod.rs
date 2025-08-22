@@ -1,3 +1,4 @@
+mod checkbox_test;
 mod command_test;
 mod cursor_movement_test;
 mod delimiter_movement_test;

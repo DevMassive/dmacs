@@ -12,7 +12,8 @@ use crate::error::{DmacsError, Result};
 
 // Import necessary types and functions from the libc crate
 use libc::{
-    _POSIX_VDISABLE, TCSANOW, VDSUSP, VLNEXT, VREPRINT, VSTOP, tcgetattr, tcsetattr, termios,
+    _POSIX_VDISABLE, TCSANOW, VDSUSP, VLNEXT, VREPRINT, VSTATUS, VSTOP, tcgetattr, tcsetattr,
+    termios,
 };
 
 pub static CTRL_C_COUNT: AtomicUsize = AtomicUsize::new(0);
@@ -54,6 +55,9 @@ impl Terminal {
 
         // Disable reprint character (Ctrl+R)
         termios_settings.c_cc[VREPRINT] = _POSIX_VDISABLE;
+
+        // Disable status character (Ctrl+T)
+        termios_settings.c_cc[VSTATUS] = _POSIX_VDISABLE;
         if unsafe { tcsetattr(stdin_fd, TCSANOW, &termios_settings) } != 0 {
             return Err(DmacsError::Io(io::Error::last_os_error()));
         }

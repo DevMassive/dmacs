@@ -22,7 +22,8 @@ pub enum LastActionType {
     Deletion,
     Newline,
     LineMovement,
-    Other, // For actions like kill_line, yank, etc.
+    ToggleCheckbox, // For checkbox toggling
+    Other,          // For actions like kill_line, yank, etc.
 }
 
 pub struct Editor {
@@ -105,6 +106,9 @@ impl Editor {
         let should_start_new_group = if self.last_action_time.is_none() {
             debug!("save_state_for_undo: First action ever");
             true // Always start new group for the very first action
+        } else if current_action_type == LastActionType::ToggleCheckbox {
+            debug!("save_state_for_undo: ToggleCheckbox always starts a new group");
+            true
         } else {
             let time_since_last_action = now.duration_since(self.last_action_time.unwrap());
             debug!("save_state_for_undo: time_since_last_action={time_since_last_action:?}");
@@ -1034,6 +1038,54 @@ impl Editor {
             self.desired_cursor_x = 0;
             self.row_offset = self.cursor_y; // Scroll to make cursor at top
         }
+    }
+
+    pub fn toggle_checkbox(&mut self) -> Result<()> {
+        self.last_action_was_kill = false;
+        self.save_state_for_undo(LastActionType::ToggleCheckbox);
+
+        let y = self.cursor_y;
+        if y >= self.document.lines.len() {
+            return Ok(());
+        }
+
+        let original_line = self.document.lines[y].clone();
+        let (new_line, cursor_x_change, message) =
+            if let Some(stripped) = original_line.strip_prefix("- [x] ") {
+                (stripped.to_string(), -6isize, "Checkbox removed.")
+            } else if let Some(stripped) = original_line.strip_prefix("- [ ] ") {
+                (format!("- [x] {stripped}"), 0, "Checkbox checked.")
+            } else {
+                (format!("- [ ] {original_line}"), 6, "Checkbox added.")
+            };
+
+        let diff = Diff {
+            x: 0,
+            y,
+            added_text: new_line,
+            deleted_text: original_line,
+        };
+        let action_diff = ActionDiff::CharChange(diff);
+
+        if let Some(last_transaction) = self.undo_stack.last_mut() {
+            let (_new_x, new_y) = self.document.apply_action_diff(&action_diff, false)?;
+            last_transaction.push(action_diff);
+
+            self.cursor_y = new_y;
+            // Adjust cursor_x based on the change in line length at the beginning
+            if cursor_x_change > 0 {
+                self.cursor_x += cursor_x_change as usize;
+            } else {
+                self.cursor_x = self.cursor_x.saturating_sub(cursor_x_change.unsigned_abs());
+            }
+            // Ensure cursor is not beyond the new line length
+            self.clamp_cursor_x();
+            self.desired_cursor_x =
+                self.get_display_width(&self.document.lines[self.cursor_y], self.cursor_x);
+            self.status_message = message.to_string();
+        }
+
+        Ok(())
     }
 
     pub fn set_undo_debounce_threshold(&mut self, threshold_ms: u64) {
