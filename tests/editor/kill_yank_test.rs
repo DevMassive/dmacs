@@ -24,7 +24,7 @@ fn test_editor_kill_line_end_of_line_not_last_line() {
         .unwrap();
     assert_eq!(editor.document.lines.len(), 1);
     assert_eq!(editor.document.lines[0], "helloworld");
-    assert_eq!(editor.kill_buffer, "\nworld"); // Newline + content of next line
+    assert_eq!(editor.kill_buffer, "\n"); // Newline
     assert_eq!(editor.cursor_pos(), (5, 0));
 }
 

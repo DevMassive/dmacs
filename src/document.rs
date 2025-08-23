@@ -1,55 +1,20 @@
 use crate::backup::BackupManager;
 use crate::error::{DmacsError, Result};
-use log::debug;
 use std::io::Write;
 use std::path::PathBuf;
 
-// Document being edited
 #[derive(Clone, Debug)]
-pub struct Diff {
-    pub x: usize,
-    pub y: usize,
-    pub added_text: String,
-    pub deleted_text: String,
-}
-
-#[derive(Clone, Debug)]
-pub enum ActionDiff {
-    CharChange(Diff),
-    NewlineInsertion {
-        x: usize,
-        y: usize,
-    },
-    NewlineDeletion {
-        original_x: usize,
-        original_y: usize,
-        undo_x: usize,
-        undo_y: usize,
-    },
-    LineSwap {
-        y1: usize,
-        y2: usize,
-        original_cursor_x: usize,
-        original_cursor_y: usize,
-        new_cursor_x: usize,
-        new_cursor_y: usize,
-    },
-    LineChange {
-        y: usize,
-        original_line: String,
-        new_line: String,
-        original_cursor_x: usize,
-        original_cursor_y: usize,
-        new_cursor_x: usize,
-        new_cursor_y: usize,
-    },
-    DeleteRange {
-        start_x: usize,
-        start_y: usize,
-        end_x: usize,
-        end_y: usize,
-        content: Vec<String>,
-    },
+pub struct ActionDiff {
+    pub cursor_start_x: usize,
+    pub cursor_start_y: usize,
+    pub cursor_end_x: usize,
+    pub cursor_end_y: usize,
+    pub start_x: usize,
+    pub start_y: usize,
+    pub end_x: usize,
+    pub end_y: usize,
+    pub old: Vec<String>,
+    pub new: Vec<String>,
 }
 
 #[derive(Clone)]
@@ -113,287 +78,87 @@ impl Document {
         self.lines != original_lines
     }
 
-    pub fn swap_lines(&mut self, y1: usize, y2: usize) {
-        if y1 < self.lines.len() && y2 < self.lines.len() {
-            self.lines.swap(y1, y2);
-        }
-    }
-
     pub fn apply_action_diff(
         &mut self,
         action_diff: &ActionDiff,
         is_undo: bool,
     ) -> Result<(usize, usize)> {
-        match action_diff {
-            ActionDiff::CharChange(diff) => self.modify_single_char(diff, is_undo),
-            ActionDiff::NewlineInsertion { x, y } => {
-                if is_undo {
-                    self.delete_newline(*x, *y) // Undo insertion is deletion
-                } else {
-                    self.insert_newline(*x, *y) // Redo insertion is insertion
+        let ActionDiff {
+            cursor_start_x,
+            cursor_start_y,
+            cursor_end_x,
+            cursor_end_y,
+            start_x,
+            start_y,
+            end_x,
+            end_y,
+            ref old,
+            ref new,
+        } = *action_diff;
+
+        let replacement = if is_undo { old } else { new };
+
+        // Delete start..end
+        // Do nothing if it is insertion or deletion
+        let is_insertion = old.is_empty() && !replacement.is_empty();
+        let is_deletion = new.is_empty() && !replacement.is_empty();
+        if !is_insertion && !is_deletion {
+            if start_y == end_y {
+                if start_y < self.lines.len() {
+                    self.lines[start_y].drain(start_x..end_x);
                 }
-            }
-            ActionDiff::NewlineDeletion {
-                original_x,
-                original_y,
-                undo_x,
-                undo_y,
-            } => {
-                if is_undo {
-                    self.insert_newline(*undo_x, *undo_y) // Undo deletion is insertion
-                } else {
-                    self.delete_newline(*original_x, *original_y) // Redo deletion is deletion
-                }
-            }
-            ActionDiff::LineSwap {
-                y1,
-                y2,
-                original_cursor_x,
-                original_cursor_y,
-                new_cursor_x,
-                new_cursor_y,
-            } => {
-                self.swap_lines(*y1, *y2);
-                if is_undo {
-                    Ok((*original_cursor_x, *original_cursor_y))
-                } else {
-                    Ok((*new_cursor_x, *new_cursor_y))
-                }
-            }
-            ActionDiff::LineChange {
-                y,
-                original_line,
-                new_line,
-                original_cursor_x,
-                original_cursor_y,
-                new_cursor_x,
-                new_cursor_y,
-            } => {
-                if *y >= self.lines.len() {
-                    // This case can happen if a line is deleted and then undone.
-                    // To be safe, let's just insert the line if it's out of bounds.
-                    if *y == self.lines.len() {
-                        self.lines.push(if is_undo {
-                            original_line.clone()
-                        } else {
-                            new_line.clone()
-                        });
-                    } else {
-                        return Err(DmacsError::Document(format!("Invalid line index: {y}")));
-                    }
-                } else {
-                    self.lines[*y] = if is_undo {
-                        original_line.clone()
-                    } else {
-                        new_line.clone()
-                    };
-                }
-
-                if is_undo {
-                    Ok((*original_cursor_x, *original_cursor_y))
-                } else {
-                    Ok((*new_cursor_x, *new_cursor_y))
-                }
-            }
-            ActionDiff::DeleteRange {
-                start_x,
-                start_y,
-                end_x,
-                end_y,
-                content,
-            } => {
-                if is_undo {
-                    // Undo: Re-insert the content
-                    let mut current_y = *start_y;
-                    let mut current_x = *start_x;
-
-                    if content.is_empty() {
-                        return Ok((current_x, current_y));
-                    }
-
-                    // If single line deletion
-                    if *start_y == *end_y {
-                        if *start_y < self.lines.len() {
-                            self.lines[*start_y].insert_str(*start_x, &content[0]);
-                        } else {
-                            self.lines.insert(*start_y, content[0].clone());
-                        }
-                    } else {
-                        // Multi-line deletion
-                        // The current line at start_y contains the prefix of the original start_y line
-                        // and the suffix of the original end_y line.
-                        // We need to split it and insert the deleted lines.
-
-                        let original_start_line_prefix =
-                            self.lines[*start_y][0..*start_x].to_string();
-                        let original_end_line_suffix = self.lines[*start_y][*start_x..].to_string();
-
-                        // Reconstruct the start line
-                        self.lines[*start_y] =
-                            format!("{}{}", original_start_line_prefix, content[0]);
-
-                        // Insert the intermediate lines
-                        for (i, line) in content.iter().enumerate().skip(1).take(content.len() - 2)
-                        {
-                            self.lines.insert(*start_y + i, line.clone());
-                        }
-
-                        // Reconstruct the end line
-                        let end_line_idx = *start_y + content.len() - 1;
-                        self.lines.insert(
-                            end_line_idx,
-                            format!("{}{}", content.last().unwrap(), original_end_line_suffix),
-                        );
-                    }
-
-                    // Adjust cursor position
-                    current_x = *end_x;
-                    current_y = *end_y;
-
-                    Ok((current_x, current_y))
-                } else {
-                    // Redo: Perform the deletion again
-                    if *start_y == *end_y {
-                        // Single line deletion
-                        if *start_y < self.lines.len() {
-                            self.lines[*start_y].drain(*start_x..*end_x);
-                        }
-                    } else {
-                        // Multi-line deletion
-                        let mut remaining_start_line_prefix = String::new();
-                        if *start_y < self.lines.len() {
-                            let start_line = &mut self.lines[*start_y];
-                            remaining_start_line_prefix = start_line[0..*start_x].to_string();
-                            start_line.drain(*start_x..); // Remove from start_x to end of line
-                        }
-
-                        let mut remaining_end_line_suffix = String::new();
-                        if *end_y < self.lines.len() {
-                            let end_line = &mut self.lines[*end_y];
-                            remaining_end_line_suffix = end_line[*end_x..].to_string();
-                            end_line.drain(0..*end_x); // Remove from beginning to end_x
-                        }
-
-                        // Join the remaining parts
-                        if *start_y < self.lines.len() {
-                            self.lines[*start_y] =
-                                format!("{remaining_start_line_prefix}{remaining_end_line_suffix}");
-                        }
-
-                        // Remove intermediate lines and the end_y line if it\'s different from start_y
-                        // Iterate backwards to avoid index issues
-                        for y_idx in (*start_y + 1..=*end_y).rev() {
-                            // Iterate from end_y down to start_y + 1
-                            if y_idx < self.lines.len() {
-                                self.lines.remove(y_idx);
-                            }
-                        }
-                    }
-                    Ok((*start_x, *start_y))
-                }
-            }
-        }
-    }
-
-    pub fn modify_single_char(&mut self, diff: &Diff, is_undo: bool) -> Result<(usize, usize)> {
-        let (add, delete) = if is_undo {
-            (&diff.deleted_text, &diff.added_text)
-        } else {
-            (&diff.added_text, &diff.deleted_text)
-        };
-
-        if diff.y >= self.lines.len() {
-            return Err(DmacsError::Document(format!(
-                "Invalid line index: {}",
-                diff.y
-            )));
-        }
-
-        // Calculate new cursor position (initial values)
-        let new_x = diff.x + add.len();
-        let new_y = diff.y; // new_y is not mutable anymore as it\'s not changed here
-
-        let line = &mut self.lines[diff.y]; // Get mutable reference to the line
-
-        // Handle deletion
-        if !delete.is_empty() {
-            let delete_len = delete.len();
-            if diff.x + delete_len > line.len() {
-                return Err(DmacsError::Document(format!(
-                    "Deletion out of bounds: x={}, delete_len={}, line_len={}",
-                    diff.x,
-                    delete_len,
-                    line.len()
-                )));
-            }
-            if line[diff.x..].starts_with(delete) {
-                line.replace_range(diff.x..(diff.x + delete_len), "");
             } else {
-                let found_text = &line[diff.x..(diff.x + delete_len)];
-                return Err(DmacsError::Document(format!(
-                    "Text to delete does not match: expected \"{delete}\", found \"{found_text}\""
-                )));
+                let prefix = self.lines[start_y][..start_x].to_string();
+                let suffix = self.lines[end_y][end_x..].to_string();
+                self.lines[start_y] = format!("{prefix}{suffix}");
+
+                for y in (start_y + 1..=end_y).rev() {
+                    if y < self.lines.len() {
+                        self.lines.remove(y);
+                    }
+                }
             }
         }
 
-        // Handle insertion
-        if !add.is_empty() {
-            if diff.x > line.len() {
-                return Err(DmacsError::Document(format!(
-                    "Insertion out of bounds: x={}, line_len={}",
-                    diff.x,
-                    line.len()
-                )));
-            }
-            line.insert_str(diff.x, add);
-        }
-
-        Ok((new_x, new_y))
-    }
-
-    pub fn insert_newline(&mut self, x: usize, y: usize) -> Result<(usize, usize)> {
-        // Handle newline insertion (splitting a line)
-        if y > self.lines.len() {
-            return Err(DmacsError::Document(format!(
-                "Invalid line index for newline insertion: {y}"
-            )));
-        }
-        if y == self.lines.len() {
-            self.lines.push(String::new());
-        } else {
-            let current_line = self
-                .lines
-                .get_mut(y)
-                .ok_or(DmacsError::Document(format!("Invalid line index: {y}")))?;
-            let new_line = current_line.split_off(x);
-            self.lines.insert(y + 1, new_line);
-        }
-        debug!("Inserted newline at x={x}, y={y}");
-        Ok((0, y + 1))
-    }
-    pub fn delete_newline(&mut self, x: usize, y: usize) -> Result<(usize, usize)> {
-        // Handle newline deletion (joining lines)
-        if x == 0 {
-            // Backspace at the beginning of a line, join with previous
-            if y == 0 {
-                Ok((0, 0)) // Cannot join with nothing
+        // Insert replacement
+        if !replacement.is_empty() {
+            if replacement.len() == 1 {
+                if start_y < self.lines.len() {
+                    self.lines[start_y].insert_str(start_x, &replacement[0]);
+                } else {
+                    self.lines.insert(start_y, replacement[0].clone());
+                }
             } else {
-                let current_line = self.lines.remove(y);
-                let prev_line_len = self.lines[y - 1].len();
-                self.lines[y - 1].push_str(&current_line);
-                Ok((prev_line_len, y - 1))
+                let suffix = if start_y < self.lines.len() {
+                    self.lines[start_y][start_x..].to_string()
+                } else {
+                    String::new()
+                };
+                self.lines[start_y] =
+                    format!("{}{}", &self.lines[start_y][..start_x], replacement[0]);
+
+                for (i, line) in replacement
+                    .iter()
+                    .enumerate()
+                    .skip(1)
+                    .take(replacement.len() - 2)
+                {
+                    self.lines.insert(start_y + i, line.clone());
+                }
+
+                let end_line_idx = start_y + replacement.len() - 1;
+                self.lines.insert(
+                    end_line_idx,
+                    format!("{}{}", replacement.last().unwrap(), suffix),
+                );
             }
+        }
+
+        // Adjust cursor position
+        if is_undo {
+            Ok((cursor_start_x, cursor_start_y))
         } else {
-            // Delete at the end of a line, join with next
-            if y >= self.lines.len().saturating_sub(1) {
-                return Err(DmacsError::Document(format!(
-                    "Cannot join line {y} with next line."
-                )));
-            }
-            let next_line = self.lines.remove(y + 1);
-            let current_line_len = self.lines[y].len();
-            self.lines[y].push_str(&next_line);
-            Ok((current_line_len, y))
+            Ok((cursor_end_x, cursor_end_y))
         }
     }
 }

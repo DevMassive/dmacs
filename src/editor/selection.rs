@@ -82,12 +82,18 @@ impl Selection {
 
             self.clear_marker();
 
-            let action_diff = ActionDiff::DeleteRange {
+            let action_diff = ActionDiff {
+                cursor_start_x: end_x,
+                cursor_start_y: end_y,
+                cursor_end_x: start_x,
+                cursor_end_y: start_y,
+
                 start_x,
                 start_y,
                 end_x,
                 end_y,
-                content: deleted_content_lines,
+                new: vec![],
+                old: deleted_content_lines,
             };
             Ok((killed_text, Some(action_diff)))
         } else {

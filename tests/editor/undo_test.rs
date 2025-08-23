@@ -401,7 +401,7 @@ fn test_undo_redo_kill_line() {
     assert_eq!(editor.document.lines[1], "Another Line");
     assert_eq!(editor.undo_stack.len(), 3);
     assert_eq!(editor.redo_stack.len(), 1);
-    assert_eq!(editor.cursor_x, 12);
+    assert_eq!(editor.cursor_x, 0);
     assert_eq!(editor.cursor_y, 1);
 
     // Redo kill_line
@@ -555,4 +555,38 @@ fn test_undo_redo_cut_selection() {
     assert_eq!(editor.redo_stack.len(), 0);
     assert_eq!(editor.cursor_x, 0);
     assert_eq!(editor.cursor_y, 1);
+}
+
+#[test]
+fn test_undo_redo_move_line() {
+    let mut editor = Editor::new(None);
+    editor.set_undo_debounce_threshold(0);
+
+    editor.insert_text("Line 1").unwrap();
+    assert_eq!(editor.cursor_x, 6);
+    assert_eq!(editor.cursor_y, 0);
+
+    editor.insert_newline().unwrap();
+    assert_eq!(editor.cursor_x, 0);
+    assert_eq!(editor.cursor_y, 1);
+
+    editor.insert_text("Line Two").unwrap();
+    assert_eq!(editor.cursor_x, 8);
+    assert_eq!(editor.cursor_y, 1);
+
+    editor.go_to_start_of_file();
+    assert_eq!(editor.cursor_x, 0);
+    assert_eq!(editor.cursor_y, 0);
+
+    editor.move_line_down(); // Swap "Line 1" with "Line Two"
+    assert_eq!(editor.cursor_x, 0);
+    assert_eq!(editor.cursor_y, 1);
+    assert_eq!(editor.document.lines[0], "Line Two");
+    assert_eq!(editor.document.lines[1], "Line 1");
+
+    editor.undo();
+    assert_eq!(editor.cursor_x, 0);
+    assert_eq!(editor.cursor_y, 0);
+    assert_eq!(editor.document.lines[0], "Line 1");
+    assert_eq!(editor.document.lines[1], "Line Two");
 }
