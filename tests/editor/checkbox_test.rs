@@ -13,9 +13,9 @@ fn test_toggle_checkbox_add() {
     editor.insert_text("Hello world").unwrap();
     editor.go_to_start_of_line();
     simulate_ctrl_t(&mut editor);
-    assert_eq!(editor.document.lines[0], "- [ ] Hello world");
-    assert_eq!(editor.cursor_pos(), (6, 0));
-    assert_eq!(editor.status_message, "Checkbox added.");
+    assert_eq!(editor.document.lines[0], "- Hello world");
+    assert_eq!(editor.cursor_pos(), (2, 0));
+    assert_eq!(editor.status_message, "List item added.");
 }
 
 #[test]
@@ -47,6 +47,12 @@ fn test_toggle_checkbox_undo_redo() {
     editor.go_to_start_of_line();
     let initial_pos = editor.cursor_pos();
 
+    // Add list item
+    simulate_ctrl_t(&mut editor);
+    assert_eq!(editor.document.lines[0], "- Hello world");
+    assert_eq!(editor.status_message, "List item added.");
+    let after_list_item_pos = editor.cursor_pos();
+
     // Add checkbox
     simulate_ctrl_t(&mut editor);
     assert_eq!(editor.document.lines[0], "- [ ] Hello world");
@@ -75,12 +81,22 @@ fn test_toggle_checkbox_undo_redo() {
     assert_eq!(editor.document.lines[0], "- [ ] Hello world");
     assert_eq!(editor.cursor_pos(), after_add_pos);
 
-    // Undo add
+    // Undo add checkbox
+    editor.undo();
+    assert_eq!(editor.document.lines[0], "- Hello world");
+    assert_eq!(editor.cursor_pos(), after_list_item_pos);
+
+    // Undo add list item
     editor.undo();
     assert_eq!(editor.document.lines[0], "Hello world");
     assert_eq!(editor.cursor_pos(), initial_pos);
 
-    // Redo add
+    // Redo add list item
+    editor.redo();
+    assert_eq!(editor.document.lines[0], "- Hello world");
+    assert_eq!(editor.cursor_pos(), after_list_item_pos);
+
+    // Redo add checkbox
     editor.redo();
     assert_eq!(editor.document.lines[0], "- [ ] Hello world");
     assert_eq!(editor.cursor_pos(), after_add_pos);
@@ -102,9 +118,9 @@ fn test_toggle_indented_checkbox_add() {
     editor.insert_text("  Hello world").unwrap();
     editor.go_to_start_of_line();
     simulate_ctrl_t(&mut editor);
-    assert_eq!(editor.document.lines[0], "  - [ ] Hello world");
-    assert_eq!(editor.cursor_pos(), (8, 0));
-    assert_eq!(editor.status_message, "Checkbox added.");
+    assert_eq!(editor.document.lines[0], "  - Hello world");
+    assert_eq!(editor.cursor_pos(), (4, 0));
+    assert_eq!(editor.status_message, "List item added.");
 }
 
 #[test]
@@ -135,7 +151,7 @@ fn test_toggle_indented_checkbox_add_cursor_middle() {
     editor.insert_text("  Hello world").unwrap();
     editor.set_cursor_pos(4, 0); // "  He|llo world"
     simulate_ctrl_t(&mut editor);
-    assert_eq!(editor.document.lines[0], "  - [ ] Hello world");
-    assert_eq!(editor.cursor_pos(), (10, 0)); // "  - [ ] He|llo world"
-    assert_eq!(editor.status_message, "Checkbox added.");
+    assert_eq!(editor.document.lines[0], "  - Hello world");
+    assert_eq!(editor.cursor_pos(), (6, 0)); // "  - He|llo world"
+    assert_eq!(editor.status_message, "List item added.");
 }
