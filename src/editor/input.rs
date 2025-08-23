@@ -84,7 +84,8 @@ impl Editor {
             Input::KeyRight => self.move_cursor_right(),
             _ => {}
         }
-        self.clamp_cursor_x();
+        self.scroll
+            .clamp_cursor_x(&mut self.cursor_x, &self.cursor_y, &self.document);
         Ok(())
     }
 }

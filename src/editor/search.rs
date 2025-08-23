@@ -130,8 +130,9 @@ impl Editor {
             if let Some(&(row, col)) = self.search.results.get(index) {
                 self.cursor_y = row;
                 self.cursor_x = col;
-                self.desired_cursor_x =
-                    self.get_display_width(&self.document.lines[self.cursor_y], self.cursor_x);
+                self.desired_cursor_x = self
+                    .scroll
+                    .get_display_width(&self.document.lines[self.cursor_y], self.cursor_x);
             }
         }
     }

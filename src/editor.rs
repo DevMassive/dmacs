@@ -1,19 +1,16 @@
-use log::debug;
-use std::time::{Duration, Instant};
-use unicode_width::UnicodeWidthChar;
-
 use crate::document::{ActionDiff, Document};
 use crate::editor::search::Search;
 use crate::error::Result;
+use log::debug;
+use std::time::{Duration, Instant};
 
 pub mod command;
 pub mod input;
+pub mod scroll;
 pub mod search;
 pub mod selection;
 pub mod ui;
-use crate::editor::ui::STATUS_BAR_HEIGHT;
-
-const TAB_STOP: usize = 4;
+use crate::editor::scroll::Scroll;
 
 #[derive(PartialEq, Debug)]
 pub enum LastActionType {
@@ -34,10 +31,7 @@ pub struct Editor {
     pub cursor_y: usize,
     pub desired_cursor_x: usize, // column index
     pub status_message: String,
-    pub row_offset: usize, // public for tests
-    pub col_offset: usize, // public for tests
-    pub screen_rows: usize,
-    pub screen_cols: usize,
+    pub scroll: Scroll,
     pub undo_stack: Vec<Vec<ActionDiff>>,
     pub redo_stack: Vec<Vec<ActionDiff>>,
     pub kill_buffer: String,
@@ -74,10 +68,7 @@ impl Editor {
             cursor_y: 0,
             desired_cursor_x: 0,
             status_message: "".to_string(),
-            row_offset: 0,
-            col_offset: 0,
-            screen_rows: 0,
-            screen_cols: 0,
+            scroll: Scroll::new(),
             undo_stack: Vec::new(),
             redo_stack: Vec::new(),
             kill_buffer: String::new(),
@@ -93,8 +84,7 @@ impl Editor {
     }
 
     pub fn update_screen_size(&mut self, screen_rows: usize, screen_cols: usize) {
-        self.screen_rows = screen_rows;
-        self.screen_cols = screen_cols;
+        self.scroll.update_screen_size(screen_rows, screen_cols);
     }
 
     pub fn save_state_for_undo(&mut self, current_action_type: LastActionType) {
@@ -166,8 +156,9 @@ impl Editor {
 
             self.cursor_x = current_cursor_x;
             self.cursor_y = current_cursor_y;
-            self.desired_cursor_x =
-                self.get_display_width(&self.document.lines[self.cursor_y], self.cursor_x);
+            self.desired_cursor_x = self
+                .scroll
+                .get_display_width(&self.document.lines[self.cursor_y], self.cursor_x);
             self.status_message = "Undo successful.".to_string();
             debug!("Document after undo: {:?}", self.document.lines);
         } else {
@@ -209,8 +200,9 @@ impl Editor {
 
             self.cursor_x = current_cursor_x;
             self.cursor_y = current_cursor_y;
-            self.desired_cursor_x =
-                self.get_display_width(&self.document.lines[self.cursor_y], self.cursor_x);
+            self.desired_cursor_x = self
+                .scroll
+                .get_display_width(&self.document.lines[self.cursor_y], self.cursor_x);
             self.status_message = "Redo successful.".to_string();
             debug!("Document after redo: {:?}", self.document.lines);
         } else {
@@ -227,8 +219,9 @@ impl Editor {
         let (new_x, new_y) = self.document.apply_action_diff(action_diff, false).unwrap();
         self.cursor_x = new_x;
         self.cursor_y = new_y;
-        self.desired_cursor_x =
-            self.get_display_width(&self.document.lines[self.cursor_y], self.cursor_x);
+        self.desired_cursor_x = self
+            .scroll
+            .get_display_width(&self.document.lines[self.cursor_y], self.cursor_x);
     }
 
     pub fn insert_text(&mut self, text: &str) -> Result<()> {
@@ -543,7 +536,9 @@ impl Editor {
         self.last_action_was_kill = false;
         let y = self.cursor_y;
         self.cursor_x = self.document.lines[y].len();
-        self.desired_cursor_x = self.get_display_width(&self.document.lines[y], self.cursor_x);
+        self.desired_cursor_x = self
+            .scroll
+            .get_display_width(&self.document.lines[y], self.cursor_x);
     }
 
     pub fn move_cursor_word_left(&mut self) -> Result<()> {
@@ -555,8 +550,9 @@ impl Editor {
             if self.cursor_y > 0 {
                 self.cursor_y -= 1;
                 self.cursor_x = self.document.lines[self.cursor_y].len();
-                self.desired_cursor_x =
-                    self.get_display_width(&self.document.lines[self.cursor_y], self.cursor_x);
+                self.desired_cursor_x = self
+                    .scroll
+                    .get_display_width(&self.document.lines[self.cursor_y], self.cursor_x);
             }
             return Ok(());
         }
@@ -588,7 +584,7 @@ impl Editor {
         }
 
         self.cursor_x = new_cursor_x;
-        self.desired_cursor_x = self.get_display_width(current_line, self.cursor_x);
+        self.desired_cursor_x = self.scroll.get_display_width(current_line, self.cursor_x);
         Ok(())
     }
 
@@ -629,7 +625,7 @@ impl Editor {
         }
 
         self.cursor_x = new_cursor_x;
-        self.desired_cursor_x = self.get_display_width(current_line, self.cursor_x);
+        self.desired_cursor_x = self.scroll.get_display_width(current_line, self.cursor_x);
         Ok(())
     }
 
@@ -649,55 +645,6 @@ impl Editor {
         Ok(())
     }
 
-    pub fn clamp_cursor_x(&mut self) {
-        if self.cursor_y >= self.document.lines.len() {
-            self.cursor_x = 0;
-            return;
-        }
-        let line_len = self.document.lines[self.cursor_y].len();
-        if self.cursor_x > line_len {
-            self.cursor_x = line_len;
-        }
-    }
-
-    pub fn get_display_width(&self, line: &str, until_byte: usize) -> usize {
-        let mut width = 0;
-        let mut bytes = 0;
-        for ch in line.chars() {
-            if bytes >= until_byte {
-                break;
-            }
-            if ch == '\x09' {
-                width += TAB_STOP - (width % TAB_STOP);
-            } else {
-                width += ch.width().unwrap_or(0);
-            }
-            bytes += ch.len_utf8();
-        }
-        width
-    }
-
-    pub fn get_byte_pos_from_display_width(&self, display_x: usize) -> usize {
-        let line = &self.document.lines[self.cursor_y];
-        let mut current_display_x = 0;
-        let mut byte_pos = 0;
-        for ch in line.chars() {
-            if current_display_x >= display_x {
-                break;
-            }
-            if ch == '\x09' {
-                current_display_x += TAB_STOP - (current_display_x % TAB_STOP);
-            } else {
-                current_display_x += ch.width().unwrap_or(0);
-            }
-            if current_display_x > display_x {
-                break;
-            }
-            byte_pos += ch.len_utf8();
-        }
-        byte_pos
-    }
-
     pub fn cursor_pos(&self) -> (usize, usize) {
         (self.cursor_x, self.cursor_y)
     }
@@ -705,7 +652,8 @@ impl Editor {
     pub fn set_cursor_pos(&mut self, x: usize, y: usize) {
         self.cursor_x = x;
         self.cursor_y = y;
-        self.clamp_cursor_x();
+        self.scroll
+            .clamp_cursor_x(&mut self.cursor_x, &self.cursor_y, &self.document);
     }
 
     pub fn set_message(&mut self, message: &str) {
@@ -809,100 +757,80 @@ impl Editor {
     }
 
     pub fn scroll_page_down(&mut self) {
-        self.last_action_was_kill = false;
-        let page_height = self.screen_rows.saturating_sub(STATUS_BAR_HEIGHT).max(1);
-        self.row_offset = self.row_offset.saturating_add(page_height);
-        self.row_offset = self
-            .row_offset
-            .min(self.document.lines.len().saturating_sub(1));
-        self.cursor_y = self.row_offset;
-        self.clamp_cursor_x();
+        self.scroll.scroll_page_down(
+            &mut self.cursor_y,
+            &mut self.cursor_x,
+            &self.document,
+            &mut self.last_action_was_kill,
+        );
     }
 
     pub fn scroll_page_up(&mut self) {
-        self.last_action_was_kill = false;
-        let page_height = self.screen_rows.saturating_sub(STATUS_BAR_HEIGHT).max(1);
-        self.row_offset = self.row_offset.saturating_sub(page_height);
-        self.cursor_y = self.row_offset;
-        self.clamp_cursor_x();
+        self.scroll.scroll_page_up(
+            &mut self.cursor_y,
+            &mut self.cursor_x,
+            &self.document,
+            &mut self.last_action_was_kill,
+        );
     }
 
     pub fn go_to_start_of_file(&mut self) {
-        self.last_action_was_kill = false;
-        self.cursor_y = 0;
-        self.cursor_x = 0;
-        self.desired_cursor_x = 0;
-        self.row_offset = 0;
-        self.col_offset = 0;
+        self.scroll.go_to_start_of_file(
+            &mut self.cursor_y,
+            &mut self.cursor_x,
+            &mut self.desired_cursor_x,
+            &mut self.last_action_was_kill,
+        );
     }
 
     pub fn go_to_end_of_file(&mut self) {
-        self.last_action_was_kill = false;
-        self.cursor_y = self.document.lines.len().saturating_sub(1);
-        self.cursor_x = self.document.lines[self.cursor_y].len();
-        self.desired_cursor_x =
-            self.get_display_width(&self.document.lines[self.cursor_y], self.cursor_x);
-        let screen_height = self.screen_rows.saturating_sub(1);
-        if self.cursor_y >= self.row_offset + screen_height {
-            self.row_offset = self.cursor_y.saturating_sub(screen_height) + 1;
-        }
-        self.clamp_cursor_x();
+        self.scroll.go_to_end_of_file(
+            &mut self.cursor_y,
+            &mut self.cursor_x,
+            &mut self.desired_cursor_x,
+            &self.document,
+            &mut self.last_action_was_kill,
+        );
     }
 
     pub fn move_cursor_up(&mut self) {
-        self.last_action_was_kill = false;
-        if self.cursor_y > 0 {
-            self.cursor_y -= 1;
-            self.cursor_x = self.get_byte_pos_from_display_width(self.desired_cursor_x);
-        } else {
-            self.cursor_x = 0;
-            self.desired_cursor_x = 0;
-        }
+        self.scroll.move_cursor_up(
+            &mut self.cursor_y,
+            &mut self.cursor_x,
+            &mut self.desired_cursor_x,
+            &self.document,
+            &mut self.last_action_was_kill,
+        );
     }
 
     pub fn move_cursor_down(&mut self) {
-        self.last_action_was_kill = false;
-        if self.cursor_y < self.document.lines.len() - 1 {
-            self.cursor_y += 1;
-            self.cursor_x = self.get_byte_pos_from_display_width(self.desired_cursor_x);
-        } else {
-            self.go_to_end_of_line();
-        }
+        self.scroll.move_cursor_down(
+            &mut self.cursor_y,
+            &mut self.cursor_x,
+            &mut self.desired_cursor_x,
+            &self.document,
+            &mut self.last_action_was_kill,
+        );
     }
 
     pub fn move_cursor_left(&mut self) {
-        self.last_action_was_kill = false;
-        let line = &self.document.lines[self.cursor_y];
-        if self.cursor_x > 0 {
-            let mut new_pos = self.cursor_x - 1;
-            while !line.is_char_boundary(new_pos) {
-                new_pos -= 1;
-            }
-            self.cursor_x = new_pos;
-            self.desired_cursor_x = self.get_display_width(line, self.cursor_x);
-        } else if self.cursor_y > 0 {
-            self.cursor_y -= 1;
-            self.cursor_x = self.document.lines[self.cursor_y].len();
-            self.desired_cursor_x =
-                self.get_display_width(&self.document.lines[self.cursor_y], self.cursor_x);
-        }
+        self.scroll.move_cursor_left(
+            &mut self.cursor_y,
+            &mut self.cursor_x,
+            &mut self.desired_cursor_x,
+            &self.document,
+            &mut self.last_action_was_kill,
+        );
     }
 
     pub fn move_cursor_right(&mut self) {
-        self.last_action_was_kill = false;
-        let line = &self.document.lines[self.cursor_y];
-        if self.cursor_x < line.len() {
-            let mut new_pos = self.cursor_x + 1;
-            while !line.is_char_boundary(new_pos) {
-                new_pos += 1;
-            }
-            self.cursor_x = new_pos;
-            self.desired_cursor_x = self.get_display_width(line, self.cursor_x);
-        } else if self.cursor_y < self.document.lines.len() - 1 {
-            self.cursor_y += 1;
-            self.cursor_x = 0;
-            self.desired_cursor_x = 0;
-        }
+        self.scroll.move_cursor_right(
+            &mut self.cursor_y,
+            &mut self.cursor_x,
+            &mut self.desired_cursor_x,
+            &self.document,
+            &mut self.last_action_was_kill,
+        );
     }
 
     pub fn set_alt_pressed(&mut self, is_alt_pressed: bool) {
@@ -980,7 +908,7 @@ impl Editor {
             self.cursor_y = new_cursor_y;
             self.cursor_x = 0;
             self.desired_cursor_x = 0;
-            self.row_offset = self.cursor_y; // Scroll to make cursor at top
+            self.scroll.row_offset = self.cursor_y; // Scroll to make cursor at top
         }
         // If target_line_y is None, do nothing, which is the desired behavior.
     }
@@ -1020,7 +948,7 @@ impl Editor {
             self.cursor_y = new_cursor_y;
             self.cursor_x = 0;
             self.desired_cursor_x = 0;
-            self.row_offset = self.cursor_y; // Scroll to make cursor at top
+            self.scroll.row_offset = self.cursor_y; // Scroll to make cursor at top
         }
     }
 

@@ -157,8 +157,8 @@ fn test_go_to_start_of_file() {
     assert_eq!(editor.cursor_pos(), (1, 2));
     editor.go_to_start_of_file();
     assert_eq!(editor.cursor_pos(), (0, 0));
-    assert_eq!(editor.row_offset, 0);
-    assert_eq!(editor.col_offset, 0);
+    assert_eq!(editor.scroll.row_offset, 0);
+    assert_eq!(editor.scroll.col_offset, 0);
 }
 
 #[test]

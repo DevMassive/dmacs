@@ -31,10 +31,10 @@ impl Editor {
 
         // Draw text
         for (index, line) in self.document.lines.iter().enumerate() {
-            if index < self.row_offset {
+            if index < self.scroll.row_offset {
                 continue;
             }
-            let row = index - self.row_offset;
+            let row = index - self.scroll.row_offset;
             if row >= screen_rows.saturating_sub(STATUS_BAR_HEIGHT) {
                 break;
             }
@@ -124,8 +124,8 @@ impl Editor {
                 }
 
                 // Draw character
-                if display_x > self.col_offset {
-                    let screen_x = char_start_display_x.saturating_sub(self.col_offset);
+                if display_x > self.scroll.col_offset {
+                    let screen_x = char_start_display_x.saturating_sub(self.scroll.col_offset);
                     if screen_x < screen_cols {
                         if ch == '\x09' {
                             // Draw a tab as spaces
@@ -141,7 +141,7 @@ impl Editor {
                     }
                 }
                 // Stop drawing if we reach the end of the screen
-                if char_start_display_x.saturating_sub(self.col_offset) >= screen_cols {
+                if char_start_display_x.saturating_sub(self.scroll.col_offset) >= screen_cols {
                     break;
                 }
 
@@ -170,7 +170,7 @@ impl Editor {
                 };
 
                 if highlight_eol_char {
-                    let eol_screen_x = display_x.saturating_sub(self.col_offset);
+                    let eol_screen_x = display_x.saturating_sub(self.scroll.col_offset);
                     if eol_screen_x < screen_cols {
                         window.attron(A_REVERSE);
                         window.mvaddch(row as i32, eol_screen_x as i32, ' '); // Draw a reversed space
@@ -230,34 +230,36 @@ impl Editor {
         }
 
         // Move cursor
-        let display_cursor_x =
-            self.get_display_width(&self.document.lines[self.cursor_y], self.cursor_x);
+        let display_cursor_x = self
+            .scroll
+            .get_display_width(&self.document.lines[self.cursor_y], self.cursor_x);
         window.mv(
-            (self.cursor_y - self.row_offset + STATUS_BAR_HEIGHT) as i32,
-            (display_cursor_x - self.col_offset) as i32,
+            (self.cursor_y - self.scroll.row_offset + STATUS_BAR_HEIGHT) as i32,
+            (display_cursor_x - self.scroll.col_offset) as i32,
         );
         window.refresh();
     }
 
     pub fn scroll(&mut self) {
-        let visible_content_height = self.screen_rows.saturating_sub(STATUS_BAR_HEIGHT);
+        let visible_content_height = self.scroll.screen_rows.saturating_sub(STATUS_BAR_HEIGHT);
 
         // Vertical scroll
-        if self.cursor_y < self.row_offset {
-            self.row_offset = self.cursor_y;
+        if self.cursor_y < self.scroll.row_offset {
+            self.scroll.row_offset = self.cursor_y;
         }
-        if self.cursor_y >= self.row_offset + visible_content_height {
-            self.row_offset = self.cursor_y - visible_content_height + 1;
+        if self.cursor_y >= self.scroll.row_offset + visible_content_height {
+            self.scroll.row_offset = self.cursor_y - visible_content_height + 1;
         }
 
         // Horizontal scroll
-        let display_cursor_x =
-            self.get_display_width(&self.document.lines[self.cursor_y], self.cursor_x);
-        if display_cursor_x < self.col_offset {
-            self.col_offset = display_cursor_x;
+        let display_cursor_x = self
+            .scroll
+            .get_display_width(&self.document.lines[self.cursor_y], self.cursor_x);
+        if display_cursor_x < self.scroll.col_offset {
+            self.scroll.col_offset = display_cursor_x;
         }
-        if display_cursor_x >= self.col_offset + self.screen_cols {
-            self.col_offset = display_cursor_x.saturating_sub(self.screen_cols) + 1;
+        if display_cursor_x >= self.scroll.col_offset + self.scroll.screen_cols {
+            self.scroll.col_offset = display_cursor_x.saturating_sub(self.scroll.screen_cols) + 1;
         }
     }
 }
