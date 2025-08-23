@@ -32,6 +32,7 @@ impl Terminal {
         noecho();
         curs_set(1);
         window.nodelay(true); // Make getch() non-blocking
+        window.timeout(50); // Set a timeout for getch() to reduce CPU usage
 
         // termios settings change starts here
         let stdin_fd = stdin().as_raw_fd();
