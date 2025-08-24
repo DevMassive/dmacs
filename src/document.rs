@@ -2,6 +2,8 @@ use crate::backup::BackupManager;
 use crate::error::{DmacsError, Result};
 use std::io::Write;
 use std::path::PathBuf;
+use std::fs;
+use std::time::SystemTime;
 
 #[derive(Clone, Debug)]
 pub struct ActionDiff {
@@ -45,7 +47,7 @@ impl Document {
 
     pub fn save(&mut self, base_dir: Option<PathBuf>) -> Result<()> {
         if let Some(filename) = &self.filename {
-            let backup_manager = BackupManager::new_with_base_dir(base_dir)?; // Use new_with_base_dir
+            let backup_manager = BackupManager::new_with_base_dir(base_dir)?;
 
             // Backup original content if it exists
             if let Some(original_content) = &self.original_content {
@@ -76,6 +78,18 @@ impl Document {
             .unwrap_or_default();
 
         self.lines != original_lines
+    }
+
+    pub fn last_modified(&self) -> Result<SystemTime> {
+        if let Some(filename) = &self.filename {
+            let metadata = fs::metadata(filename).map_err(DmacsError::Io)?;
+            metadata.modified().map_err(DmacsError::Io)
+        } else {
+            Err(DmacsError::Io(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                "Document has no filename, cannot get last modified time.",
+            )))
+        }
     }
 
     pub fn apply_action_diff(

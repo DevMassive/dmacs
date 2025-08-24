@@ -2,7 +2,8 @@ use crate::document::{ActionDiff, Document};
 use crate::editor::search::Search;
 use crate::error::Result;
 use log::debug;
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime};
+use crate::persistence::{self, CursorPosition};
 
 pub mod command;
 pub mod input;
@@ -50,14 +51,48 @@ impl Editor {
         let document = match filename {
             Some(fname) => {
                 if let Ok(doc) = Document::open(&fname) {
+                    let last_modified = doc.last_modified().ok();
+                    if let Some(lm) = last_modified {
+                        debug!("Attempting to restore cursor for file: {}, last_modified: {:?}", fname, lm);
+                        if let Some((x, y)) = persistence::get_cursor_position(&fname) {
+                            debug!("Restoring cursor position for {}: ({}, {})", fname, x, y);
+                            return Self {
+                                should_quit: false,
+                                document: doc,
+                                cursor_x: x,
+                                cursor_y: y,
+                                desired_cursor_x: x,
+                                status_message: "".to_string(),
+                                scroll: Scroll::new(),
+                                undo_stack: Vec::new(),
+                                redo_stack: Vec::new(),
+                                kill_buffer: String::new(),
+                                last_action_was_kill: false,
+                                is_alt_pressed: false,
+                                search: Search::new(),
+                                selection: selection::Selection::new(),
+                                last_action_time: None,
+                                last_action_type: LastActionType::None,
+                                undo_debounce_threshold: Duration::from_millis(500),
+                            };
+                        } else {
+                            debug!("No matching cursor position found for {}. Starting at (0,0).", fname);
+                        }
+                    } else {
+                        debug!("Could not get last modified date for {}. Starting at (0,0).", fname);
+                    }
                     doc
                 } else {
+                    debug!("Could not open file {}. Creating new empty document.", fname);
                     let mut doc = Document::new_empty();
                     doc.filename = Some(fname);
                     doc
                 }
             }
-            None => Document::default(),
+            None => {
+                debug!("No filename provided. Creating new empty document.");
+                Document::default()
+            },
         };
 
         // Save the initial state for undo after construction
@@ -639,6 +674,25 @@ impl Editor {
 
     pub fn quit(&mut self) -> Result<()> {
         self.last_action_was_kill = false;
+        if let Some(file_path) = &self.document.filename {
+            if let Ok(last_modified) = self.document.last_modified() {
+                let cursor_pos = CursorPosition {
+                    file_path: file_path.clone(),
+                    last_modified,
+                    cursor_x: self.cursor_x,
+                    cursor_y: self.cursor_y,
+                    timestamp: SystemTime::now(),
+                };
+                debug!("Saving cursor position for {}: ({}, {}), last_modified: {:?}", file_path, self.cursor_x, self.cursor_y, last_modified);
+                if let Err(e) = persistence::save_cursor_position(cursor_pos) {
+                    debug!("Failed to save cursor position: {:?}", e);
+                }
+            } else {
+                debug!("Could not get last modified date for {}. Not saving cursor position.", file_path);
+            }
+        } else {
+            debug!("No filename for current document. Not saving cursor position.");
+        }
         self.document.save(None)?;
         self.should_quit = true;
         debug!("Editor quitting.");

@@ -4,6 +4,8 @@ use dmacs::terminal::Terminal;
 use simplelog::{Config, LevelFilter, WriteLogger};
 use std::env;
 use std::fs::File;
+use std::path::PathBuf;
+use log::debug;
 
 fn main() -> Result<()> {
     // Set up a custom panic hook to log panics
@@ -19,9 +21,20 @@ fn main() -> Result<()> {
     }));
 
     let args: Vec<String> = env::args().collect();
-    let filename = args.get(1).cloned();
+    let mut filename: Option<String> = None;
 
-    if args.contains(&"--debug".to_string()) {
+    // Parse arguments to find filename and debug flag
+    let mut debug_mode = false;
+    for (i, arg) in args.iter().enumerate() {
+        if arg == "--debug" {
+            debug_mode = true;
+        } else if i == 1 && !arg.starts_with("--") {
+            // Assume the first non-flag argument is the filename
+            filename = Some(arg.clone());
+        }
+    }
+
+    if debug_mode {
         WriteLogger::init(
             LevelFilter::Debug,
             Config::default(),
@@ -30,8 +43,24 @@ fn main() -> Result<()> {
         .unwrap();
     }
 
+    let absolute_filename = if let Some(fname) = filename {
+        match std::fs::canonicalize(&fname) {
+            Ok(path) => {
+                debug!("Resolved filename '{}' to absolute path '{}'", fname, path.display());
+                Some(path.to_string_lossy().into_owned())
+            },
+            Err(e) => {
+                debug!("Could not canonicalize filename '{}': {}", fname, e);
+                // If canonicalization fails, use the original path, it might be a new file
+                Some(fname)
+            }
+        }
+    } else {
+        None
+    };
+
     let terminal = Terminal::new()?;
-    run_editor(&terminal, filename)?;
+    run_editor(&terminal, absolute_filename)?;
 
     Ok(())
 }
