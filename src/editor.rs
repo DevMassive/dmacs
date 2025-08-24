@@ -56,7 +56,7 @@ impl Editor {
                         debug!(
                             "Attempting to restore cursor for file: {fname}, last_modified: {lm:?}"
                         );
-                        if let Some((x, y)) = persistence::get_cursor_position(&fname) {
+                        if let Some((x, y)) = persistence::get_cursor_position(&fname, lm) {
                             debug!("Restoring cursor position for {fname}: ({x}, {y})");
                             return Self {
                                 should_quit: false,
@@ -678,6 +678,7 @@ impl Editor {
 
     pub fn quit(&mut self) -> Result<()> {
         self.last_action_was_kill = false;
+        self.document.save(None)?;
         if let Some(file_path) = &self.document.filename {
             if let Ok(last_modified) = self.document.last_modified() {
                 let cursor_pos = CursorPosition {
@@ -701,7 +702,6 @@ impl Editor {
         } else {
             debug!("No filename for current document. Not saving cursor position.");
         }
-        self.document.save(None)?;
         self.should_quit = true;
         debug!("Editor quitting.");
         persistence::cleanup_old_cursor_position_files();

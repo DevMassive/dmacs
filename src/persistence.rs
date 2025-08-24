@@ -112,9 +112,15 @@ pub fn save_cursor_position(pos: CursorPosition) -> Result<(), io::Error> {
     Ok(())
 }
 
-pub fn get_cursor_position(file_path: &str) -> Option<(usize, usize)> {
+pub fn get_cursor_position(file_path: &str, last_modified: SystemTime) -> Option<(usize, usize)> {
     debug!("Looking for cursor position for file: {file_path}");
     if let Some(pos) = load_cursor_position(file_path) {
+        if pos.last_modified != last_modified {
+            debug!(
+                "Last modified date for {file_path} has changed. Not restoring cursor position."
+            );
+            return None;
+        }
         debug!(
             "Found record for {}. Restoring cursor position: ({}, {}).",
             file_path, pos.cursor_x, pos.cursor_y
