@@ -20,6 +20,7 @@ sha2 = "0.10"
 [dev-dependencies]
 tempfile = "3.10.1"
 uuid = { version = "1.0", features = ["v4"] }
+filetime = "0.2"
 
 [lib]
 name = "dmacs"
@@ -32,3 +33,7 @@ path = "tests/editor/mod.rs"
 [[test]]
 name = "backup_tests"
 path = "tests/backup_test.rs"
+
+[[test]]
+name = "persistence_tests"
+path = "tests/persistence_test.rs"

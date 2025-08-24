@@ -52,9 +52,7 @@ fn load_cursor_position(file_path: &str) -> Option<CursorPosition> {
     let file_path_hashed = match get_cursor_pos_file_path(file_path) {
         Ok(path) => path,
         Err(e) => {
-            error!(
-                "Failed to get cursor position file path for {file_path}: {e}"
-            );
+            error!("Failed to get cursor position file path for {file_path}: {e}");
             return None;
         }
     };
@@ -133,9 +131,7 @@ pub fn cleanup_old_cursor_position_files() {
     let cursor_pos_dir = match get_cursor_pos_dir() {
         Ok(path) => path,
         Err(e) => {
-            error!(
-                "Failed to get cursor positions directory for cleanup: {e}"
-            );
+            error!("Failed to get cursor positions directory for cleanup: {e}");
             return;
         }
     };

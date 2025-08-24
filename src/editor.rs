@@ -83,15 +83,11 @@ impl Editor {
                             );
                         }
                     } else {
-                        debug!(
-                            "Could not get last modified date for {fname}. Starting at (0,0)."
-                        );
+                        debug!("Could not get last modified date for {fname}. Starting at (0,0).");
                     }
                     doc
                 } else {
-                    debug!(
-                        "Could not open file {fname}. Creating new empty document."
-                    );
+                    debug!("Could not open file {fname}. Creating new empty document.");
                     let mut doc = Document::new_empty();
                     doc.filename = Some(fname);
                     doc
