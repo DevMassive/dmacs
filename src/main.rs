@@ -4,7 +4,7 @@ use dmacs::terminal::Terminal;
 use simplelog::{Config, LevelFilter, WriteLogger};
 use std::env;
 use std::fs::File;
-use std::path::PathBuf;
+
 use log::debug;
 
 fn main() -> Result<()> {
@@ -46,11 +46,15 @@ fn main() -> Result<()> {
     let absolute_filename = if let Some(fname) = filename {
         match std::fs::canonicalize(&fname) {
             Ok(path) => {
-                debug!("Resolved filename '{}' to absolute path '{}'", fname, path.display());
+                debug!(
+                    "Resolved filename '{}' to absolute path '{}'",
+                    fname,
+                    path.display()
+                );
                 Some(path.to_string_lossy().into_owned())
-            },
+            }
             Err(e) => {
-                debug!("Could not canonicalize filename '{}': {}", fname, e);
+                debug!("Could not canonicalize filename '{fname}': {e}");
                 // If canonicalization fails, use the original path, it might be a new file
                 Some(fname)
             }

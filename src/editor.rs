@@ -1,9 +1,9 @@
 use crate::document::{ActionDiff, Document};
 use crate::editor::search::Search;
 use crate::error::Result;
-use log::debug;
-use std::time::{Duration, Instant, SystemTime};
 use crate::persistence::{self, CursorPosition};
+use log::debug;
+use std::time::{Duration, Instant};
 
 pub mod command;
 pub mod input;
@@ -53,9 +53,11 @@ impl Editor {
                 if let Ok(doc) = Document::open(&fname) {
                     let last_modified = doc.last_modified().ok();
                     if let Some(lm) = last_modified {
-                        debug!("Attempting to restore cursor for file: {}, last_modified: {:?}", fname, lm);
+                        debug!(
+                            "Attempting to restore cursor for file: {fname}, last_modified: {lm:?}"
+                        );
                         if let Some((x, y)) = persistence::get_cursor_position(&fname) {
-                            debug!("Restoring cursor position for {}: ({}, {})", fname, x, y);
+                            debug!("Restoring cursor position for {fname}: ({x}, {y})");
                             return Self {
                                 should_quit: false,
                                 document: doc,
@@ -76,14 +78,20 @@ impl Editor {
                                 undo_debounce_threshold: Duration::from_millis(500),
                             };
                         } else {
-                            debug!("No matching cursor position found for {}. Starting at (0,0).", fname);
+                            debug!(
+                                "No matching cursor position found for {fname}. Starting at (0,0)."
+                            );
                         }
                     } else {
-                        debug!("Could not get last modified date for {}. Starting at (0,0).", fname);
+                        debug!(
+                            "Could not get last modified date for {fname}. Starting at (0,0)."
+                        );
                     }
                     doc
                 } else {
-                    debug!("Could not open file {}. Creating new empty document.", fname);
+                    debug!(
+                        "Could not open file {fname}. Creating new empty document."
+                    );
                     let mut doc = Document::new_empty();
                     doc.filename = Some(fname);
                     doc
@@ -92,7 +100,7 @@ impl Editor {
             None => {
                 debug!("No filename provided. Creating new empty document.");
                 Document::default()
-            },
+            }
         };
 
         // Save the initial state for undo after construction
@@ -681,14 +689,18 @@ impl Editor {
                     last_modified,
                     cursor_x: self.cursor_x,
                     cursor_y: self.cursor_y,
-                    timestamp: SystemTime::now(),
                 };
-                debug!("Saving cursor position for {}: ({}, {}), last_modified: {:?}", file_path, self.cursor_x, self.cursor_y, last_modified);
+                debug!(
+                    "Saving cursor position for {}: ({}, {}), last_modified: {:?}",
+                    file_path, self.cursor_x, self.cursor_y, last_modified
+                );
                 if let Err(e) = persistence::save_cursor_position(cursor_pos) {
-                    debug!("Failed to save cursor position: {:?}", e);
+                    debug!("Failed to save cursor position: {e:?}");
                 }
             } else {
-                debug!("Could not get last modified date for {}. Not saving cursor position.", file_path);
+                debug!(
+                    "Could not get last modified date for {file_path}. Not saving cursor position."
+                );
             }
         } else {
             debug!("No filename for current document. Not saving cursor position.");
@@ -696,6 +708,7 @@ impl Editor {
         self.document.save(None)?;
         self.should_quit = true;
         debug!("Editor quitting.");
+        persistence::cleanup_old_cursor_position_files();
         Ok(())
     }
 

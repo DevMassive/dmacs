@@ -1,8 +1,8 @@
 use crate::backup::BackupManager;
 use crate::error::{DmacsError, Result};
+use std::fs;
 use std::io::Write;
 use std::path::PathBuf;
-use std::fs;
 use std::time::SystemTime;
 
 #[derive(Clone, Debug)]
