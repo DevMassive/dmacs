@@ -1,5 +1,7 @@
 use dmacs::editor::Editor;
 use pancurses::Input;
+use std::fs;
+use tempfile::NamedTempFile;
 
 #[test]
 fn test_editor_initial_state_no_file() {
@@ -69,4 +71,26 @@ fn test_is_checked_checkbox() {
     assert!(!Editor::is_checked_checkbox("- [] task"));
     assert!(!Editor::is_checked_checkbox("- [ ] task"));
     assert!(!Editor::is_checked_checkbox("task - [x]"));
+}
+
+#[test]
+fn test_alt_s_saves_file() {
+    let file = NamedTempFile::new().expect("Failed to create temp file");
+    let path = file.path().to_path_buf();
+    let initial_content = "Hello, world!";
+    fs::write(&path, initial_content).expect("Failed to write to temp file");
+
+    let mut editor = Editor::new(Some(path.to_str().unwrap().to_string()));
+
+    // Insert some text
+    editor.process_input(Input::Character('T'), false).unwrap();
+
+    // Simulate Alt + S
+    editor.process_input(Input::Character('s'), true).unwrap();
+
+    // Read the file content and assert that the changes are saved
+    let saved_content = fs::read_to_string(&path).expect("Failed to read saved file");
+    assert_eq!(saved_content, "THello, world!\n");
+
+    // Clean up the temporary file (done automatically by NamedTempFile drop)
 }

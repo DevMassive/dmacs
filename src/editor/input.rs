@@ -33,6 +33,10 @@ impl Editor {
             Input::KeyBackspace if is_alt_pressed => self.hungry_delete()?,
             Input::Character('w') if is_alt_pressed => self.copy_selection_action()?, // Option-W
             Input::Character('_') if is_alt_pressed => self.redo(), // Alt + _ for redo
+            Input::Character('s') if is_alt_pressed => {
+                self.document.save(None)?;
+                self.status_message = "File saved!".to_string();
+            }
             _ => self.handle_keypress(key)?,
         }
         Ok(())
