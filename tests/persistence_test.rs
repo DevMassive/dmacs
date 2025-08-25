@@ -62,6 +62,8 @@ fn test_cleanup_old_cursor_position_files() {
         last_modified: SystemTime::now(),
         cursor_x: 10,
         cursor_y: 5,
+        scroll_row_offset: 0,
+        scroll_col_offset: 0,
     };
     let recent_hashed_path = get_test_cursor_pos_file_path(&temp_dir, recent_file_path);
     fs::write(
@@ -77,6 +79,8 @@ fn test_cleanup_old_cursor_position_files() {
         last_modified: SystemTime::now(),
         cursor_x: 20,
         cursor_y: 10,
+        scroll_row_offset: 0,
+        scroll_col_offset: 0,
     };
     let old_hashed_path = get_test_cursor_pos_file_path(&temp_dir, old_file_path);
     fs::write(
@@ -129,6 +133,59 @@ fn test_cleanup_old_cursor_position_files() {
         "Recent file should not be deleted"
     );
     assert!(!old_hashed_path.exists(), "Old file should be deleted");
+
+    teardown_test_env(&temp_dir);
+}
+
+#[test]
+fn test_get_cursor_position_with_scroll_restoration() {
+    let temp_dir = setup_test_env();
+    let file_path = "/path/to/test_file.txt";
+    let last_modified = SystemTime::now();
+    let expected_cursor_x = 15;
+    let expected_cursor_y = 25;
+    let expected_scroll_row_offset = 5;
+    let expected_scroll_col_offset = 10;
+
+    let pos = CursorPosition {
+        file_path: file_path.to_string(),
+        last_modified,
+        cursor_x: expected_cursor_x,
+        cursor_y: expected_cursor_y,
+        scroll_row_offset: expected_scroll_row_offset,
+        scroll_col_offset: expected_scroll_col_offset,
+    };
+
+    // Temporarily change the HOME environment variable for the test
+    let original_home = std::env::var_os("HOME");
+    unsafe {
+        std::env::set_var("HOME", &temp_dir);
+    }
+
+    // Save the cursor position
+    persistence::save_cursor_position(pos).unwrap();
+
+    // Retrieve the cursor position
+    let retrieved_pos = persistence::get_cursor_position(file_path, last_modified);
+
+    // Restore original HOME environment variable
+    if let Some(home) = original_home {
+        unsafe {
+            std::env::set_var("HOME", home);
+        }
+    } else {
+        unsafe {
+            std::env::remove_var("HOME");
+        }
+    }
+
+    // Assertions
+    assert!(retrieved_pos.is_some());
+    let (x, y, scroll_row, scroll_col) = retrieved_pos.unwrap();
+    assert_eq!(x, expected_cursor_x);
+    assert_eq!(y, expected_cursor_y);
+    assert_eq!(scroll_row, expected_scroll_row_offset);
+    assert_eq!(scroll_col, expected_scroll_col_offset);
 
     teardown_test_env(&temp_dir);
 }

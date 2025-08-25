@@ -57,8 +57,12 @@ impl Editor {
                         debug!(
                             "Attempting to restore cursor for file: {fname}, last_modified: {lm:?}"
                         );
-                        if let Some((x, y)) = persistence::get_cursor_position(&fname, lm) {
-                            debug!("Restoring cursor position for {fname}: ({x}, {y})");
+                        if let Some((x, y, scroll_row, scroll_col)) =
+                            persistence::get_cursor_position(&fname, lm)
+                        {
+                            debug!(
+                                "Restoring cursor position for {fname}: ({x}, {y}), scroll: ({scroll_row}, {scroll_col})"
+                            );
                             return Self {
                                 should_quit: false,
                                 document: doc,
@@ -66,7 +70,7 @@ impl Editor {
                                 cursor_y: y,
                                 desired_cursor_x: x,
                                 status_message: "".to_string(),
-                                scroll: Scroll::new(),
+                                scroll: Scroll::new_with_offset(scroll_row, scroll_col),
                                 undo_stack: Vec::new(),
                                 redo_stack: Vec::new(),
                                 kill_buffer: String::new(),
@@ -689,10 +693,17 @@ impl Editor {
                     last_modified,
                     cursor_x: self.cursor_x,
                     cursor_y: self.cursor_y,
+                    scroll_row_offset: self.scroll.row_offset,
+                    scroll_col_offset: self.scroll.col_offset,
                 };
                 debug!(
-                    "Saving cursor position for {}: ({}, {}), last_modified: {:?}",
-                    file_path, self.cursor_x, self.cursor_y, last_modified
+                    "Saving cursor position for {}: ({}, {}), scroll: ({}, {}), last_modified: {:?}",
+                    file_path,
+                    self.cursor_x,
+                    self.cursor_y,
+                    self.scroll.row_offset,
+                    self.scroll.col_offset,
+                    last_modified
                 );
                 if let Err(e) = persistence::save_cursor_position(cursor_pos) {
                     debug!("Failed to save cursor position: {e:?}");

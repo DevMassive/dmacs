@@ -16,6 +16,8 @@ pub struct CursorPosition {
     pub last_modified: SystemTime,
     pub cursor_x: usize,
     pub cursor_y: usize,
+    pub scroll_row_offset: usize,
+    pub scroll_col_offset: usize,
 }
 
 fn get_config_dir() -> Result<PathBuf, io::Error> {
@@ -112,7 +114,10 @@ pub fn save_cursor_position(pos: CursorPosition) -> Result<(), io::Error> {
     Ok(())
 }
 
-pub fn get_cursor_position(file_path: &str, last_modified: SystemTime) -> Option<(usize, usize)> {
+pub fn get_cursor_position(
+    file_path: &str,
+    last_modified: SystemTime,
+) -> Option<(usize, usize, usize, usize)> {
     debug!("Looking for cursor position for file: {file_path}");
     if let Some(pos) = load_cursor_position(file_path) {
         if pos.last_modified != last_modified {
@@ -122,10 +127,15 @@ pub fn get_cursor_position(file_path: &str, last_modified: SystemTime) -> Option
             return None;
         }
         debug!(
-            "Found record for {}. Restoring cursor position: ({}, {}).",
-            file_path, pos.cursor_x, pos.cursor_y
+            "Found record for {}. Restoring cursor position: ({}, {}), scroll: ({}, {}).",
+            file_path, pos.cursor_x, pos.cursor_y, pos.scroll_row_offset, pos.scroll_col_offset
         );
-        return Some((pos.cursor_x, pos.cursor_y));
+        return Some((
+            pos.cursor_x,
+            pos.cursor_y,
+            pos.scroll_row_offset,
+            pos.scroll_col_offset,
+        ));
     } else {
         debug!("No record found for {file_path}.");
     }

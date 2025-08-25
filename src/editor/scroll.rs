@@ -27,6 +27,15 @@ impl Scroll {
         }
     }
 
+    pub fn new_with_offset(row_offset: usize, col_offset: usize) -> Self {
+        Self {
+            row_offset,
+            col_offset,
+            screen_rows: 0, // These will be updated later by update_screen_size
+            screen_cols: 0, // These will be updated later by update_screen_size
+        }
+    }
+
     pub fn update_screen_size(&mut self, screen_rows: usize, screen_cols: usize) {
         self.screen_rows = screen_rows;
         self.screen_cols = screen_cols;
