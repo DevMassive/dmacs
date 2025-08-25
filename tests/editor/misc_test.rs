@@ -94,3 +94,31 @@ fn test_alt_s_saves_file() {
 
     // Clean up the temporary file (done automatically by NamedTempFile drop)
 }
+
+#[test]
+fn test_ctrl_x_no_exit_on_save() {
+    let file = NamedTempFile::new().expect("Failed to create temp file");
+    let path = file.path().to_path_buf();
+    let initial_content = "Hello, world!";
+    fs::write(&path, initial_content).expect("Failed to write to temp file");
+
+    let mut editor = Editor::new(Some(path.to_str().unwrap().to_string()));
+    editor.set_no_exit_on_save(true);
+
+    // Insert some text
+    editor.process_input(Input::Character('N'), false).unwrap();
+
+    // Simulate Ctrl + X (save and exit, but with no_exit_on_save it should only save)
+    editor
+        .process_input(Input::Character('\x18'), false)
+        .unwrap();
+
+    // Assert that the file content is saved
+    let saved_content = fs::read_to_string(&path).expect("Failed to read saved file");
+    assert_eq!(saved_content, "NHello, world!\n");
+
+    // Assert that the editor did NOT quit
+    assert!(!editor.should_quit);
+
+    // Clean up the temporary file (done automatically by NamedTempFile drop)
+}

@@ -25,9 +25,12 @@ fn main() -> Result<()> {
 
     // Parse arguments to find filename and debug flag
     let mut debug_mode = false;
+    let mut no_exit_on_save = false;
     for (i, arg) in args.iter().enumerate() {
         if arg == "--debug" {
             debug_mode = true;
+        } else if arg == "--no-exit-on-save" {
+            no_exit_on_save = true;
         } else if i == 1 && !arg.starts_with("--") {
             // Assume the first non-flag argument is the filename
             filename = Some(arg.clone());
@@ -64,7 +67,7 @@ fn main() -> Result<()> {
     };
 
     let terminal = Terminal::new()?;
-    run_editor(&terminal, absolute_filename)?;
+    run_editor(&terminal, absolute_filename, no_exit_on_save)?;
 
     Ok(())
 }

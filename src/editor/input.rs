@@ -46,7 +46,14 @@ impl Editor {
         self.status_message.clear();
         match key {
             Input::Character(c) => match c {
-                '\x18' => self.quit()?,
+                '\x18' => {
+                    if self.no_exit_on_save {
+                        self.save_document()?;
+                        self.set_message("File saved. Editor will not exit.");
+                    } else {
+                        self.quit()?;
+                    }
+                },
                 '\x13' => self.enter_search_mode(), // Ctrl + S
                 '\x01' => self.go_to_start_of_line(),
                 '\x05' => self.go_to_end_of_line(),

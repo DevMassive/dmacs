@@ -40,6 +40,7 @@ pub struct Editor {
     pub is_alt_pressed: bool,
     pub search: Search,
     pub selection: selection::Selection,
+    pub no_exit_on_save: bool,
     // New fields for debouncing
     last_action_time: Option<Instant>,
     last_action_type: LastActionType,
@@ -73,6 +74,7 @@ impl Editor {
                                 is_alt_pressed: false,
                                 search: Search::new(),
                                 selection: selection::Selection::new(),
+                                no_exit_on_save: false,
                                 last_action_time: None,
                                 last_action_type: LastActionType::None,
                                 undo_debounce_threshold: Duration::from_millis(500),
@@ -115,6 +117,7 @@ impl Editor {
             is_alt_pressed: false,
             search: Search::new(),
             selection: selection::Selection::new(),
+            no_exit_on_save: false,
             // Initialize new fields
             last_action_time: None,
             last_action_type: LastActionType::None,
@@ -1117,6 +1120,10 @@ impl Editor {
 
     pub fn set_undo_debounce_threshold(&mut self, threshold_ms: u64) {
         self.undo_debounce_threshold = Duration::from_millis(threshold_ms);
+    }
+
+    pub fn set_no_exit_on_save(&mut self, value: bool) {
+        self.no_exit_on_save = value;
     }
 }
 
