@@ -411,24 +411,35 @@ impl Editor {
 
         // Check for command execution
         if x == current_line.len() {
-            if let Some(command_output) = command::execute_command(&current_line) {
-                if !command_output.is_empty() {
-                    self.commit(
-                        LastActionType::Other,
-                        &ActionDiff {
-                            cursor_start_x: self.cursor_x,
-                            cursor_start_y: self.cursor_y,
-                            cursor_end_x: self.cursor_x,
-                            cursor_end_y: self.cursor_y,
-                            start_x: 0,
-                            start_y: self.cursor_y - 1,
-                            end_x: current_line.len(),
-                            end_y: self.cursor_y - 1,
-                            new: vec![command_output.to_string()],
-                            old: vec![current_line.to_string()],
-                        },
-                    );
-                    self.status_message = current_line.to_string();
+            match command::execute_command(&current_line) {
+                command::CommandResult::Success {
+                    new_line_content,
+                    status_message,
+                } => {
+                    if let Some(new_content) = new_line_content {
+                        self.commit(
+                            LastActionType::Other,
+                            &ActionDiff {
+                                cursor_start_x: self.cursor_x,
+                                cursor_start_y: self.cursor_y,
+                                cursor_end_x: self.cursor_x,
+                                cursor_end_y: self.cursor_y,
+                                start_x: 0,
+                                start_y: self.cursor_y - 1,
+                                end_x: current_line.len(),
+                                end_y: self.cursor_y - 1,
+                                new: vec![new_content],
+                                old: vec![current_line.to_string()],
+                            },
+                        );
+                    }
+                    self.status_message = status_message;
+                }
+                command::CommandResult::Error(message) => {
+                    self.status_message = message.to_string();
+                }
+                command::CommandResult::NoCommand => {
+                    // Do nothing, not a command
                 }
             }
         }
