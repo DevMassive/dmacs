@@ -600,10 +600,7 @@ impl Editor {
 
     pub fn move_cursor_word_left(&mut self) -> Result<()> {
         self.last_action_was_kill = false;
-        let current_line = &self.document.lines[self.cursor_y];
-        let mut new_cursor_x = self.cursor_x;
-
-        if new_cursor_x == 0 {
+        if self.cursor_x == 0 {
             if self.cursor_y > 0 {
                 self.cursor_y -= 1;
                 self.cursor_x = self.document.lines[self.cursor_y].len();
@@ -614,34 +611,34 @@ impl Editor {
             return Ok(());
         }
 
-        let mut chars_iter = current_line[..new_cursor_x].char_indices().rev();
+        let line = &self.document.lines[self.cursor_y];
+        let mut new_cursor_x = self.cursor_x;
 
-        // Step 1: Skip any non-word characters (including whitespace) to the left
-        // until we hit a word character or the beginning of the line.
-        let mut found_word_char = false;
-        for (idx, ch) in chars_iter.by_ref() {
-            if is_word_char(ch) {
-                new_cursor_x = idx; // This is the start of a word
-                found_word_char = true;
+        // 1. Skip whitespace to the left
+        let mut boundary = new_cursor_x;
+        for (idx, ch) in line[..new_cursor_x].char_indices().rev() {
+            if get_char_type(ch) != CharType::Whitespace {
                 break;
             }
-            new_cursor_x = idx; // Keep moving left
+            boundary = idx;
         }
+        new_cursor_x = boundary;
 
-        // Step 2: If we found a word character, now skip all word characters
-        // to find the actual beginning of the word.
-        if found_word_char {
-            for (idx, ch) in chars_iter {
-                if !is_word_char(ch) {
-                    new_cursor_x = idx + ch.len_utf8();
+        // 2. We are at the end of a word. Get its type.
+        if new_cursor_x > 0 {
+            let word_type = get_char_type(line[..new_cursor_x].chars().next_back().unwrap());
+            // 3. Skip all chars of this type
+            for (idx, ch) in line[..new_cursor_x].char_indices().rev() {
+                if get_char_type(ch) != word_type {
                     break;
                 }
-                new_cursor_x = idx; // Keep moving left
+                boundary = idx;
             }
+            new_cursor_x = boundary;
         }
 
         self.cursor_x = new_cursor_x;
-        self.desired_cursor_x = self.scroll.get_display_width(current_line, self.cursor_x);
+        self.desired_cursor_x = self.scroll.get_display_width(line, self.cursor_x);
         Ok(())
     }
 
@@ -650,7 +647,7 @@ impl Editor {
         let current_line = &self.document.lines[self.cursor_y];
         let line_len = current_line.len();
 
-        if self.cursor_x == line_len {
+        if self.cursor_x >= line_len {
             if self.cursor_y < self.document.lines.len() - 1 {
                 self.cursor_y += 1;
                 self.cursor_x = 0;
@@ -660,25 +657,30 @@ impl Editor {
         }
 
         let mut new_cursor_x = self.cursor_x;
-        let mut chars_iter = current_line[new_cursor_x..].chars().peekable();
+        let mut iter = current_line[new_cursor_x..].char_indices().peekable();
 
-        // Step 1: Skip any non-word characters (including whitespace)
-        // until we hit a word character or the end of the line.
-        while let Some(&ch) = chars_iter.peek() {
-            if is_word_char(ch) {
-                break; // Found start of a word
+        // 1. Skip whitespace
+        while let Some((_, ch)) = iter.peek() {
+            if get_char_type(*ch) == CharType::Whitespace {
+                new_cursor_x += ch.len_utf8();
+                iter.next();
+            } else {
+                break;
             }
-            new_cursor_x += ch.len_utf8();
-            chars_iter.next(); // Consume the character
         }
 
-        // Step 2: Skip all word characters
-        while let Some(&ch) = chars_iter.peek() {
-            if !is_word_char(ch) {
-                break; // Found end of a word
+        // 2. We are at a word. Get its type.
+        if let Some((_, first_word_char)) = iter.peek() {
+            let word_type = get_char_type(*first_word_char);
+            // 3. Skip all chars of this type
+            while let Some((_, ch)) = iter.peek() {
+                if get_char_type(*ch) == word_type {
+                    new_cursor_x += ch.len_utf8();
+                    iter.next();
+                } else {
+                    break;
+                }
             }
-            new_cursor_x += ch.len_utf8();
-            chars_iter.next(); // Consume the character
         }
 
         self.cursor_x = new_cursor_x;
@@ -1149,56 +1151,87 @@ impl Editor {
     }
 }
 
-fn find_word_boundary_left(line: &str, current_x: usize) -> usize {
-    let mut delete_start = current_x;
+#[derive(PartialEq, Eq, Clone, Copy, Debug)]
+enum CharType {
+    Kanji,
+    Hiragana,
+    Katakana,
+    Alphanumeric,
+    Punctuation,
+    Whitespace,
+    Other,
+}
 
-    if delete_start == 0 {
+fn get_char_type(ch: char) -> CharType {
+    if ch.is_whitespace() {
+        return CharType::Whitespace;
+    }
+    if ch == '。' || ch == '、' {
+        return CharType::Punctuation;
+    }
+    // ASCII Alphanumeric
+    if ch.is_ascii_alphanumeric() {
+        return CharType::Alphanumeric;
+    }
+    // Hiragana
+    if ('\u{3040}'..='\u{309F}').contains(&ch) {
+        return CharType::Hiragana;
+    }
+    // Katakana
+    if ('\u{30A0}'..='\u{30FF}').contains(&ch) {
+        return CharType::Katakana;
+    }
+    // CJK Unified Ideographs (Kanji)
+    if ('\u{4E00}'..='\u{9FFF}').contains(&ch) {
+        return CharType::Kanji;
+    }
+    // Full-width digits
+    if ('\u{FF10}'..='\u{FF19}').contains(&ch) {
+        return CharType::Alphanumeric;
+    }
+    // Full-width uppercase
+    if ('\u{FF21}'..='\u{FF3A}').contains(&ch) {
+        return CharType::Alphanumeric;
+    }
+    // Full-width lowercase
+    if ('\u{FF41}'..='\u{FF5A}').contains(&ch) {
+        return CharType::Alphanumeric;
+    }
+    CharType::Other
+}
+
+fn find_word_boundary_left(line: &str, current_x: usize) -> usize {
+    if current_x == 0 {
         return 0;
     }
 
-    let mut chars_to_left = line[..delete_start].char_indices().rev();
+    let mut boundary = current_x;
 
-    // Step 1: Skip any trailing non-word characters (e.g., punctuation, spaces after a word)
-    // until we hit a word character.
-    let mut found_word_char = false;
-    for (idx, ch) in chars_to_left.by_ref() {
-        if is_word_char(ch) {
-            delete_start = idx;
-            found_word_char = true;
-            break;
-        }
-        delete_start = idx;
-    }
+    // 1. Find char to the left and its type
+    let (start_idx, start_char) = line[..boundary].char_indices().next_back().unwrap();
+    let current_type = get_char_type(start_char);
+    boundary = start_idx;
 
-    // Step 2: If we found a word character, now skip all word characters
-    // to find the actual beginning of the word.
-    if found_word_char {
-        for (idx, ch) in chars_to_left {
-            if !is_word_char(ch) {
-                delete_start = idx + ch.len_utf8();
+    // If it's NOT whitespace, it's a word. Find its beginning.
+    if current_type != CharType::Whitespace {
+        for (idx, ch) in line[..start_idx].char_indices().rev() {
+            if get_char_type(ch) != current_type {
                 break;
             }
-            delete_start = idx;
+            boundary = idx;
         }
     }
 
-    // Step 3: Now, `delete_start` is at the beginning of the word (or the beginning of the line
-    // if no word was found). We need to also delete any preceding whitespace.
-    // Iterate left from `delete_start` to find the first non-whitespace character.
-    // We need a new iterator for this, starting from `delete_start`.
-    let mut final_delete_start = delete_start;
-    let whitespace_chars_to_left = line[..delete_start].char_indices().rev();
-    for (idx, ch) in whitespace_chars_to_left {
-        if ch.is_whitespace() {
-            final_delete_start = idx;
+    // Now, `boundary` is at the beginning of the word/whitespace block.
+    // Delete any preceding whitespace.
+    let mut final_boundary = boundary;
+    for (idx, ch) in line[..boundary].char_indices().rev() {
+        if get_char_type(ch) == CharType::Whitespace {
+            final_boundary = idx;
         } else {
             break;
         }
     }
 
-    final_delete_start
-}
-
-fn is_word_char(ch: char) -> bool {
-    ch.is_alphanumeric() || ch == '_' || ch.is_alphabetic()
+    final_boundary
 }

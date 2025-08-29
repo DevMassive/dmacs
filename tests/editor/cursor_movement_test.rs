@@ -172,3 +172,115 @@ fn test_go_to_end_of_file() {
     editor.go_to_end_of_file();
     assert_eq!(editor.cursor_pos(), (1, 2)); // Line 2 (0-indexed), cursor at end of 'c'
 }
+
+#[test]
+fn test_editor_move_cursor_word_right_japanese() {
+    let mut editor = Editor::new(None);
+    editor.document.lines = vec!["漢字とひらがなとカタカナと英字123。".to_string()];
+    editor.set_cursor_pos(0, 0);
+
+    // Move to end of "漢字"
+    editor
+        .process_input(Input::Character('\x06'), false)
+        .unwrap(); // Ctrl-F
+    assert_eq!(editor.cursor_pos(), (6, 0));
+
+    // Move to end of "とひらがなと"
+    editor
+        .process_input(Input::Character('\x06'), false)
+        .unwrap(); // Ctrl-F
+    assert_eq!(editor.cursor_pos(), (24, 0));
+
+    // Move to end of "カタカナ"
+    editor
+        .process_input(Input::Character('\x06'), false)
+        .unwrap(); // Ctrl-F
+    assert_eq!(editor.cursor_pos(), (36, 0));
+
+    // Move to end of "と"
+    editor
+        .process_input(Input::Character('\x06'), false)
+        .unwrap(); // Ctrl-F
+    assert_eq!(editor.cursor_pos(), (39, 0));
+
+    // Move to end of "英字"
+    editor
+        .process_input(Input::Character('\x06'), false)
+        .unwrap(); // Ctrl-F
+    assert_eq!(editor.cursor_pos(), (45, 0));
+
+    // Move to end of "123"
+    editor
+        .process_input(Input::Character('\x06'), false)
+        .unwrap(); // Ctrl-F
+    assert_eq!(editor.cursor_pos(), (48, 0));
+
+    // Move to end of "。"
+    editor
+        .process_input(Input::Character('\x06'), false)
+        .unwrap(); // Ctrl-F
+    assert_eq!(editor.cursor_pos(), (51, 0));
+
+    // Stays at the end
+    editor
+        .process_input(Input::Character('\x06'), false)
+        .unwrap(); // Ctrl-F
+    assert_eq!(editor.cursor_pos(), (51, 0));
+}
+
+#[test]
+fn test_editor_move_cursor_word_left_japanese() {
+    let mut editor = Editor::new(None);
+    let line = "漢字とひらがなとカタカナと英字123。".to_string();
+    let line_len = line.len();
+    editor.document.lines = vec![line];
+    editor.set_cursor_pos(line_len, 0);
+
+    // Move to beginning of "。"
+    editor
+        .process_input(Input::Character('\x02'), false)
+        .unwrap(); // Ctrl-B
+    assert_eq!(editor.cursor_pos(), (48, 0));
+
+    // Move to beginning of "123"
+    editor
+        .process_input(Input::Character('\x02'), false)
+        .unwrap(); // Ctrl-B
+    assert_eq!(editor.cursor_pos(), (45, 0));
+
+    // Move to beginning of "英字"
+    editor
+        .process_input(Input::Character('\x02'), false)
+        .unwrap(); // Ctrl-B
+    assert_eq!(editor.cursor_pos(), (39, 0));
+
+    // Move to beginning of "と"
+    editor
+        .process_input(Input::Character('\x02'), false)
+        .unwrap(); // Ctrl-B
+    assert_eq!(editor.cursor_pos(), (36, 0));
+
+    // Move to beginning of "カタカナ"
+    editor
+        .process_input(Input::Character('\x02'), false)
+        .unwrap(); // Ctrl-B
+    assert_eq!(editor.cursor_pos(), (24, 0));
+
+    // Move to beginning of "とひらがなと"
+    editor
+        .process_input(Input::Character('\x02'), false)
+        .unwrap(); // Ctrl-B
+    assert_eq!(editor.cursor_pos(), (6, 0));
+
+    // Move to beginning of "漢字"
+    editor
+        .process_input(Input::Character('\x02'), false)
+        .unwrap(); // Ctrl-B
+    assert_eq!(editor.cursor_pos(), (0, 0));
+
+    // Stays at the beginning
+    editor
+        .process_input(Input::Character('\x02'), false)
+        .unwrap(); // Ctrl-B
+    assert_eq!(editor.cursor_pos(), (0, 0));
+}
