@@ -39,7 +39,7 @@ impl Editor {
             // Draw tasks
             for (i, (_original_idx, task_content)) in self.task.tasks.iter().enumerate() {
                 let display_row = start_task_row + i - self.task.task_display_offset;
-                if display_row >= TASK_UI_HEIGHT {
+                if display_row >= start_task_row + TASK_UI_HEIGHT {
                     // Ensure we don't draw beyond the task UI area
                     break;
                 }
@@ -60,11 +60,11 @@ impl Editor {
             // Draw a separator line below the task UI
             window.attron(A_DIM);
             for i in 0..screen_cols {
-                window.mvaddch(TASK_UI_HEIGHT as i32 - 1, i as i32, pancurses::ACS_HLINE());
+                window.mvaddch((start_task_row +TASK_UI_HEIGHT) as i32 - 1, i as i32, pancurses::ACS_HLINE());
             }
             window.attroff(A_DIM);
 
-            document_start_row = TASK_UI_HEIGHT; // Shift document down
+            document_start_row = start_task_row + TASK_UI_HEIGHT; // Shift document down
         }
 
         // Draw text
