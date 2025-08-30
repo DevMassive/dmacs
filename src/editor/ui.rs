@@ -5,6 +5,7 @@ use crate::editor::Editor;
 
 const TAB_STOP: usize = 4;
 pub const STATUS_BAR_HEIGHT: usize = 2;
+pub const TASK_UI_HEIGHT: usize = 7;
 
 impl Editor {
     pub fn is_separator_line(line: &str) -> bool {
@@ -29,16 +30,54 @@ impl Editor {
 
         let selection_range = self.selection.get_selection_range(self.cursor_pos());
 
+        let mut document_start_row = STATUS_BAR_HEIGHT; // Default for normal mode
+
+        if self.mode == crate::editor::EditorMode::TaskSelection {
+            // Draw task selection UI
+            let start_task_row = STATUS_BAR_HEIGHT; // Start drawing tasks below the normal status bar
+
+            // Draw tasks
+            for (i, (_original_idx, task_content)) in self.task.tasks.iter().enumerate() {
+                let display_row = start_task_row + i - self.task.task_display_offset;
+                if display_row >= TASK_UI_HEIGHT {
+                    // Ensure we don't draw beyond the task UI area
+                    break;
+                }
+                if display_row < start_task_row {
+                    // Ensure we don't draw above the task UI area
+                    continue;
+                }
+
+                if Some(i) == self.task.selected_task_index {
+                    window.attron(A_REVERSE);
+                }
+                window.mvaddstr(display_row as i32, 0, task_content);
+                if Some(i) == self.task.selected_task_index {
+                    window.attroff(A_REVERSE);
+                }
+            }
+
+            // Draw a separator line below the task UI
+            window.attron(A_DIM);
+            for i in 0..screen_cols {
+                window.mvaddch(TASK_UI_HEIGHT as i32 - 1, i as i32, pancurses::ACS_HLINE());
+            }
+            window.attroff(A_DIM);
+
+            document_start_row = TASK_UI_HEIGHT; // Shift document down
+        }
+
         // Draw text
         for (index, line) in self.document.lines.iter().enumerate() {
             if index < self.scroll.row_offset {
                 continue;
             }
             let row = index - self.scroll.row_offset;
-            if row >= screen_rows.saturating_sub(STATUS_BAR_HEIGHT) {
+            if row >= screen_rows.saturating_sub(document_start_row) {
+                // Use document_start_row here
                 break;
             }
-            let row = row + STATUS_BAR_HEIGHT;
+            let row = row + document_start_row; // Adjust row based on document_start_row
 
             let is_comment = line.trim_start().starts_with('#');
             let is_unchecked = Self::is_unchecked_checkbox(line);
@@ -234,14 +273,18 @@ impl Editor {
             .scroll
             .get_display_width(&self.document.lines[self.cursor_y], self.cursor_x);
         window.mv(
-            (self.cursor_y - self.scroll.row_offset + STATUS_BAR_HEIGHT) as i32,
+            (self.cursor_y - self.scroll.row_offset + document_start_row) as i32,
             (display_cursor_x - self.scroll.col_offset) as i32,
         );
         window.refresh();
     }
 
     pub fn scroll(&mut self) {
-        let visible_content_height = self.scroll.screen_rows.saturating_sub(STATUS_BAR_HEIGHT);
+        let mut visible_content_height = self.scroll.screen_rows.saturating_sub(STATUS_BAR_HEIGHT);
+
+        if self.mode == crate::editor::EditorMode::TaskSelection {
+            visible_content_height = self.scroll.screen_rows.saturating_sub(TASK_UI_HEIGHT);
+        }
 
         // Vertical scroll
         if self.cursor_y < self.scroll.row_offset {

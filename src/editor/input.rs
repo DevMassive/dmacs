@@ -2,6 +2,7 @@ use log::debug;
 use pancurses::Input;
 
 use crate::editor::Editor;
+use crate::editor::EditorMode;
 use crate::error::Result;
 
 impl Editor {
@@ -11,6 +12,11 @@ impl Editor {
 
         if self.search.mode {
             self.handle_search_input(key);
+            return Ok(());
+        }
+
+        if self.mode == EditorMode::TaskSelection {
+            self.handle_task_selection_input(key);
             return Ok(());
         }
 

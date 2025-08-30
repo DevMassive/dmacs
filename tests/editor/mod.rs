@@ -9,4 +9,5 @@ mod misc_test;
 mod scrolling_test;
 mod search_test;
 mod selection_test;
+mod task_command_test;
 mod undo_test;
