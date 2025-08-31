@@ -1192,6 +1192,11 @@ impl Editor {
     pub fn set_no_exit_on_save(&mut self, value: bool) {
         self.no_exit_on_save = value;
     }
+
+    // Method to calculate task UI height
+    pub fn task_ui_height(&self) -> usize {
+        (self.scroll.screen_rows as f32 * 0.4).round() as usize
+    }
 }
 
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]

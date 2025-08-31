@@ -5,7 +5,6 @@ use crate::editor::Editor;
 
 const TAB_STOP: usize = 4;
 pub const STATUS_BAR_HEIGHT: usize = 2;
-pub const TASK_UI_HEIGHT: usize = 7;
 
 impl Editor {
     pub fn is_separator_line(line: &str) -> bool {
@@ -30,16 +29,18 @@ impl Editor {
 
         let selection_range = self.selection.get_selection_range(self.cursor_pos());
 
-        let mut document_start_row = STATUS_BAR_HEIGHT; // Default for normal mode
+        let document_start_row = STATUS_BAR_HEIGHT; // Default for normal mode
+        let mut document_end_row = screen_rows;
 
         if self.mode == crate::editor::EditorMode::TaskSelection {
-            // Draw task selection UI
-            let start_task_row = STATUS_BAR_HEIGHT; // Start drawing tasks below the normal status bar
+            // Calculate task UI height and position
+            let task_ui_height = self.task_ui_height();
+            let start_task_row = screen_rows.saturating_sub(task_ui_height);
 
             // Draw tasks
             for (i, (_original_idx, task_content)) in self.task.tasks.iter().enumerate() {
                 let display_row = start_task_row + i - self.task.task_display_offset;
-                if display_row >= start_task_row + TASK_UI_HEIGHT {
+                if display_row >= start_task_row + task_ui_height {
                     // Ensure we don't draw beyond the task UI area
                     break;
                 }
@@ -57,14 +58,16 @@ impl Editor {
                 }
             }
 
-            // Draw a separator line below the task UI
+            // Draw a separator line above the task UI
             window.attron(A_DIM);
             for i in 0..screen_cols {
-                window.mvaddch((start_task_row +TASK_UI_HEIGHT) as i32 - 1, i as i32, pancurses::ACS_HLINE());
+                window.mvaddch(start_task_row as i32 - 1, i as i32, pancurses::ACS_HLINE());
             }
             window.attroff(A_DIM);
 
-            document_start_row = start_task_row + TASK_UI_HEIGHT; // Shift document down
+            // Document starts from the top, below status bar
+            // The document drawing area ends at the start of the task UI, excluding the separator line
+            document_end_row = start_task_row.saturating_sub(1);
         }
 
         // Draw text
@@ -73,7 +76,7 @@ impl Editor {
                 continue;
             }
             let row = index - self.scroll.row_offset;
-            if row >= screen_rows.saturating_sub(document_start_row) {
+            if row >= document_end_row.saturating_sub(document_start_row) {
                 // Use document_start_row here
                 break;
             }
@@ -283,7 +286,12 @@ impl Editor {
         let mut visible_content_height = self.scroll.screen_rows.saturating_sub(STATUS_BAR_HEIGHT);
 
         if self.mode == crate::editor::EditorMode::TaskSelection {
-            visible_content_height = self.scroll.screen_rows.saturating_sub(TASK_UI_HEIGHT);
+            let task_ui_height = self.task_ui_height();
+            visible_content_height = self
+                .scroll
+                .screen_rows
+                .saturating_sub(STATUS_BAR_HEIGHT)
+                .saturating_sub(task_ui_height);
         }
 
         // Vertical scroll

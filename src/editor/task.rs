@@ -1,7 +1,6 @@
 // src/editor/task.rs
 
 use crate::document::ActionDiff;
-use crate::editor::ui::TASK_UI_HEIGHT;
 use crate::editor::{Editor, EditorMode, LastActionType};
 use pancurses::Input;
 
@@ -53,7 +52,8 @@ impl Editor {
     pub fn handle_task_selection_input(&mut self, key: Input) {
         match key {
             Input::KeyUp => {
-                let task_list_visible_rows = TASK_UI_HEIGHT.saturating_sub(1); // -1 for separator line
+                let task_ui_height = self.task_ui_height();
+                let task_list_visible_rows = task_ui_height.saturating_sub(1);
                 if let Some(idx) = self.task.selected_task_index {
                     if idx > 0 {
                         self.task.selected_task_index = Some(idx - 1);
@@ -72,7 +72,8 @@ impl Editor {
                 }
             }
             Input::KeyDown => {
-                let task_list_visible_rows = TASK_UI_HEIGHT.saturating_sub(1); // -1 for separator line
+                let task_ui_height = self.task_ui_height();
+                let task_list_visible_rows = task_ui_height.saturating_sub(1);
                 if let Some(idx) = self.task.selected_task_index {
                     if idx < self.task.tasks.len() - 1 {
                         self.task.selected_task_index = Some(idx + 1);
