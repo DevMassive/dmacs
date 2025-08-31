@@ -264,3 +264,53 @@ fn test_task_command_scroll_tasks() {
     assert_eq!(editor.task.selected_task_index, Some(0));
     assert_eq!(editor.task.task_display_offset, 0);
 }
+
+#[test]
+fn test_task_command_move_task_bug() {
+    let mut editor = setup_editor(&["- [ ] Task 1", "- [ ] Task 2"]);
+    editor.cursor_y = 0; // Cursor at "Current line"
+    editor.cursor_x = 0;
+
+    editor.document.lines.insert(0, "/task".to_string()); // Insert /task at the beginning
+    editor.cursor_y = 0; // Cursor on the /task line
+    editor.cursor_x = 5; // Cursor at the end of /task
+    editor.insert_newline().unwrap(); // Now call insert_newline // Enter task selection mode
+
+    assert_eq!(editor.document.lines.len(), 3);
+    assert_eq!(editor.document.lines[0], ""); // Empty line
+    assert_eq!(editor.document.lines[1], "- [ ] Task 1");
+    assert_eq!(editor.document.lines[2], "- [ ] Task 2"); // Original Task 1 removed, so Task 2 is now at index 3
+
+    assert_eq!(editor.task.tasks.len(), 2);
+    assert_eq!(editor.task.tasks[0].1, "- [ ] Task 1");
+    assert_eq!(editor.task.tasks[1].1, "- [ ] Task 2");
+    assert_eq!(editor.task.selected_task_index, Some(0));
+
+    // Move Task 2
+    editor.handle_task_selection_input(Input::KeyDown); // Press DOWN
+    editor.handle_task_selection_input(Input::Character(' ')); // Press SPACE
+
+    assert_eq!(editor.document.lines.len(), 3);
+    assert_eq!(editor.document.lines[0], "- [ ] Task 2");
+    assert_eq!(editor.document.lines[1], ""); // Empty line
+    assert_eq!(editor.document.lines[2], "- [ ] Task 1");
+
+    assert_eq!(editor.task.tasks.len(), 1); // Task 2 moved, only Task 1 remains
+    assert_eq!(editor.task.tasks[0].1, "- [ ] Task 1");
+    assert_eq!(editor.task.selected_task_index, Some(0)); // Still selects the first remaining task
+
+    // Move Task 1
+    editor.handle_task_selection_input(Input::Character(' ')); // Press SPACE again
+
+    assert_eq!(editor.document.lines.len(), 3);
+    assert_eq!(editor.document.lines[0], "- [ ] Task 2");
+    assert_eq!(editor.document.lines[1], "- [ ] Task 1");
+    assert_eq!(editor.document.lines[2], "");
+
+    assert!(editor.task.tasks.is_empty()); // All tasks moved
+    assert_eq!(editor.mode, EditorMode::Normal); // Should exit mode
+    assert_eq!(
+        editor.status_message,
+        "All tasks moved. Exiting task selection mode."
+    );
+}

@@ -167,6 +167,13 @@ impl Editor {
 
                         // Remove the task from the task.tasks list and update selected_task_index
                         self.task.tasks.remove(selected_idx);
+
+                        // Adjust original_line_index for subsequent tasks
+                        for (line_idx, _) in self.task.tasks.iter_mut() {
+                            if *line_idx < original_line_idx {
+                                *line_idx += 1;
+                            }
+                        }
                         if self.task.tasks.is_empty() {
                             self.task.selected_task_index = None;
                             self.set_message("All tasks moved. Exiting task selection mode.");
