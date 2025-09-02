@@ -2,6 +2,7 @@ use crate::document::{ActionDiff, Document};
 use crate::editor::search::Search;
 use crate::error::Result;
 use crate::persistence::{self, CursorPosition};
+use arboard::Clipboard;
 use log::debug;
 
 use std::time::{Duration, Instant};
@@ -534,12 +535,30 @@ impl Editor {
             self.kill_buffer.push('\x0a');
         }
 
+        self.set_clipboard(&self.kill_buffer.clone());
+
         self.last_action_was_kill = true;
 
         Ok(())
     }
 
+    fn set_clipboard(&mut self, text: &str) {
+        if let Ok(mut clipboard) = Clipboard::new() {
+            if let Err(e) = clipboard.set_text(text.to_string()) {
+                self.status_message = format!("Failed to set clipboard: {e}");
+            }
+        } else {
+            self.status_message = "Failed to initialize clipboard.".to_string();
+        }
+    }
+
     pub fn yank(&mut self) -> Result<()> {
+        if let Ok(mut clipboard) = Clipboard::new() {
+            if let Ok(text) = clipboard.get_text() {
+                self.kill_buffer = text;
+            }
+        }
+
         let text_to_yank = self.kill_buffer.clone();
         if text_to_yank.is_empty() {
             self.status_message = "Kill buffer is empty.".to_string();
@@ -994,7 +1013,8 @@ impl Editor {
         }
 
         self.kill_buffer = killed_text;
-        self.status_message = "Selection cut.".to_string();
+        self.set_clipboard(&self.kill_buffer.clone());
+        self.status_message = "Selection cut to clipboard.".to_string();
         debug!("Selection cut. Kill buffer: '{}'", self.kill_buffer);
 
         Ok(())
@@ -1003,7 +1023,8 @@ impl Editor {
     pub fn copy_selection_action(&mut self) -> Result<()> {
         let cursor_pos = self.cursor_pos();
         self.kill_buffer = self.selection.copy_selection(&self.document, cursor_pos)?;
-        self.status_message = "Selection copied.".to_string();
+        self.set_clipboard(&self.kill_buffer.clone());
+        self.status_message = "Selection copied to clipboard.".to_string();
         debug!("Selection copied. Kill buffer: '{}'", self.kill_buffer);
         Ok(())
     }
