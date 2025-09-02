@@ -8,14 +8,14 @@ use std::time::{Duration, Instant};
 
 pub mod checkbox;
 pub mod command;
+pub mod comment;
+pub mod indent;
 pub mod input;
 pub mod scroll;
 pub mod search;
 pub mod selection;
 pub mod task;
 pub mod ui;
-pub mod indent;
-pub mod comment;
 use crate::editor::scroll::Scroll;
 use crate::editor::task::Task;
 

@@ -36,10 +36,7 @@ fn test_indent_selection() {
     editor.selection.set_marker((0, 0)); // Start of line1
     editor.set_cursor_pos(5, 2); // End of line3
     editor.indent_line().unwrap();
-    assert_eq!( 
-        editor.document.lines, 
-        vec!["  line1", "  line2", "  line3"]
-    );
+    assert_eq!(editor.document.lines, vec!["  line1", "  line2", "  line3"]);
     assert!(editor.selection.is_selection_active());
     assert_eq!(editor.cursor_pos(), (7, 2)); // 5 + 2
     assert_eq!(editor.selection.marker_pos, Some((2, 0))); // 0 + 2

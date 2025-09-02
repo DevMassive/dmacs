@@ -25,8 +25,6 @@ fn test_editor_with_wide_chars() {
     assert_eq!(editor.cursor_pos(), (0, 0));
 }
 
-
-
 #[test]
 fn test_is_separator_line() {
     // Test exact match

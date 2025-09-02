@@ -119,7 +119,6 @@ impl Editor {
             }
             new_cursor_x = new_cursor_x.max(0);
 
-
             self.commit(
                 LastActionType::ToggleComment,
                 &ActionDiff {
@@ -165,7 +164,12 @@ impl Editor {
 fn comment_line(line: &str) -> String {
     let leading_whitespace_len = line.len() - line.trim_start().len();
     let leading_whitespace = &line[..leading_whitespace_len];
-    format!("{}{}{}", leading_whitespace, COMMENT_PREFIX, &line[leading_whitespace_len..])
+    format!(
+        "{}{}{}",
+        leading_whitespace,
+        COMMENT_PREFIX,
+        &line[leading_whitespace_len..]
+    )
 }
 
 fn uncomment_line(line: &str) -> String {
@@ -173,7 +177,7 @@ fn uncomment_line(line: &str) -> String {
     let leading_whitespace = &line[..leading_whitespace_len];
     let trimmed_line = line.trim_start();
     if let Some(stripped) = trimmed_line.strip_prefix(COMMENT_PREFIX) {
-        format!("{}{}", leading_whitespace, stripped)
+        format!("{leading_whitespace}{stripped}")
     } else {
         line.to_string()
     }

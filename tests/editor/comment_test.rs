@@ -11,9 +11,7 @@ fn create_editor_with_content(content: &str) -> Editor {
 }
 
 fn simulate_alt_slash(editor: &mut Editor) {
-    editor
-        .process_input(Input::Character('/'), true)
-        .unwrap();
+    editor.process_input(Input::Character('/'), true).unwrap();
 }
 
 #[test]
@@ -56,24 +54,25 @@ fn test_toggle_comment_off_indented_line() {
 
 #[test]
 fn test_toggle_comment_on_selection() {
-    let mut editor = create_editor_with_content("line1
+    let mut editor = create_editor_with_content(
+        "line1
 line2
-line3");
+line3",
+    );
     editor.selection.set_marker((0, 0));
     editor.set_cursor_pos(5, 2);
     simulate_alt_slash(&mut editor);
-    assert_eq!(
-        editor.document.lines,
-        vec!["# line1", "# line2", "# line3"]
-    );
+    assert_eq!(editor.document.lines, vec!["# line1", "# line2", "# line3"]);
     assert!(editor.selection.is_selection_active());
 }
 
 #[test]
 fn test_toggle_comment_off_selection() {
-    let mut editor = create_editor_with_content("# line1
+    let mut editor = create_editor_with_content(
+        "# line1
 # line2
-# line3");
+# line3",
+    );
     editor.selection.set_marker((0, 0));
     editor.set_cursor_pos(7, 2);
     simulate_alt_slash(&mut editor);
@@ -83,9 +82,11 @@ fn test_toggle_comment_off_selection() {
 
 #[test]
 fn test_toggle_comment_on_mixed_selection() {
-    let mut editor = create_editor_with_content("line1
+    let mut editor = create_editor_with_content(
+        "line1
 # line2
-line3");
+line3",
+    );
     editor.selection.set_marker((0, 0));
     editor.set_cursor_pos(5, 2);
     simulate_alt_slash(&mut editor);
@@ -97,9 +98,11 @@ line3");
 
 #[test]
 fn test_toggle_comment_selection_ignores_empty_lines() {
-    let mut editor = create_editor_with_content("line1
+    let mut editor = create_editor_with_content(
+        "line1
 
-line3");
+line3",
+    );
     editor.selection.set_marker((0, 0));
     editor.set_cursor_pos(5, 2);
     simulate_alt_slash(&mut editor);
@@ -108,8 +111,10 @@ line3");
 
 #[test]
 fn test_toggle_comment_selection_excludes_last_line_if_cursor_x_is_zero() {
-    let mut editor = create_editor_with_content("line1
-line2");
+    let mut editor = create_editor_with_content(
+        "line1
+line2",
+    );
     editor.selection.set_marker((0, 0));
     editor.set_cursor_pos(0, 1);
     simulate_alt_slash(&mut editor);

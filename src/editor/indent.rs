@@ -13,7 +13,10 @@ impl Editor {
         let original_cursor_pos = self.cursor_pos();
         let original_marker_pos = self.selection.marker_pos.unwrap();
 
-        let (start, end) = self.selection.get_selection_range(original_cursor_pos).unwrap();
+        let (start, end) = self
+            .selection
+            .get_selection_range(original_cursor_pos)
+            .unwrap();
         let start_y = start.1;
         let mut end_y = end.1;
 
@@ -68,7 +71,10 @@ impl Editor {
         if let Some(last_transaction) = self.undo_stack.last_mut() {
             last_transaction.push(delete_diff.clone());
         }
-        let (new_x, new_y) = self.document.apply_action_diff(&delete_diff, false).unwrap();
+        let (new_x, new_y) = self
+            .document
+            .apply_action_diff(&delete_diff, false)
+            .unwrap();
         self.cursor_x = new_x;
         self.cursor_y = new_y;
 
@@ -89,7 +95,9 @@ impl Editor {
         if let Some(last_transaction) = self.undo_stack.last_mut() {
             last_transaction.push(insert_diff.clone());
         }
-        self.document.apply_action_diff(&insert_diff, false).unwrap();
+        self.document
+            .apply_action_diff(&insert_diff, false)
+            .unwrap();
 
         // 3. Calculate and set new selection points
         let mut new_cursor_pos = original_cursor_pos;
@@ -116,7 +124,7 @@ impl Editor {
 
     pub fn indent_line(&mut self) -> Result<()> {
         if self.selection.is_selection_active() {
-            self.handle_selection_indent_outdent(|line| format!("  {}", line))
+            self.handle_selection_indent_outdent(|line| format!("  {line}"))
         } else {
             let y = self.cursor_y;
             if y >= self.document.lines.len() {
@@ -145,10 +153,10 @@ impl Editor {
     pub fn outdent_line(&mut self) -> Result<()> {
         if self.selection.is_selection_active() {
             self.handle_selection_indent_outdent(|line| {
-                if line.starts_with("  ") {
-                    line[2..].to_string()
-                } else if line.starts_with(' ') {
-                    line[1..].to_string()
+                if let Some(stripped) = line.strip_prefix("  ") {
+                    stripped.to_string()
+                } else if let Some(stripped) = line.strip_prefix(' ') {
+                    stripped.to_string()
                 } else {
                     line.to_string()
                 }
