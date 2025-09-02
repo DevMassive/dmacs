@@ -168,7 +168,7 @@ impl Editor {
                 // Draw character
                 if display_x > self.scroll.col_offset {
                     let screen_x = char_start_display_x.saturating_sub(self.scroll.col_offset);
-                    if screen_x < screen_cols {
+                    if screen_x + char_width <= screen_cols {
                         if ch == '\x09' {
                             // Draw a tab as spaces
                             for i in 0..char_width {
