@@ -92,6 +92,7 @@ impl Editor {
                 '\x1c' | // Ctrl+\
                 '\x1d' | // Ctrl+] 
                 '\x1e' => {}, // Ctrl+^
+                '\t' => self.indent_line()?,
                 _ => self.insert_text(&c.to_string())?,
             },
             Input::KeyBackspace => self.delete_char()?,
@@ -99,6 +100,7 @@ impl Editor {
             Input::KeyDown => self.move_cursor_down(),
             Input::KeyLeft => self.move_cursor_left(),
             Input::KeyRight => self.move_cursor_right(),
+            Input::KeySTab | Input::KeyBTab => self.outdent_line()?,
             _ => {}
         }
         self.scroll

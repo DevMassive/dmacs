@@ -1098,6 +1098,75 @@ impl Editor {
     pub fn task_ui_height(&self) -> usize {
         (self.scroll.screen_rows as f32 * 0.4).round() as usize
     }
+
+    pub fn indent_line(&mut self) -> Result<()> {
+        let y = self.cursor_y;
+        if y >= self.document.lines.len() {
+            return Ok(());
+        }
+
+        self.commit(
+            LastActionType::Other,
+            &ActionDiff {
+                cursor_start_x: self.cursor_x,
+                cursor_start_y: self.cursor_y,
+                cursor_end_x: self.cursor_x + 2,
+                cursor_end_y: self.cursor_y,
+                start_x: 0,
+                start_y: y,
+                end_x: 0,
+                end_y: y,
+                new: vec!["  ".to_string()],
+                old: vec![],
+            },
+        );
+        self.last_action_was_kill = false;
+        Ok(())
+    }
+
+    pub fn outdent_line(&mut self) -> Result<()> {
+        let y = self.cursor_y;
+        if y >= self.document.lines.len() {
+            return Ok(());
+        }
+
+        let line = &self.document.lines[y];
+        if line.starts_with("  ") {
+            self.commit(
+                LastActionType::Other,
+                &ActionDiff {
+                    cursor_start_x: self.cursor_x,
+                    cursor_start_y: self.cursor_y,
+                    cursor_end_x: self.cursor_x.saturating_sub(2),
+                    cursor_end_y: self.cursor_y,
+                    start_x: 0,
+                    start_y: y,
+                    end_x: 2,
+                    end_y: y,
+                    new: vec![],
+                    old: vec!["  ".to_string()],
+                },
+            );
+        } else if line.starts_with(' ') {
+            self.commit(
+                LastActionType::Other,
+                &ActionDiff {
+                    cursor_start_x: self.cursor_x,
+                    cursor_start_y: self.cursor_y,
+                    cursor_end_x: self.cursor_x.saturating_sub(1),
+                    cursor_end_y: self.cursor_y,
+                    start_x: 0,
+                    start_y: y,
+                    end_x: 1,
+                    end_y: y,
+                    new: vec![],
+                    old: vec![" ".to_string()],
+                },
+            );
+        }
+        self.last_action_was_kill = false;
+        Ok(())
+    }
 }
 
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
