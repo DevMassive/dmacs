@@ -6,6 +6,7 @@ use log::debug;
 
 use std::time::{Duration, Instant};
 
+pub mod checkbox;
 pub mod command;
 pub mod input;
 pub mod scroll;
@@ -1083,106 +1084,6 @@ impl Editor {
             self.desired_cursor_x = 0;
             self.scroll.row_offset = self.cursor_y; // Scroll to make cursor at top
         }
-    }
-
-    pub fn toggle_checkbox(&mut self) -> Result<()> {
-        self.last_action_was_kill = false;
-
-        let y = self.cursor_y;
-        if y >= self.document.lines.len() {
-            return Ok(());
-        }
-
-        let original_line = self.document.lines[y].clone();
-
-        let leading_whitespace_len = original_line.len() - original_line.trim_start().len();
-        let leading_whitespace = &original_line[..leading_whitespace_len];
-        let trimmed_line = original_line.trim_start();
-
-        let (new_line, cursor_x_change, message) =
-            if let Some(stripped) = trimmed_line.strip_prefix("- [x] ") {
-                (
-                    format!("{leading_whitespace}{stripped}"),
-                    -6isize, // -6 because "- [x] " is 6 chars
-                    "Checkbox removed.",
-                )
-            } else if let Some(stripped) = trimmed_line.strip_prefix("- [ ] ") {
-                (
-                    format!("{leading_whitespace}- [x] {stripped}"),
-                    0, // No change in length
-                    "Checkbox checked.",
-                )
-            } else if let Some(stripped) = trimmed_line.strip_prefix("- ") {
-                (
-                    format!("{leading_whitespace}- [ ] {stripped}"),
-                    4, // "- " to "- [ ] ", +4 chars
-                    "Checkbox added.",
-                )
-            } else {
-                (
-                    format!("{leading_whitespace}- {trimmed_line}"),
-                    2, // "" to "- ", +2 chars
-                    "List item added.",
-                )
-            };
-
-        let mut new_cursor_x = self.cursor_x;
-        if cursor_x_change > 0 {
-            // Adding characters
-            if self.cursor_x >= leading_whitespace_len {
-                new_cursor_x += cursor_x_change as usize;
-            } else {
-                // If cursor is in leading whitespace, move it to after the new prefix
-                new_cursor_x = leading_whitespace_len + cursor_x_change as usize;
-            }
-        } else if cursor_x_change < 0 {
-            // Removing characters
-            new_cursor_x = new_cursor_x.saturating_sub(cursor_x_change.unsigned_abs());
-        }
-        // If cursor_x_change is 0, new_cursor_x remains unchanged, which is correct.
-
-        // Ensure cursor is not beyond the new line length
-        if new_cursor_x > new_line.len() {
-            new_cursor_x = new_line.len();
-        }
-
-        self.commit(
-            LastActionType::ToggleCheckbox,
-            &ActionDiff {
-                cursor_start_x: self.cursor_x,
-                cursor_start_y: self.cursor_y,
-                cursor_end_x: 0,
-                cursor_end_y: self.cursor_y,
-
-                start_x: 0,
-                start_y: self.cursor_y,
-                end_x: original_line.len(),
-                end_y: self.cursor_y,
-
-                new: vec![],
-                old: vec![original_line],
-            },
-        );
-        self.commit(
-            LastActionType::Ammend,
-            &ActionDiff {
-                cursor_start_x: self.cursor_x,
-                cursor_start_y: self.cursor_y,
-                cursor_end_x: new_cursor_x,
-                cursor_end_y: self.cursor_y,
-
-                start_x: 0,
-                start_y: self.cursor_y,
-                end_x: new_line.len(),
-                end_y: self.cursor_y,
-
-                new: vec![new_line],
-                old: vec![],
-            },
-        );
-        self.status_message = message.to_string();
-
-        Ok(())
     }
 
     pub fn set_undo_debounce_threshold(&mut self, threshold_ms: u64) {
