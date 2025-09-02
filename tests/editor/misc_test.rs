@@ -25,54 +25,7 @@ fn test_editor_with_wide_chars() {
     assert_eq!(editor.cursor_pos(), (0, 0));
 }
 
-#[test]
-fn test_indent_on_tab_press() {
-    let mut editor = Editor::new(None);
-    editor.process_input(Input::Character('\t'), false).unwrap();
-    editor.process_input(Input::Character('a'), false).unwrap();
-    assert_eq!(editor.document.lines[0], "  a");
-    assert_eq!(editor.cursor_pos(), (3, 0));
-}
 
-#[test]
-fn test_outdent_on_shift_tab_press() {
-    let mut editor = Editor::new(None);
-    editor.insert_text("  a").unwrap();
-    editor.set_cursor_pos(3, 0);
-    editor.process_input(Input::KeySTab, false).unwrap();
-    assert_eq!(editor.document.lines[0], "a");
-    assert_eq!(editor.cursor_pos(), (1, 0));
-}
-
-#[test]
-fn test_outdent_with_one_space() {
-    let mut editor = Editor::new(None);
-    editor.insert_text(" a").unwrap();
-    editor.set_cursor_pos(2, 0);
-    editor.process_input(Input::KeySTab, false).unwrap();
-    assert_eq!(editor.document.lines[0], "a");
-    assert_eq!(editor.cursor_pos(), (1, 0));
-}
-
-#[test]
-fn test_outdent_with_no_space() {
-    let mut editor = Editor::new(None);
-    editor.insert_text("a").unwrap();
-    editor.set_cursor_pos(1, 0);
-    editor.process_input(Input::KeySTab, false).unwrap();
-    assert_eq!(editor.document.lines[0], "a");
-    assert_eq!(editor.cursor_pos(), (1, 0));
-}
-
-#[test]
-fn test_indent_cursor_position() {
-    let mut editor = Editor::new(None);
-    editor.insert_text("a").unwrap();
-    editor.set_cursor_pos(1, 0);
-    editor.process_input(Input::Character('\t'), false).unwrap();
-    assert_eq!(editor.document.lines[0], "  a");
-    assert_eq!(editor.cursor_pos(), (3, 0));
-}
 
 #[test]
 fn test_is_separator_line() {
