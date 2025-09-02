@@ -1,5 +1,6 @@
 mod checkbox_test;
 mod command_test;
+mod comment_test;
 mod cursor_movement_test;
 mod delimiter_movement_test;
 mod insertion_deletion_test;

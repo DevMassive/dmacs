@@ -21,6 +21,7 @@ impl Editor {
         }
 
         match key {
+            Input::Character('/') if is_alt_pressed => self.toggle_comment()?,
             // Alt/Option + V for page up (often sends ESC v)
             Input::Character('v') if is_alt_pressed => self.scroll_page_up(),
             // Alt/Option + <

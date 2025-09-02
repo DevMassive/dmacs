@@ -15,6 +15,7 @@ pub mod selection;
 pub mod task;
 pub mod ui;
 pub mod indent;
+pub mod comment;
 use crate::editor::scroll::Scroll;
 use crate::editor::task::Task;
 
@@ -27,6 +28,7 @@ pub enum LastActionType {
     LineMovement,
     Ammend,
     ToggleCheckbox, // For checkbox toggling
+    ToggleComment,  // For comment toggling
     Other,          // For actions like kill_line, yank, etc.
 }
 
