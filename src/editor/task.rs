@@ -230,8 +230,11 @@ impl Editor {
                     }
                 }
             }
-            Input::Character('\u{1b}') | Input::Character('\n') | Input::Character('\r') => {
-                // ESC or ENTER
+            Input::Character('\u{1b}')
+            | Input::Character('\n')
+            | Input::Character('\r')
+            | Input::Character('\x07') => {
+                // Escape or Enter or Ctrl+G to exit task selection mode
                 self.mode = EditorMode::Normal;
                 self.task.tasks.clear();
                 self.task.selected_task_index = None;

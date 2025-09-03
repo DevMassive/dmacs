@@ -37,16 +37,8 @@ impl Editor {
     pub fn handle_search_input(&mut self, key: pancurses::Input) {
         if let pancurses::Input::Character(c) = key {
             match c {
-                '\x1b' => {
-                    // Escape key to exit search mode
-                    self.search.mode = false;
-                    self.search.query.clear();
-                    self.search.results.clear();
-                    self.search.current_match_index = None;
-                    self.status_message.clear();
-                }
-                '\x0a' | '\x0d' => {
-                    // Enter to confirm search and exit search mode
+                '\x1b' | '\x0a' | '\x0d' | '\x07' => {
+                    // Escape or Enter or Ctrl+G to exit search mode
                     self.search.mode = false;
                     self.search.query.clear();
                     self.search.results.clear();
