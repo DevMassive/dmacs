@@ -18,6 +18,7 @@ pub mod selection;
 pub mod task;
 pub mod ui;
 use crate::editor::scroll::Scroll;
+pub mod fuzzy_search;
 use crate::editor::task::Task;
 
 #[derive(PartialEq, Debug)]
@@ -38,6 +39,7 @@ pub enum EditorMode {
     Normal,
     TaskSelection,
     Search,
+    FuzzySearch,
 }
 
 pub struct Editor {
@@ -63,6 +65,7 @@ pub struct Editor {
     // New fields for task command
     pub mode: EditorMode,
     pub task: Task,
+    pub fuzzy_search: fuzzy_search::FuzzySearch,
 }
 
 impl Editor {
@@ -103,6 +106,7 @@ impl Editor {
                                 // New fields for task command
                                 mode: EditorMode::Normal,
                                 task: Task::new(),
+                                fuzzy_search: fuzzy_search::FuzzySearch::new(),
                             };
                         } else {
                             debug!(
@@ -150,6 +154,7 @@ impl Editor {
             // New fields for task command
             mode: EditorMode::Normal,
             task: Task::new(),
+            fuzzy_search: fuzzy_search::FuzzySearch::new(),
         }
     }
 
@@ -1121,6 +1126,23 @@ impl Editor {
     // Method to calculate task UI height
     pub fn task_ui_height(&self) -> usize {
         (self.scroll.screen_rows as f32 * 0.4).round() as usize
+    }
+
+    pub fn enter_fuzzy_search_mode(&mut self) {
+        self.mode = EditorMode::FuzzySearch;
+        self.fuzzy_search.update_matches(&self.document);
+    }
+
+    pub fn handle_fuzzy_search_input(&mut self, key: pancurses::Input) {
+        if !self.fuzzy_search.handle_input(
+            key,
+            &mut self.cursor_y,
+            &mut self.cursor_x,
+            &self.document,
+        ) {
+            self.mode = EditorMode::Normal;
+            self.fuzzy_search.reset();
+        }
     }
 }
 

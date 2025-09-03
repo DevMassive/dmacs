@@ -110,38 +110,26 @@ fn test_editor_move_cursor_word_right() {
     editor.document.lines = vec!["word1 word2 word3".to_string()];
     editor.set_cursor_pos(0, 0); // Beginning of "word1"
 
-    editor
-        .process_input(Input::Character('\x06'), false)
-        .unwrap(); // Ctrl-F
+    editor.process_input(Input::Character('f'), true).unwrap(); // Alt-f
     assert_eq!(editor.cursor_pos(), (5, 0)); // Should move to "word2"
 
-    editor
-        .process_input(Input::Character('\x06'), false)
-        .unwrap(); // Ctrl-F
+    editor.process_input(Input::Character('f'), true).unwrap(); // Alt-f
     assert_eq!(editor.cursor_pos(), (11, 0)); // Should move to "word3"
 
-    editor
-        .process_input(Input::Character('\x06'), false)
-        .unwrap(); // Ctrl-F
+    editor.process_input(Input::Character('f'), true).unwrap(); // Alt-f
     assert_eq!(editor.cursor_pos(), (17, 0)); // Should move to end of line
 
     // Test with leading/trailing spaces
     editor.document.lines = vec!["  word1  word2  ".to_string()];
     editor.set_cursor_pos(0, 0); // Beginning of line
 
-    editor
-        .process_input(Input::Character('\x06'), false)
-        .unwrap(); // Ctrl-F
+    editor.process_input(Input::Character('f'), true).unwrap(); // Alt-f
     assert_eq!(editor.cursor_pos(), (7, 0)); // Should move to "word1"
 
-    editor
-        .process_input(Input::Character('\x06'), false)
-        .unwrap(); // Ctrl-F
+    editor.process_input(Input::Character('f'), true).unwrap(); // Alt-f
     assert_eq!(editor.cursor_pos(), (14, 0)); // Should move to "word2"
 
-    editor
-        .process_input(Input::Character('\x06'), false)
-        .unwrap(); // Ctrl-F
+    editor.process_input(Input::Character('f'), true).unwrap(); // Alt-f
     assert_eq!(editor.cursor_pos(), (16, 0)); // Should move to end of line
 }
 
@@ -180,51 +168,35 @@ fn test_editor_move_cursor_word_right_japanese() {
     editor.set_cursor_pos(0, 0);
 
     // Move to end of "漢字"
-    editor
-        .process_input(Input::Character('\x06'), false)
-        .unwrap(); // Ctrl-F
+    editor.process_input(Input::Character('f'), true).unwrap(); // Alt-f
     assert_eq!(editor.cursor_pos(), (6, 0));
 
     // Move to end of "とひらがなと"
-    editor
-        .process_input(Input::Character('\x06'), false)
-        .unwrap(); // Ctrl-F
+    editor.process_input(Input::Character('f'), true).unwrap(); // Alt-f
     assert_eq!(editor.cursor_pos(), (24, 0));
 
     // Move to end of "カタカナ"
-    editor
-        .process_input(Input::Character('\x06'), false)
-        .unwrap(); // Ctrl-F
+    editor.process_input(Input::Character('f'), true).unwrap(); // Alt-f
     assert_eq!(editor.cursor_pos(), (36, 0));
 
     // Move to end of "と"
-    editor
-        .process_input(Input::Character('\x06'), false)
-        .unwrap(); // Ctrl-F
+    editor.process_input(Input::Character('f'), true).unwrap(); // Alt-f
     assert_eq!(editor.cursor_pos(), (39, 0));
 
     // Move to end of "英字"
-    editor
-        .process_input(Input::Character('\x06'), false)
-        .unwrap(); // Ctrl-F
+    editor.process_input(Input::Character('f'), true).unwrap(); // Alt-f
     assert_eq!(editor.cursor_pos(), (45, 0));
 
     // Move to end of "123"
-    editor
-        .process_input(Input::Character('\x06'), false)
-        .unwrap(); // Ctrl-F
+    editor.process_input(Input::Character('f'), true).unwrap(); // Alt-f
     assert_eq!(editor.cursor_pos(), (48, 0));
 
     // Move to end of "。"
-    editor
-        .process_input(Input::Character('\x06'), false)
-        .unwrap(); // Ctrl-F
+    editor.process_input(Input::Character('f'), true).unwrap(); // Alt-f
     assert_eq!(editor.cursor_pos(), (51, 0));
 
     // Stays at the end
-    editor
-        .process_input(Input::Character('\x06'), false)
-        .unwrap(); // Ctrl-F
+    editor.process_input(Input::Character('f'), true).unwrap(); // Alt-f
     assert_eq!(editor.cursor_pos(), (51, 0));
 }
 

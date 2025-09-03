@@ -3,6 +3,7 @@ mod command_test;
 mod comment_test;
 mod cursor_movement_test;
 mod delimiter_movement_test;
+mod fuzzy_search_test;
 mod indent_test;
 mod insertion_deletion_test;
 mod kill_yank_test;

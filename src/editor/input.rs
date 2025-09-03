@@ -20,6 +20,11 @@ impl Editor {
             return Ok(());
         }
 
+        if self.mode == EditorMode::FuzzySearch {
+            self.handle_fuzzy_search_input(key);
+            return Ok(());
+        }
+
         match key {
             Input::Character('/') if is_alt_pressed => self.toggle_comment()?,
             // Alt/Option + V for page up (often sends ESC v)
@@ -76,7 +81,7 @@ impl Editor {
                 '\x7f' | '\x08' => self.delete_char()?,      // Backspace
                 '\x0a' | '\x0d' => self.insert_newline()?,
                 '\x02' => self.move_cursor_word_left()?, // Ctrl + B
-                '\x06' => self.move_cursor_word_right()?, // Ctrl + F
+                '\x06' => self.enter_fuzzy_search_mode(), // Ctrl + F
                 '\x14' => self.toggle_checkbox()?,             // Ctrl + T
                 '\x1f' => self.undo(),                   // Ctrl + _ for undo
                 '\x03' | // Ctrl+C
@@ -89,7 +94,13 @@ impl Editor {
                 '\x00' => self.set_marker_action(), // Ctrl+Space
                 '\x07' => self.clear_marker_action(), // Ctrl+G
                 '\x1a' | // Ctrl+Z
-                '\x1b' | // Ctrl+[ (ESC)
+                '\x1b' => {
+                    if self.mode == EditorMode::Normal {
+                        // Do nothing special in normal mode for Esc yet
+                    } else {
+                        self.mode = EditorMode::Normal;
+                    }
+                }, // Ctrl+[ (ESC)
                 '\x1c' | // Ctrl+\
                 '\x1d' | // Ctrl+] 
                 '\x1e' => {}, // Ctrl+^

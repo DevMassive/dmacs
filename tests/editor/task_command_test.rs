@@ -376,10 +376,7 @@ fn test_task_command_comment_out_task() {
 
 #[test]
 fn test_task_command_comment_out_undo_redo() {
-    let mut editor = setup_editor(&[
-        "Task list:",
-        "- [ ] The only task",
-    ]);
+    let mut editor = setup_editor(&["Task list:", "- [ ] The only task"]);
     editor.cursor_y = 0;
     editor.cursor_x = 0;
 

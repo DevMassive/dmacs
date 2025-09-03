@@ -1,12 +1,59 @@
 use pancurses::{A_BOLD, A_DIM, A_REVERSE, Window};
-use unicode_width::UnicodeWidthChar;
+use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
 use crate::editor::Editor;
+use std::cmp::min;
 
 const TAB_STOP: usize = 4;
 pub const STATUS_BAR_HEIGHT: usize = 2;
 
 impl Editor {
+    fn draw_fuzzy_search(&mut self, window: &Window) {
+        let screen_rows = window.get_max_y() as usize;
+
+        window.erase();
+
+        // Draw the matches
+        let matches = &self.fuzzy_search.matches;
+        let selected_index = self.fuzzy_search.selected_index;
+
+        let list_height = screen_rows.saturating_sub(1);
+
+        if selected_index < self.fuzzy_search.scroll_offset {
+            self.fuzzy_search.scroll_offset = selected_index;
+        }
+        if selected_index >= self.fuzzy_search.scroll_offset + list_height {
+            self.fuzzy_search.scroll_offset = selected_index - list_height + 1;
+        }
+
+        let scroll_offset = self.fuzzy_search.scroll_offset;
+
+        for (idx, (line, line_number)) in matches
+            .iter()
+            .skip(scroll_offset)
+            .take(min(list_height, matches.len() - scroll_offset))
+            .enumerate()
+        {
+            let i = scroll_offset + idx;
+            let display_text = format!("{}: {}", line_number + 1, line);
+            if i == selected_index {
+                window.attron(A_REVERSE);
+            }
+            window.mvaddstr(idx as i32, 0, &display_text);
+            if i == selected_index {
+                window.attroff(A_REVERSE);
+            }
+        }
+
+        // Draw the search prompt
+        let prompt = format!("FUZZY SEARCH: {}", self.fuzzy_search.query);
+        window.mvaddstr(screen_rows as i32 - 1, 0, &prompt);
+
+        // Move cursor to the end of the prompt
+        window.mv(screen_rows as i32 - 1, prompt.width() as i32);
+        window.refresh();
+    }
+
     pub fn is_separator_line(line: &str) -> bool {
         line == "---"
     }
@@ -22,6 +69,11 @@ impl Editor {
     pub fn draw(&mut self, window: &Window) {
         let screen_rows = window.get_max_y() as usize;
         let screen_cols = window.get_max_x() as usize;
+
+        if self.mode == crate::editor::EditorMode::FuzzySearch {
+            self.draw_fuzzy_search(window);
+            return;
+        }
 
         self.scroll();
 
@@ -121,7 +173,7 @@ impl Editor {
                 let char_start_display_x = display_x;
 
                 // Calculate character width
-                let char_width = if ch == '\x09' {
+                let char_width = if ch == '\t' {
                     TAB_STOP - (display_x % TAB_STOP)
                 } else {
                     ch.width().unwrap_or(0)
@@ -169,7 +221,7 @@ impl Editor {
                 if display_x > self.scroll.col_offset {
                     let screen_x = char_start_display_x.saturating_sub(self.scroll.col_offset);
                     if screen_x + char_width <= screen_cols {
-                        if ch == '\x09' {
+                        if ch == '\t' {
                             // Draw a tab as spaces
                             for i in 0..char_width {
                                 if screen_x + i < screen_cols {
