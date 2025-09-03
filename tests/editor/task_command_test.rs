@@ -496,3 +496,44 @@ fn test_task_command_fuzzy_search() {
     assert_eq!(remaining_tasks[1], "- [ ] Apricot");
     assert_eq!(remaining_tasks[2], "- [ ] Banana");
 }
+
+#[test]
+fn test_task_command_fuzzy_search_ctrl_g_exit() {
+    let mut editor = setup_editor(&["- [ ] Task A", "- [ ] Task B"]);
+    editor.cursor_y = 0;
+    editor.cursor_x = 0;
+
+    // Enter task mode
+    editor.document.lines.insert(0, "/task".to_string());
+    editor.cursor_y = 0;
+    editor.cursor_x = 5;
+    editor.insert_newline().unwrap();
+    assert_eq!(editor.mode, EditorMode::TaskSelection);
+    assert_eq!(editor.task.tasks.len(), 2);
+
+    // Press Ctrl+G with empty query, should exit
+    editor.handle_task_selection_input(Input::Character('\x07'));
+    assert_eq!(editor.mode, EditorMode::Normal);
+
+    // Re-enter task mode
+    editor.document.lines.insert(0, "/task".to_string());
+    editor.cursor_y = 0;
+    editor.cursor_x = 5;
+    editor.insert_newline().unwrap();
+    assert_eq!(editor.mode, EditorMode::TaskSelection);
+
+    // Type a query
+    editor.handle_task_selection_input(Input::Character('A'));
+    assert_eq!(editor.task.fuzzy_search.query, "A");
+    assert_eq!(editor.task.tasks.len(), 1);
+
+    // Press Ctrl+G with non-empty query, should clear query but not exit
+    editor.handle_task_selection_input(Input::Character('\x07'));
+    assert_eq!(editor.mode, EditorMode::TaskSelection);
+    assert_eq!(editor.task.fuzzy_search.query, "");
+    assert_eq!(editor.task.tasks.len(), 2);
+
+    // Press Ctrl+G again with empty query, should exit
+    editor.handle_task_selection_input(Input::Character('\x07'));
+    assert_eq!(editor.mode, EditorMode::Normal);
+}

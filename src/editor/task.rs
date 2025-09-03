@@ -272,11 +272,8 @@ impl Editor {
                     }
                 }
             }
-            Input::Character('\u{1b}')
-            | Input::Character('\n')
-            | Input::Character('\r')
-            | Input::Character('\x07') => {
-                // Escape or Enter or Ctrl+G to exit task selection mode
+            Input::Character('\u{1b}') | Input::Character('\n') | Input::Character('\r') => {
+                // Escape or Enter to exit task selection mode
                 self.mode = EditorMode::Normal;
                 self.task.tasks.clear();
                 self.task.all_tasks.clear();
@@ -284,6 +281,26 @@ impl Editor {
                 self.task.task_display_offset = 0;
                 self.task.fuzzy_search.reset();
                 self.set_message("Exited task selection mode.");
+            }
+            Input::Character('\x07') => {
+                // Ctrl+G
+                if !self.task.fuzzy_search.query.is_empty() {
+                    self.task.fuzzy_search.query.clear();
+                    self.update_task_matches();
+                    self.set_message(&format!(
+                        "Found {} unchecked tasks. Use Up/Down to select, SPACE to move, ESC/ENTER to exit.",
+                        self.task.tasks.len()
+                    ));
+                } else {
+                    // If query is empty, exit task mode
+                    self.mode = EditorMode::Normal;
+                    self.task.tasks.clear();
+                    self.task.all_tasks.clear();
+                    self.task.selected_task_index = None;
+                    self.task.task_display_offset = 0;
+                    self.task.fuzzy_search.reset();
+                    self.set_message("Exited task selection mode.");
+                }
             }
             Input::KeyBackspace
             | Input::KeyDC
