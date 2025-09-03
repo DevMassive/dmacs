@@ -416,3 +416,83 @@ fn test_task_command_comment_out_undo_redo() {
     assert_eq!(editor.document.lines[2], "# - [ ] The only task");
     assert_eq!(editor.mode, EditorMode::Normal);
 }
+
+#[test]
+fn test_task_command_fuzzy_search() {
+    let mut editor = setup_editor(&[
+        "Task list:",
+        "- [ ] Apple",
+        "- [ ] Banana",
+        "Some other line",
+        "- [ ] Apricot",
+        "- [x] Done Task",
+        "- [ ] Avocado",
+    ]);
+    editor.cursor_y = 0;
+    editor.cursor_x = 0;
+
+    // Enter task selection mode
+    editor.document.lines.insert(0, "/task".to_string());
+    editor.cursor_y = 0;
+    editor.cursor_x = 5;
+    editor.insert_newline().unwrap();
+
+    assert_eq!(editor.mode, EditorMode::TaskSelection);
+    assert_eq!(editor.task.tasks.len(), 4);
+    assert_eq!(editor.task.all_tasks.len(), 4);
+
+    // Type "Ap" to search
+    editor.handle_task_selection_input(Input::Character('A'));
+    editor.handle_task_selection_input(Input::Character('p'));
+
+    assert_eq!(editor.task.fuzzy_search.query, "Ap");
+    assert_eq!(editor.task.tasks.len(), 2);
+    assert_eq!(editor.task.tasks[0].1, "- [ ] Apple");
+    assert_eq!(editor.task.tasks[1].1, "- [ ] Apricot");
+    assert_eq!(editor.task.selected_task_index, Some(0));
+
+    // Press backspace
+    editor.handle_task_selection_input(Input::KeyBackspace);
+    assert_eq!(editor.task.fuzzy_search.query, "A");
+    assert_eq!(editor.task.tasks.len(), 3); // "Apple", "Apricot", "Avocado"
+
+    // Sort to have a deterministic order for assertion
+    let mut matched_tasks: Vec<String> = editor.task.tasks.iter().map(|(_, s)| s.clone()).collect();
+    matched_tasks.sort();
+    assert_eq!(matched_tasks[0], "- [ ] Apple");
+    assert_eq!(matched_tasks[1], "- [ ] Apricot");
+    assert_eq!(matched_tasks[2], "- [ ] Avocado");
+
+    // Clear query
+    editor.handle_task_selection_input(Input::KeyBackspace);
+    assert_eq!(editor.task.fuzzy_search.query, "");
+    assert_eq!(editor.task.tasks.len(), 4);
+
+    // Search for something unique
+    editor.handle_task_selection_input(Input::Character('v'));
+    assert_eq!(editor.task.fuzzy_search.query, "v");
+    assert_eq!(editor.task.tasks.len(), 1);
+    assert_eq!(editor.task.tasks[0].1, "- [ ] Avocado");
+
+    // Move the filtered task
+    editor.handle_task_selection_input(Input::Character(' '));
+
+    // After moving, the task list should be updated, and the query is still active.
+    // Since "Avocado" was the only match, the list is now empty.
+    assert_eq!(editor.task.tasks.len(), 0);
+    assert_eq!(editor.task.all_tasks.len(), 3); // Avocado removed from all_tasks
+
+    // Clear the query
+    editor.handle_task_selection_input(Input::KeyBackspace);
+    assert_eq!(editor.task.fuzzy_search.query, "");
+
+    // The list should now show the remaining tasks
+    assert_eq!(editor.task.tasks.len(), 3);
+
+    let mut remaining_tasks: Vec<String> =
+        editor.task.tasks.iter().map(|(_, s)| s.clone()).collect();
+    remaining_tasks.sort();
+    assert_eq!(remaining_tasks[0], "- [ ] Apple");
+    assert_eq!(remaining_tasks[1], "- [ ] Apricot");
+    assert_eq!(remaining_tasks[2], "- [ ] Banana");
+}

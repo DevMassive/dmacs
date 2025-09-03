@@ -1,14 +1,22 @@
 // src/editor/task.rs
 
 use crate::document::ActionDiff;
+use crate::editor::fuzzy_search::FuzzySearch;
 use crate::editor::{Editor, EditorMode, LastActionType};
+use fuzzy_matcher::skim::SkimMatcherV2;
+use fuzzy_matcher::FuzzyMatcher;
+use once_cell::sync::Lazy;
 use pancurses::Input;
 
-#[derive(PartialEq, Debug)]
+static MATCHER: Lazy<SkimMatcherV2> = Lazy::new(SkimMatcherV2::default);
+
+#[derive(Debug)]
 pub struct Task {
     pub tasks: Vec<(usize, String)>, // Store (original_line_index, content)
+    pub all_tasks: Vec<(usize, String)>,
     pub selected_task_index: Option<usize>,
     pub task_display_offset: usize,
+    pub fuzzy_search: FuzzySearch,
 }
 
 impl Default for Task {
@@ -21,17 +29,21 @@ impl Task {
     pub fn new() -> Self {
         Self {
             tasks: Vec::new(),
+            all_tasks: Vec::new(),
             selected_task_index: None,
             task_display_offset: 0,
+            fuzzy_search: FuzzySearch::new(),
         }
     }
 }
 
 impl Editor {
     pub fn find_unchecked_tasks(&mut self) {
-        self.task.tasks.clear(); // Change from task_list to tasks
+        self.task.tasks.clear();
+        self.task.all_tasks.clear();
         self.task.selected_task_index = None;
         self.task.task_display_offset = 0;
+        self.task.fuzzy_search.reset();
 
         let mut found_tasks = Vec::new();
         for (i, line) in self.document.lines.iter().enumerate() {
@@ -41,12 +53,40 @@ impl Editor {
         }
 
         if !found_tasks.is_empty() {
-            self.task.tasks = found_tasks; // Change from task_list to tasks
+            self.task.all_tasks = found_tasks.clone();
+            self.task.tasks = found_tasks;
             self.task.selected_task_index = Some(0);
-            self.set_message(&format!("Found {} unchecked tasks. Use Up/Down to select, SPACE to move, ESC/ENTER to exit.", self.task.tasks.len()));
+            self.set_message(&format!(
+                "Found {} unchecked tasks. Use Up/Down to select, SPACE to move, ESC/ENTER to exit.",
+                self.task.tasks.len()
+            ));
         } else {
             self.set_message("No unchecked tasks found below current line.");
         }
+    }
+
+    fn update_task_matches(&mut self) {
+        let query = &self.task.fuzzy_search.query;
+        if query.is_empty() {
+            self.task.tasks = self.task.all_tasks.clone();
+        } else {
+            self.task.tasks = self.task
+                .all_tasks
+                .iter()
+                .filter_map(|(line_idx, line_content)| {
+                    MATCHER
+                        .fuzzy_match(line_content, query)
+                        .map(|_score| (*line_idx, line_content.clone()))
+                })
+                .collect();
+        }
+
+        if self.task.tasks.is_empty() {
+            self.task.selected_task_index = None;
+        } else {
+            self.task.selected_task_index = Some(0);
+        }
+        self.task.task_display_offset = 0;
     }
 
     pub fn handle_task_selection_input(&mut self, key: Input) {
@@ -167,6 +207,7 @@ impl Editor {
 
                         // Remove the task from the task.tasks list and update selected_task_index
                         self.task.tasks.remove(selected_idx);
+                        self.task.all_tasks.retain(|(idx, _)| *idx != original_line_idx);
 
                         // Adjust original_line_index for subsequent tasks
                         for (line_idx, _) in self.task.tasks.iter_mut() {
@@ -213,6 +254,7 @@ impl Editor {
                         );
 
                         self.task.tasks.remove(selected_idx);
+                        self.task.all_tasks.retain(|(idx, _)| *idx != original_line_idx);
 
                         if self.task.tasks.is_empty() {
                             self.task.selected_task_index = None;
@@ -237,9 +279,23 @@ impl Editor {
                 // Escape or Enter or Ctrl+G to exit task selection mode
                 self.mode = EditorMode::Normal;
                 self.task.tasks.clear();
+                self.task.all_tasks.clear();
                 self.task.selected_task_index = None;
                 self.task.task_display_offset = 0;
+                self.task.fuzzy_search.reset();
                 self.set_message("Exited task selection mode.");
+            }
+            Input::KeyBackspace
+            | Input::KeyDC
+            | Input::Character('\x7f')
+            | Input::Character('\x08') => {
+                if self.task.fuzzy_search.query.pop().is_some() {
+                    self.update_task_matches();
+                }
+            }
+            Input::Character(c) => {
+                self.task.fuzzy_search.query.push(c);
+                self.update_task_matches();
             }
             _ => {
                 // Ignore other keys in task selection mode

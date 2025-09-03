@@ -6,7 +6,7 @@ use crate::document::Document;
 
 static MATCHER: Lazy<SkimMatcherV2> = Lazy::new(SkimMatcherV2::default);
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct FuzzySearch {
     pub query: String,
     pub matches: Vec<(String, usize)>,
