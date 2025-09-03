@@ -314,3 +314,108 @@ fn test_task_command_move_task_bug() {
         "All tasks moved. Exiting task selection mode."
     );
 }
+
+#[test]
+fn test_task_command_comment_out_task() {
+    let mut editor = setup_editor(&["Task list:", "- [ ] Task 1", "- [ ] Task 2", "- [ ] Task 3"]);
+    editor.cursor_y = 0;
+    editor.cursor_x = 0;
+
+    // Enter task selection mode
+    editor.document.lines.insert(0, "/task".to_string());
+    editor.cursor_y = 0;
+    editor.cursor_x = 5;
+    editor.insert_newline().unwrap();
+
+    // Initial state: 3 tasks found
+    assert_eq!(editor.mode, EditorMode::TaskSelection);
+    assert_eq!(editor.task.tasks.len(), 3);
+    assert_eq!(editor.task.selected_task_index, Some(0)); // Task 1
+
+    // Select Task 2
+    editor.handle_task_selection_input(Input::KeyDown);
+    assert_eq!(editor.task.selected_task_index, Some(1));
+
+    // Comment out Task 2
+    editor.handle_task_selection_input(Input::Character('#'));
+
+    // Assertions for commenting out Task 2
+    // The original line index of Task 2 is 3 (after /task line processing)
+    assert_eq!(editor.document.lines[3], "# - [ ] Task 2");
+    assert_eq!(editor.task.tasks.len(), 2);
+    assert_eq!(editor.task.tasks[0].1, "- [ ] Task 1");
+    assert_eq!(editor.task.tasks[1].1, "- [ ] Task 3");
+    assert_eq!(editor.task.selected_task_index, Some(1)); // Selection moves to Task 3
+    assert_eq!(
+        editor.status_message,
+        "Task commented out. 2 tasks remaining."
+    );
+
+    // Now, the selected task is Task 3 (index 1 in the list). Comment it out.
+    editor.handle_task_selection_input(Input::Character('#'));
+
+    // Assertions for commenting out Task 3
+    assert_eq!(editor.document.lines[4], "# - [ ] Task 3");
+    assert_eq!(editor.task.tasks.len(), 1);
+    assert_eq!(editor.task.tasks[0].1, "- [ ] Task 1");
+    assert_eq!(editor.task.selected_task_index, Some(0)); // Selection moves to last item
+
+    // Comment out the final task, Task 1
+    editor.handle_task_selection_input(Input::Character('#'));
+
+    // Assertions for commenting out the last task
+    assert_eq!(editor.document.lines[2], "# - [ ] Task 1");
+    assert!(editor.task.tasks.is_empty());
+    assert_eq!(editor.task.selected_task_index, None);
+    assert_eq!(editor.mode, EditorMode::Normal); // Should exit mode
+    assert_eq!(
+        editor.status_message,
+        "All tasks handled. Exiting task selection mode."
+    );
+}
+
+#[test]
+fn test_task_command_comment_out_undo_redo() {
+    let mut editor = setup_editor(&[
+        "Task list:",
+        "- [ ] The only task",
+    ]);
+    editor.cursor_y = 0;
+    editor.cursor_x = 0;
+
+    // Enter task selection mode
+    editor.document.lines.insert(0, "/task".to_string());
+    editor.cursor_y = 0;
+    editor.cursor_x = 5;
+    editor.insert_newline().unwrap();
+
+    // Initial state: 1 task found
+    assert_eq!(editor.mode, EditorMode::TaskSelection);
+    assert_eq!(editor.task.tasks.len(), 1);
+    assert_eq!(editor.task.selected_task_index, Some(0));
+
+    // Comment out the task
+    editor.handle_task_selection_input(Input::Character('#'));
+
+    // Assertions for commenting out the task
+    assert_eq!(editor.mode, EditorMode::Normal);
+    assert_eq!(editor.document.lines[2], "# - [ ] The only task");
+    assert_eq!(
+        editor.status_message,
+        "All tasks handled. Exiting task selection mode."
+    );
+
+    // Undo the change
+    editor.undo();
+
+    // Assertions after undo
+    assert_eq!(editor.document.lines[2], "- [ ] The only task");
+    assert_eq!(editor.mode, EditorMode::Normal);
+
+    // Redo the change
+    editor.redo();
+
+    // Assertions after redo
+    assert_eq!(editor.document.lines[2], "# - [ ] The only task");
+    assert_eq!(editor.mode, EditorMode::Normal);
+}

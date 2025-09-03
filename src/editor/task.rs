@@ -192,6 +192,44 @@ impl Editor {
                     }
                 }
             }
+            Input::Character('#') => {
+                if let Some(selected_idx) = self.task.selected_task_index {
+                    if let Some((original_line_idx, _)) = self.task.tasks.get(selected_idx).cloned()
+                    {
+                        self.commit(
+                            LastActionType::ToggleComment,
+                            &ActionDiff {
+                                cursor_start_x: self.cursor_x,
+                                cursor_start_y: self.cursor_y,
+                                cursor_end_x: self.cursor_x,
+                                cursor_end_y: self.cursor_y,
+                                start_x: 0,
+                                start_y: original_line_idx,
+                                end_x: "# ".len(),
+                                end_y: original_line_idx,
+                                new: vec!["# ".to_string()],
+                                old: vec![],
+                            },
+                        );
+
+                        self.task.tasks.remove(selected_idx);
+
+                        if self.task.tasks.is_empty() {
+                            self.task.selected_task_index = None;
+                            self.set_message("All tasks handled. Exiting task selection mode.");
+                            self.mode = EditorMode::Normal;
+                        } else {
+                            if selected_idx >= self.task.tasks.len() {
+                                self.task.selected_task_index = Some(self.task.tasks.len() - 1);
+                            }
+                            self.set_message(&format!(
+                                "Task commented out. {} tasks remaining.",
+                                self.task.tasks.len()
+                            ));
+                        }
+                    }
+                }
+            }
             Input::Character('\u{1b}') | Input::Character('\n') | Input::Character('\r') => {
                 // ESC or ENTER
                 self.mode = EditorMode::Normal;
