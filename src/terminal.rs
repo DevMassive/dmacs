@@ -11,9 +11,14 @@ use crate::Event;
 use crate::error::{DmacsError, Result};
 
 // Import necessary types and functions from the libc crate
+#[cfg(target_os = "macos")]
 use libc::{
     _POSIX_VDISABLE, TCSANOW, VDSUSP, VLNEXT, VREPRINT, VSTATUS, VSTOP, tcgetattr, tcsetattr,
     termios,
+};
+#[cfg(not(target_os = "macos"))]
+use libc::{
+    _POSIX_VDISABLE, TCSANOW, VLNEXT, VREPRINT, VSTOP, VSUSP, tcgetattr, tcsetattr, termios,
 };
 
 pub static CTRL_C_COUNT: AtomicUsize = AtomicUsize::new(0);
@@ -46,7 +51,14 @@ impl Terminal {
         original_termios.clone_from(&termios_settings);
 
         // Disable dsusp character
-        termios_settings.c_cc[VDSUSP] = _POSIX_VDISABLE;
+        #[cfg(target_os = "macos")]
+        {
+            termios_settings.c_cc[VDSUSP] = _POSIX_VDISABLE;
+        }
+        #[cfg(not(target_os = "macos"))]
+        {
+            termios_settings.c_cc[VSUSP] = _POSIX_VDISABLE;
+        }
 
         // Disable lnext character (Ctrl+V)
         termios_settings.c_cc[VLNEXT] = _POSIX_VDISABLE;
@@ -58,7 +70,10 @@ impl Terminal {
         termios_settings.c_cc[VREPRINT] = _POSIX_VDISABLE;
 
         // Disable status character (Ctrl+T)
-        termios_settings.c_cc[VSTATUS] = _POSIX_VDISABLE;
+        #[cfg(target_os = "macos")]
+        {
+            termios_settings.c_cc[VSTATUS] = _POSIX_VDISABLE;
+        }
         if unsafe { tcsetattr(stdin_fd, TCSANOW, &termios_settings) } != 0 {
             return Err(DmacsError::Io(io::Error::last_os_error()));
         }
