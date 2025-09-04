@@ -58,6 +58,27 @@ fn test_editor_insert_newline_with_indent() {
 }
 
 #[test]
+fn test_editor_backspace_indentation() {
+    let mut editor = Editor::new(None);
+    editor.document.lines[0] = "    Hello".to_string();
+    editor.set_cursor_pos(4, 0); // After indentation
+    editor.delete_char().unwrap(); // Backspace
+    assert_eq!(editor.document.lines[0], "  Hello");
+    assert_eq!(editor.cursor_x, 2);
+
+    editor.delete_char().unwrap(); // Backspace
+    assert_eq!(editor.document.lines[0], "Hello");
+    assert_eq!(editor.cursor_x, 0);
+
+    // Should not delete 2 chars if not at end of indentation
+    editor.document.lines[0] = "  Hello  World".to_string();
+    editor.set_cursor_pos(9, 0); // After "  Hello  "
+    editor.delete_char().unwrap(); // Backspace
+    assert_eq!(editor.document.lines[0], "  Hello World");
+    assert_eq!(editor.cursor_x, 8);
+}
+
+#[test]
 fn test_editor_backspace_line_join() {
     let mut editor = Editor::new(None);
     editor.document.lines = vec!["hello".to_string(), "world".to_string()];

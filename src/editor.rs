@@ -327,6 +327,28 @@ impl Editor {
         // Backspace
         if self.cursor_x > 0 {
             let line = &self.document.lines[self.cursor_y];
+            let prefix = &line[..self.cursor_x];
+            if prefix.chars().all(|c| c.is_whitespace()) && prefix.ends_with("  ") {
+                // Delete 2 spaces
+                let char_start_byte = self.cursor_x - 2;
+                self.commit(
+                    LastActionType::Deletion,
+                    &ActionDiff {
+                        cursor_start_x: self.cursor_x,
+                        cursor_start_y: self.cursor_y,
+                        cursor_end_x: char_start_byte,
+                        cursor_end_y: self.cursor_y,
+                        start_x: char_start_byte,
+                        start_y: self.cursor_y,
+                        end_x: self.cursor_x,
+                        end_y: self.cursor_y,
+                        new: vec![],
+                        old: vec!["  ".to_string()],
+                    },
+                );
+                return Ok(());
+            }
+
             let mut char_to_delete = String::new();
             let mut char_start_byte = 0;
 
