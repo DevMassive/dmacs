@@ -486,9 +486,7 @@ impl Editor {
 
         let mut new_line_prefix = indentation.clone();
 
-        if trimmed_line.starts_with("- [ ] ") {
-            new_line_prefix.push_str("- [ ] ");
-        } else if trimmed_line.starts_with("- [x] ") {
+        if trimmed_line.starts_with("- [ ] ") || trimmed_line.starts_with("- [x] ") {
             new_line_prefix.push_str("- [ ] ");
         } else if trimmed_line.starts_with("- ") {
             new_line_prefix.push_str("- ");
