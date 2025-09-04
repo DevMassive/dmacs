@@ -1,9 +1,15 @@
 use dmacs::editor::Editor;
 use pancurses::Input;
 
+fn editor_with_clipboard_disabled() -> Editor {
+    let mut editor = Editor::new(None);
+    editor._set_clipboard_enabled_for_test(false);
+    editor
+}
+
 #[test]
 fn test_editor_kill_line_middle_of_line() {
-    let mut editor = Editor::new(None);
+    let mut editor = editor_with_clipboard_disabled();
     editor.document.lines = vec!["hello world".to_string()];
     editor.set_cursor_pos(6, 0); // Cursor at 'w' in "world"
     editor
@@ -16,7 +22,7 @@ fn test_editor_kill_line_middle_of_line() {
 
 #[test]
 fn test_editor_kill_line_end_of_line_not_last_line() {
-    let mut editor = Editor::new(None);
+    let mut editor = editor_with_clipboard_disabled();
     editor.document.lines = vec!["hello".to_string(), "world".to_string()];
     editor.set_cursor_pos(5, 0); // Cursor at end of "hello"
     editor
@@ -30,7 +36,7 @@ fn test_editor_kill_line_end_of_line_not_last_line() {
 
 #[test]
 fn test_editor_kill_line_empty_line_not_last_line() {
-    let mut editor = Editor::new(None);
+    let mut editor = editor_with_clipboard_disabled();
     editor.document.lines = vec!["line1".to_string(), "".to_string(), "line3".to_string()];
     editor.set_cursor_pos(0, 1); // Cursor at beginning of empty line
     editor
@@ -45,7 +51,7 @@ fn test_editor_kill_line_empty_line_not_last_line() {
 
 #[test]
 fn test_editor_kill_line_last_line() {
-    let mut editor = Editor::new(None);
+    let mut editor = editor_with_clipboard_disabled();
     editor.document.lines = vec!["last line".to_string()];
     editor.set_cursor_pos(0, 0);
     editor
@@ -58,7 +64,7 @@ fn test_editor_kill_line_last_line() {
 
 #[test]
 fn test_editor_yank_single_line() {
-    let mut editor = Editor::new(None);
+    let mut editor = editor_with_clipboard_disabled();
     editor.kill_buffer = "yanked text".to_string();
     editor.document.lines = vec!["start ".to_string(), "end".to_string()];
     editor.set_cursor_pos(6, 0); // After "start "
@@ -71,7 +77,7 @@ fn test_editor_yank_single_line() {
 
 #[test]
 fn test_editor_yank_multiple_lines() {
-    let mut editor = Editor::new(None);
+    let mut editor = editor_with_clipboard_disabled();
     editor.kill_buffer = "line1\nline2\nline3".to_string();
     editor.document.lines = vec!["start".to_string(), "end".to_string()];
     editor.set_cursor_pos(5, 0); // After "start"
@@ -88,7 +94,7 @@ fn test_editor_yank_multiple_lines() {
 
 #[test]
 fn test_editor_consecutive_kill_line() {
-    let mut editor = Editor::new(None);
+    let mut editor = editor_with_clipboard_disabled();
     editor.document.lines = vec![
         "line one".to_string(),
         "line two".to_string(),
@@ -142,7 +148,7 @@ fn test_editor_consecutive_kill_line() {
 
 #[test]
 fn test_editor_yank_empty_kill_buffer() {
-    let mut editor = Editor::new(None);
+    let mut editor = editor_with_clipboard_disabled();
     editor.kill_buffer = "".to_string();
     editor.document.lines = vec!["original".to_string()];
     editor.set_cursor_pos(0, 0);

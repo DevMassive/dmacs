@@ -1,6 +1,12 @@
 use dmacs::editor::Editor;
 use pancurses::Input;
 
+fn editor_with_clipboard_disabled() -> Editor {
+    let mut editor = Editor::new(None);
+    editor._set_clipboard_enabled_for_test(false);
+    editor
+}
+
 #[test]
 fn test_set_marker() {
     let mut editor = Editor::new(None);
@@ -30,7 +36,7 @@ fn test_clear_marker() {
 
 #[test]
 fn test_cut_selection() {
-    let mut editor = Editor::new(None);
+    let mut editor = editor_with_clipboard_disabled();
     editor.document.lines = vec!["hello world".to_string()];
     editor.set_cursor_pos(11, 0); // Cursor at end of "world"
     editor.selection.marker_pos = Some((6, 0)); // Marker at 'w'
@@ -47,7 +53,7 @@ fn test_cut_selection() {
 
 #[test]
 fn test_copy_selection() {
-    let mut editor = Editor::new(None);
+    let mut editor = editor_with_clipboard_disabled();
     editor.document.lines = vec!["hello world".to_string()];
     editor.set_cursor_pos(11, 0); // Cursor at end of "world"
     editor.selection.marker_pos = Some((6, 0)); // Marker at 'w'
@@ -77,7 +83,7 @@ fn test_highlight_selection() {
 
 #[test]
 fn test_cut_selection_from_start_of_line() {
-    let mut editor = Editor::new(None);
+    let mut editor = editor_with_clipboard_disabled();
     editor.document.lines = vec!["hello world".to_string()];
     editor.set_cursor_pos(5, 0); // Cursor at end of "hello"
     editor.selection.marker_pos = Some((0, 0)); // Marker at 'h'
@@ -94,7 +100,7 @@ fn test_cut_selection_from_start_of_line() {
 
 #[test]
 fn test_cut_selection_to_end_of_line() {
-    let mut editor = Editor::new(None);
+    let mut editor = editor_with_clipboard_disabled();
     editor.document.lines = vec!["hello world".to_string()];
     editor.set_cursor_pos(11, 0); // Cursor at end of "world"
     editor.selection.marker_pos = Some((6, 0)); // Marker at 'w'
@@ -111,7 +117,7 @@ fn test_cut_selection_to_end_of_line() {
 
 #[test]
 fn test_cut_entire_line() {
-    let mut editor = Editor::new(None);
+    let mut editor = editor_with_clipboard_disabled();
     editor.document.lines = vec!["hello world".to_string()];
     editor.set_cursor_pos(11, 0); // Cursor at end of line
     editor.selection.marker_pos = Some((0, 0)); // Marker at start of line
@@ -128,7 +134,7 @@ fn test_cut_entire_line() {
 
 #[test]
 fn test_cut_multiple_lines() {
-    let mut editor = Editor::new(None);
+    let mut editor = editor_with_clipboard_disabled();
     editor.document.lines = vec![
         "line one".to_string(),
         "line two".to_string(),
@@ -149,7 +155,7 @@ fn test_cut_multiple_lines() {
 
 #[test]
 fn test_cut_selection_marker_after_cursor() {
-    let mut editor = Editor::new(None);
+    let mut editor = editor_with_clipboard_disabled();
     editor.document.lines = vec!["hello world".to_string()];
     editor.set_cursor_pos(6, 0); // Cursor at 'w'
     editor.selection.marker_pos = Some((11, 0)); // Marker at end of "world"

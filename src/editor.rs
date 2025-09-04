@@ -66,6 +66,7 @@ pub struct Editor {
     pub mode: EditorMode,
     pub task: Task,
     pub fuzzy_search: fuzzy_search::FuzzySearch,
+    clipboard_enabled: bool,
 }
 
 impl Editor {
@@ -107,6 +108,7 @@ impl Editor {
                                 mode: EditorMode::Normal,
                                 task: Task::new(),
                                 fuzzy_search: fuzzy_search::FuzzySearch::new(),
+                                clipboard_enabled: true,
                             };
                         } else {
                             debug!(
@@ -155,6 +157,7 @@ impl Editor {
             mode: EditorMode::Normal,
             task: Task::new(),
             fuzzy_search: fuzzy_search::FuzzySearch::new(),
+            clipboard_enabled: true,
         }
     }
 
@@ -562,6 +565,9 @@ impl Editor {
     }
 
     fn set_clipboard(&mut self, text: &str) {
+        if !self.clipboard_enabled {
+            return;
+        }
         if let Ok(mut clipboard) = Clipboard::new() {
             if let Err(e) = clipboard.set_text(text.to_string()) {
                 self.status_message = format!("Failed to set clipboard: {e}");
@@ -572,9 +578,11 @@ impl Editor {
     }
 
     pub fn yank(&mut self) -> Result<()> {
-        if let Ok(mut clipboard) = Clipboard::new() {
-            if let Ok(text) = clipboard.get_text() {
-                self.kill_buffer = text;
+        if self.clipboard_enabled {
+            if let Ok(mut clipboard) = Clipboard::new() {
+                if let Ok(text) = clipboard.get_text() {
+                    self.kill_buffer = text;
+                }
             }
         }
 
@@ -629,6 +637,11 @@ impl Editor {
 
         self.last_action_was_kill = false;
         Ok(())
+    }
+
+    #[doc(hidden)]
+    pub fn _set_clipboard_enabled_for_test(&mut self, enabled: bool) {
+        self.clipboard_enabled = enabled;
     }
 
     pub fn hungry_delete(&mut self) -> Result<()> {

@@ -1,6 +1,12 @@
 use dmacs::editor::Editor;
 use pancurses::Input;
 
+fn editor_with_clipboard_disabled() -> Editor {
+    let mut editor = Editor::new(None);
+    editor._set_clipboard_enabled_for_test(false);
+    editor
+}
+
 #[test]
 fn test_debounced_undo_insertion() {
     let mut editor = Editor::new(None);
@@ -361,7 +367,7 @@ fn test_redo_simple() {
 
 #[test]
 fn test_undo_redo_kill_line() {
-    let mut editor = Editor::new(None);
+    let mut editor = editor_with_clipboard_disabled();
     editor.set_undo_debounce_threshold(0); // Disable debouncing for clear test cases
 
     editor.insert_text("Hello World").unwrap();
@@ -417,7 +423,7 @@ fn test_undo_redo_kill_line() {
 
 #[test]
 fn test_undo_redo_yank() {
-    let mut editor = Editor::new(None);
+    let mut editor = editor_with_clipboard_disabled();
     editor.set_undo_debounce_threshold(0);
 
     editor.insert_text("Yank Me").unwrap();
@@ -478,7 +484,7 @@ fn test_undo_redo_yank() {
 
 #[test]
 fn test_undo_redo_cut_selection() {
-    let mut editor = Editor::new(None);
+    let mut editor = editor_with_clipboard_disabled();
     editor.set_undo_debounce_threshold(0);
 
     editor.insert_text("Line One").unwrap();
