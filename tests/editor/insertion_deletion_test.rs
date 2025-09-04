@@ -58,6 +58,48 @@ fn test_editor_insert_newline_with_indent() {
 }
 
 #[test]
+fn test_editor_insert_newline_with_list_marker() {
+    let mut editor = Editor::new(None);
+    editor.document.lines[0] = "  - Hello".to_string();
+    editor.set_cursor_pos(9, 0); // End of line
+    editor.insert_newline().unwrap();
+
+    assert_eq!(editor.document.lines.len(), 2);
+    assert_eq!(editor.document.lines[0], "  - Hello");
+    assert_eq!(editor.document.lines[1], "  - ");
+    assert_eq!(editor.cursor_y, 1);
+    assert_eq!(editor.cursor_x, 4); // "  - "
+}
+
+#[test]
+fn test_editor_insert_newline_with_task_marker() {
+    let mut editor = Editor::new(None);
+    editor.document.lines[0] = "  - [ ] Task 1".to_string();
+    editor.set_cursor_pos(15, 0); // End of line
+    editor.insert_newline().unwrap();
+
+    assert_eq!(editor.document.lines.len(), 2);
+    assert_eq!(editor.document.lines[0], "  - [ ] Task 1");
+    assert_eq!(editor.document.lines[1], "  - [ ] ");
+    assert_eq!(editor.cursor_y, 1);
+    assert_eq!(editor.cursor_x, 8); // "  - [ ] "
+}
+
+#[test]
+fn test_editor_insert_newline_with_checked_task_marker() {
+    let mut editor = Editor::new(None);
+    editor.document.lines[0] = "  - [x] Task 1".to_string();
+    editor.set_cursor_pos(15, 0); // End of line
+    editor.insert_newline().unwrap();
+
+    assert_eq!(editor.document.lines.len(), 2);
+    assert_eq!(editor.document.lines[0], "  - [x] Task 1");
+    assert_eq!(editor.document.lines[1], "  - [ ] "); // Should be unchecked
+    assert_eq!(editor.cursor_y, 1);
+    assert_eq!(editor.cursor_x, 8); // "  - [ ] "
+}
+
+#[test]
 fn test_editor_backspace_indentation() {
     let mut editor = Editor::new(None);
     editor.document.lines[0] = "    Hello".to_string();

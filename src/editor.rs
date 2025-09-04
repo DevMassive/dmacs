@@ -482,24 +482,19 @@ impl Editor {
 
         // Get indentation of the current line
         let indentation = self.get_indentation();
-        let indentation_len = indentation.len();
+        let trimmed_line = current_line.trim_start();
 
-        // If not a command, insert a regular newline
-        self.commit(
-            LastActionType::Newline,
-            &ActionDiff {
-                cursor_start_x: self.cursor_x,
-                cursor_start_y: self.cursor_y,
-                cursor_end_x: indentation_len,
-                cursor_end_y: self.cursor_y + 1,
-                start_x: self.cursor_x,
-                start_y: self.cursor_y,
-                end_x: indentation_len,
-                end_y: self.cursor_y + 1,
-                new: vec!["".to_string(), indentation],
-                old: vec![],
-            },
-        );
+        let mut new_line_prefix = indentation.clone();
+
+        if trimmed_line.starts_with("- [ ] ") {
+            new_line_prefix.push_str("- [ ] ");
+        } else if trimmed_line.starts_with("- [x] ") {
+            new_line_prefix.push_str("- [ ] ");
+        } else if trimmed_line.starts_with("- ") {
+            new_line_prefix.push_str("- ");
+        }
+
+        let indentation_len = new_line_prefix.len();
 
         // Check for command execution
         if x == current_line.len() {
@@ -517,24 +512,58 @@ impl Editor {
                                 cursor_end_x: self.cursor_x,
                                 cursor_end_y: self.cursor_y,
                                 start_x: 0,
-                                start_y: self.cursor_y - 1,
+                                start_y: self.cursor_y,
                                 end_x: current_line.len(),
-                                end_y: self.cursor_y - 1,
-                                new: vec![new_content],
+                                end_y: self.cursor_y,
+                                new: vec![],
                                 old: vec![current_line.to_string()],
+                            },
+                        );
+                        self.commit(
+                            LastActionType::Ammend,
+                            &ActionDiff {
+                                cursor_start_x: self.cursor_x,
+                                cursor_start_y: self.cursor_y,
+                                cursor_end_x: 0,
+                                cursor_end_y: self.cursor_y + 1,
+                                start_x: 0,
+                                start_y: self.cursor_y,
+                                end_x: 0,
+                                end_y: self.cursor_y + 1,
+                                new: vec![new_content, "".to_string()],
+                                old: vec![],
                             },
                         );
                     }
                     self.status_message = status_message;
+                    return Ok(());
                 }
                 command::CommandResult::Error(message) => {
                     self.status_message = message.to_string();
+                    return Ok(());
                 }
                 command::CommandResult::NoCommand => {
                     // Do nothing, not a command
                 }
             }
         }
+
+        // If not a command, insert a regular newline
+        self.commit(
+            LastActionType::Newline,
+            &ActionDiff {
+                cursor_start_x: self.cursor_x,
+                cursor_start_y: self.cursor_y,
+                cursor_end_x: indentation_len,
+                cursor_end_y: self.cursor_y + 1,
+                start_x: self.cursor_x,
+                start_y: self.cursor_y,
+                end_x: indentation_len,
+                end_y: self.cursor_y + 1,
+                new: vec!["".to_string(), new_line_prefix],
+                old: vec![],
+            },
+        );
 
         Ok(())
     }
