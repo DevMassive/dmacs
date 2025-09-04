@@ -472,7 +472,7 @@ impl Editor {
                 cursor_end_y: self.cursor_y + 1,
                 start_x: self.cursor_x,
                 start_y: self.cursor_y,
-                end_x: 0,
+                end_x: indentation_len,
                 end_y: self.cursor_y + 1,
                 new: vec!["".to_string(), indentation],
                 old: vec![],
