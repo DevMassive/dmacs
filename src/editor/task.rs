@@ -3,8 +3,8 @@
 use crate::document::ActionDiff;
 use crate::editor::fuzzy_search::FuzzySearch;
 use crate::editor::{Editor, EditorMode, LastActionType};
-use fuzzy_matcher::skim::SkimMatcherV2;
 use fuzzy_matcher::FuzzyMatcher;
+use fuzzy_matcher::skim::SkimMatcherV2;
 use once_cell::sync::Lazy;
 use pancurses::Input;
 
@@ -70,7 +70,8 @@ impl Editor {
         if query.is_empty() {
             self.task.tasks = self.task.all_tasks.clone();
         } else {
-            self.task.tasks = self.task
+            self.task.tasks = self
+                .task
                 .all_tasks
                 .iter()
                 .filter_map(|(line_idx, line_content)| {
@@ -207,7 +208,9 @@ impl Editor {
 
                         // Remove the task from the task.tasks list and update selected_task_index
                         self.task.tasks.remove(selected_idx);
-                        self.task.all_tasks.retain(|(idx, _)| *idx != original_line_idx);
+                        self.task
+                            .all_tasks
+                            .retain(|(idx, _)| *idx != original_line_idx);
 
                         // Adjust original_line_index for subsequent tasks
                         for (line_idx, _) in self.task.tasks.iter_mut() {
@@ -254,7 +257,9 @@ impl Editor {
                         );
 
                         self.task.tasks.remove(selected_idx);
-                        self.task.all_tasks.retain(|(idx, _)| *idx != original_line_idx);
+                        self.task
+                            .all_tasks
+                            .retain(|(idx, _)| *idx != original_line_idx);
 
                         if self.task.tasks.is_empty() {
                             self.task.selected_task_index = None;

@@ -44,6 +44,20 @@ fn test_editor_insert_newline() {
 }
 
 #[test]
+fn test_editor_insert_newline_with_indent() {
+    let mut editor = Editor::new(None);
+    editor.document.lines[0] = "  Hello".to_string();
+    editor.set_cursor_pos(7, 0); // End of line
+    editor.insert_newline().unwrap();
+
+    assert_eq!(editor.document.lines.len(), 2);
+    assert_eq!(editor.document.lines[0], "  Hello");
+    assert_eq!(editor.document.lines[1], "  ");
+    assert_eq!(editor.cursor_y, 1);
+    assert_eq!(editor.cursor_x, 2);
+}
+
+#[test]
 fn test_editor_backspace_line_join() {
     let mut editor = Editor::new(None);
     editor.document.lines = vec!["hello".to_string(), "world".to_string()];

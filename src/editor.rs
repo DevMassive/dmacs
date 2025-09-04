@@ -415,6 +415,16 @@ impl Editor {
         Ok(())
     }
 
+    fn get_indentation(&self) -> String {
+        if self.cursor_y >= self.document.lines.len() {
+            return String::new();
+        }
+        self.document.lines[self.cursor_y]
+            .chars()
+            .take_while(|&c| c.is_whitespace())
+            .collect()
+    }
+
     pub fn insert_newline(&mut self) -> Result<()> {
         self.last_action_was_kill = false;
 
@@ -445,19 +455,23 @@ impl Editor {
             return Ok(());
         }
 
+        // Get indentation of the current line
+        let indentation = self.get_indentation();
+        let indentation_len = indentation.len();
+
         // If not a command, insert a regular newline
         self.commit(
             LastActionType::Newline,
             &ActionDiff {
                 cursor_start_x: self.cursor_x,
                 cursor_start_y: self.cursor_y,
-                cursor_end_x: 0,
+                cursor_end_x: indentation_len,
                 cursor_end_y: self.cursor_y + 1,
                 start_x: self.cursor_x,
                 start_y: self.cursor_y,
                 end_x: 0,
                 end_y: self.cursor_y + 1,
-                new: vec!["".to_string(), "".to_string()],
+                new: vec!["".to_string(), indentation],
                 old: vec![],
             },
         );
