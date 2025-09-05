@@ -55,7 +55,7 @@ dmacs <filename>
 | `Alt-←` | Move to previous word |
 | `Alt-Up` | Move line up |
 | `Alt-Down` | Move line down |
-| `PageUp` / `PageDown` | Scroll up/down by a page |
+| `Meta-V` / `Ctrl-V` | Scroll up/down by a page |
 | `Ctrl-N` | Move to next delimiter (`---`) |
 | `Ctrl-P` | Move to previous delimiter (`---`) |
 
