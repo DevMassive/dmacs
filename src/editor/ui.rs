@@ -167,9 +167,32 @@ impl Editor {
             }
 
             let mut display_x = 0;
-            let mut byte_idx = 0;
+            let mut start_byte = 0;
+
+            if self.scroll.col_offset > 0 {
+                let mut current_width = 0;
+                for (idx, ch) in line.char_indices() {
+                    let char_width = if ch == '\t' {
+                        TAB_STOP - (current_width % TAB_STOP)
+                    } else {
+                        ch.width().unwrap_or(0)
+                    };
+                    if current_width + char_width >= self.scroll.col_offset {
+                        display_x = current_width;
+                        start_byte = idx;
+                        break;
+                    }
+                    current_width += char_width;
+                    if idx + ch.len_utf8() == line.len() {
+                        display_x = current_width;
+                        start_byte = line.len();
+                    }
+                }
+            }
+
+            let mut byte_idx = start_byte;
             let line_len = line.len();
-            for ch in line.chars() {
+            for ch in line[start_byte..].chars() {
                 let char_start_display_x = display_x;
 
                 // Calculate character width
@@ -218,29 +241,26 @@ impl Editor {
                 }
 
                 // Draw character
-                if display_x > self.scroll.col_offset {
-                    let screen_x = char_start_display_x.saturating_sub(self.scroll.col_offset);
-                    if screen_x + char_width <= screen_cols {
-                        if ch == '\t' {
-                            // Draw a tab as spaces
-                            for i in 0..char_width {
-                                if screen_x + i < screen_cols {
-                                    window.mvaddch(row as i32, (screen_x + i) as i32, ' ');
-                                }
+                let screen_x = char_start_display_x.saturating_sub(self.scroll.col_offset);
+                if screen_x < screen_cols {
+                    if ch == '\t' {
+                        for i in 0..char_width {
+                            if screen_x + i < screen_cols {
+                                window.mvaddch(row as i32, (screen_x + i) as i32, ' ');
                             }
-                        } else {
-                            // Draw character
-                            window.mvaddstr(row as i32, screen_x as i32, ch.to_string());
                         }
+                    } else {
+                        window.mvaddstr(row as i32, screen_x as i32, ch.to_string());
                     }
-                }
-                // Stop drawing if we reach the end of the screen
-                if char_start_display_x.saturating_sub(self.scroll.col_offset) >= screen_cols {
-                    break;
                 }
 
                 if is_highlighted || is_selected {
                     window.attroff(A_REVERSE);
+                }
+
+                // Stop drawing if we reach the end of the screen
+                if screen_x >= screen_cols {
+                    break;
                 }
                 byte_idx += ch.len_utf8();
             }

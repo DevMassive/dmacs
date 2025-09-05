@@ -494,7 +494,7 @@ impl Editor {
 
             let patterns = ["- [x] ", "- [ ] ", "- "];
             for pattern in &patterns {
-                if content == *pattern {                    
+                if content == *pattern {
                     self.commit(
                         LastActionType::Newline,
                         &ActionDiff {
