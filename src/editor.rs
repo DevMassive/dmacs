@@ -326,6 +326,37 @@ impl Editor {
         self.last_action_was_kill = false;
         // Backspace
         if self.cursor_x > 0 {
+            let line = self.document.lines[self.cursor_y].clone();
+            // Only apply if cursor is at the end of the line
+            if self.cursor_x == line.len() {
+                let trimmed_line = line.trim();
+                let patterns = ["- [x]", "- [ ]", "-"];
+                for pattern in &patterns {
+                    if trimmed_line == *pattern {
+                        let indentation_len = line.len() - line.trim_start().len();
+                        let start_x = indentation_len;
+                        let end_x = line.len();
+
+                        self.commit(
+                            LastActionType::Deletion,
+                            &ActionDiff {
+                                cursor_start_x: self.cursor_x,
+                                cursor_start_y: self.cursor_y,
+                                cursor_end_x: indentation_len,
+                                cursor_end_y: self.cursor_y,
+                                start_x,
+                                start_y: self.cursor_y,
+                                end_x,
+                                end_y: self.cursor_y,
+                                new: vec![],
+                                old: vec![line[start_x..end_x].to_string()],
+                            },
+                        );
+                        return Ok(());
+                    }
+                }
+            }
+
             let line = &self.document.lines[self.cursor_y];
             let prefix = &line[..self.cursor_x];
             if prefix.chars().all(|c| c.is_whitespace()) && prefix.ends_with("  ") {

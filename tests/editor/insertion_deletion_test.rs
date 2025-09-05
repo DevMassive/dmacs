@@ -213,3 +213,57 @@ fn test_editor_hungry_delete() {
     assert_eq!(editor.document.lines[0], "");
     assert_eq!(editor.cursor_pos(), (0, 0));
 }
+
+#[test]
+fn test_editor_backspace_empty_list_item() {
+    let mut editor = Editor::new(None);
+
+    // Test deleting "- "
+    editor.document.lines[0] = "- ".to_string();
+    editor.set_cursor_pos(2, 0);
+    editor.delete_char().unwrap();
+    assert_eq!(editor.document.lines[0], "");
+    assert_eq!(editor.cursor_pos(), (0, 0));
+
+    // Test deleting "- [ ] "
+    editor.document.lines[0] = "- [ ] ".to_string();
+    editor.set_cursor_pos(6, 0);
+    editor.delete_char().unwrap();
+    assert_eq!(editor.document.lines[0], "");
+    assert_eq!(editor.cursor_pos(), (0, 0));
+
+    // Test deleting "- [x] "
+    editor.document.lines[0] = "- [x] ".to_string();
+    editor.set_cursor_pos(6, 0);
+    editor.delete_char().unwrap();
+    assert_eq!(editor.document.lines[0], "");
+    assert_eq!(editor.cursor_pos(), (0, 0));
+
+    // Test with indentation
+    editor.document.lines[0] = "  - ".to_string();
+    editor.set_cursor_pos(4, 0);
+    editor.delete_char().unwrap();
+    assert_eq!(editor.document.lines[0], "  ");
+    assert_eq!(editor.cursor_pos(), (2, 0));
+
+    // Test with extra whitespace
+    editor.document.lines[0] = "- [ ]   ".to_string();
+    editor.set_cursor_pos(9, 0);
+    editor.delete_char().unwrap();
+    assert_eq!(editor.document.lines[0], "");
+    assert_eq!(editor.cursor_pos(), (0, 0));
+
+    // Test with indentation and extra whitespace
+    editor.document.lines[0] = "    - [x]  ".to_string();
+    editor.set_cursor_pos(11, 0);
+    editor.delete_char().unwrap();
+    assert_eq!(editor.document.lines[0], "    ");
+    assert_eq!(editor.cursor_pos(), (4, 0));
+
+    // Test that it doesn't delete when not at the end of the line
+    editor.document.lines[0] = "- [x] something".to_string();
+    editor.set_cursor_pos(15, 0); // cursor at the very end
+    editor.delete_char().unwrap();
+    assert_eq!(editor.document.lines[0], "- [x] somethin"); // regular backspace
+    assert_eq!(editor.cursor_pos(), (14, 0));
+}
