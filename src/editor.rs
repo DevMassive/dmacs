@@ -488,6 +488,33 @@ impl Editor {
         let x = self.cursor_x;
         let current_line = self.document.lines[y].clone();
 
+        if x == current_line.len() {
+            let indentation_len = current_line.len() - current_line.trim_start().len();
+            let content = &current_line[indentation_len..];
+
+            let patterns = ["- [x] ", "- [ ] ", "- "];
+            for pattern in &patterns {
+                if content == *pattern {                    
+                    self.commit(
+                        LastActionType::Newline,
+                        &ActionDiff {
+                            cursor_start_x: self.cursor_x,
+                            cursor_start_y: self.cursor_y,
+                            cursor_end_x: 0,
+                            cursor_end_y: self.cursor_y,
+                            start_x: 0,
+                            start_y: self.cursor_y,
+                            end_x: self.document.lines[self.cursor_y].len(),
+                            end_y: self.cursor_y,
+                            new: vec![],
+                            old: vec![current_line],
+                        },
+                    );
+                    return Ok(());
+                }
+            }
+        }
+
         // Check for command execution BEFORE committing the newline
         if x == current_line.len() && current_line.trim() == "/task" {
             self.mode = EditorMode::TaskSelection;

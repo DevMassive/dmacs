@@ -267,3 +267,52 @@ fn test_editor_backspace_empty_list_item() {
     assert_eq!(editor.document.lines[0], "- [x] somethin"); // regular backspace
     assert_eq!(editor.cursor_pos(), (14, 0));
 }
+
+#[test]
+fn test_editor_newline_empty_list_item() {
+    let mut editor = Editor::new(None);
+
+    // Test with "- "
+    editor.document.lines[0] = "- ".to_string();
+    editor.set_cursor_pos(2, 0);
+    editor.insert_newline().unwrap();
+    assert_eq!(editor.document.lines[0], "");
+    assert_eq!(editor.cursor_pos(), (0, 0));
+
+    // Test with "  - "
+    editor.document.lines = vec!["  - ".to_string()];
+    editor.set_cursor_pos(4, 0);
+    editor.insert_newline().unwrap();
+    assert_eq!(editor.document.lines[0], "");
+    assert_eq!(editor.cursor_pos(), (0, 0));
+
+    // Test with "- [ ] "
+    editor.document.lines = vec!["- [ ] ".to_string()];
+    editor.set_cursor_pos(6, 0);
+    editor.insert_newline().unwrap();
+    assert_eq!(editor.document.lines[0], "");
+    assert_eq!(editor.cursor_pos(), (0, 0));
+
+    // Test with "- [x] "
+    editor.document.lines = vec!["- [x] ".to_string()];
+    editor.set_cursor_pos(6, 0);
+    editor.insert_newline().unwrap();
+    assert_eq!(editor.document.lines[0], "");
+    assert_eq!(editor.cursor_pos(), (0, 0));
+
+    // Negative test: multiple spaces after marker
+    editor.document.lines = vec!["-   ".to_string()];
+    editor.set_cursor_pos(4, 0);
+    editor.insert_newline().unwrap();
+    assert_eq!(editor.document.lines.len(), 2);
+    assert_eq!(editor.document.lines[0], "-   ");
+    assert_eq!(editor.document.lines[1], "- ");
+
+    // Negative test: multiple spaces after checkbox
+    editor.document.lines = vec!["- [ ]   ".to_string()];
+    editor.set_cursor_pos(9, 0);
+    editor.insert_newline().unwrap();
+    assert_eq!(editor.document.lines.len(), 2);
+    assert_eq!(editor.document.lines[0], "- [ ]   ");
+    assert_eq!(editor.document.lines[1], "- [ ] ");
+}
