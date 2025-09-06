@@ -59,24 +59,26 @@ impl Scroll {
         width
     }
 
-    pub fn get_byte_pos_from_display_width(&self, line: &str, display_x: usize) -> usize {
+    pub fn get_byte_pos_from_display_width(&self, line: &str, display_x: usize) -> (usize, usize) {
         let mut current_display_x = 0;
         let mut byte_pos = 0;
         for ch in line.chars() {
             if current_display_x >= display_x {
-                break;
+                return (byte_pos, current_display_x);
             }
-            if ch == '\x09' {
-                current_display_x += TAB_STOP - (current_display_x % TAB_STOP);
+            let next_display_x = if ch == '\t' {
+                current_display_x + (TAB_STOP - (current_display_x % TAB_STOP))
             } else {
-                current_display_x += ch.width().unwrap_or(0);
+                current_display_x + ch.width().unwrap_or(0)
+            };
+
+            if next_display_x > display_x {
+                return (byte_pos, current_display_x);
             }
-            if current_display_x > display_x {
-                break;
-            }
+            current_display_x = next_display_x;
             byte_pos += ch.len_utf8();
         }
-        byte_pos
+        (byte_pos, current_display_x)
     }
 
     // Helper for clamping cursor_x, now part of Scroll
@@ -167,8 +169,9 @@ impl Scroll {
         *last_action_was_kill = false;
         if *cursor_y > 0 {
             *cursor_y -= 1;
-            *cursor_x =
-                self.get_byte_pos_from_display_width(&document.lines[*cursor_y], *desired_cursor_x);
+            *cursor_x = self
+                .get_byte_pos_from_display_width(&document.lines[*cursor_y], *desired_cursor_x)
+                .0;
         } else {
             *cursor_x = 0;
             *desired_cursor_x = 0;
@@ -186,8 +189,9 @@ impl Scroll {
         *last_action_was_kill = false;
         if *cursor_y < document.lines.len().saturating_sub(1) {
             *cursor_y += 1;
-            *cursor_x =
-                self.get_byte_pos_from_display_width(&document.lines[*cursor_y], *desired_cursor_x);
+            *cursor_x = self
+                .get_byte_pos_from_display_width(&document.lines[*cursor_y], *desired_cursor_x)
+                .0;
         } else {
             *cursor_x = document.lines[*cursor_y].len();
             *desired_cursor_x = self.get_display_width(&document.lines[*cursor_y], *cursor_x);

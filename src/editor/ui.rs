@@ -166,29 +166,12 @@ impl Editor {
                 continue;
             }
 
-            let mut display_x = 0;
-            let mut start_byte = 0;
-
-            if self.scroll.col_offset > 0 {
-                let mut current_width = 0;
-                for (idx, ch) in line.char_indices() {
-                    let char_width = if ch == '\t' {
-                        TAB_STOP - (current_width % TAB_STOP)
-                    } else {
-                        ch.width().unwrap_or(0)
-                    };
-                    if current_width + char_width >= self.scroll.col_offset {
-                        display_x = current_width;
-                        start_byte = idx;
-                        break;
-                    }
-                    current_width += char_width;
-                    if idx + ch.len_utf8() == line.len() {
-                        display_x = current_width;
-                        start_byte = line.len();
-                    }
-                }
-            }
+            let (start_byte, mut display_x) = if self.scroll.col_offset > 0 {
+                self.scroll
+                    .get_byte_pos_from_display_width(line, self.scroll.col_offset)
+            } else {
+                (0, 0)
+            };
 
             let mut byte_idx = start_byte;
             let line_len = line.len();
