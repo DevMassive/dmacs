@@ -488,6 +488,7 @@ impl Editor {
         let x = self.cursor_x;
         let current_line = self.document.lines[y].clone();
 
+        // Delete empty list item
         if x == current_line.len() {
             let indentation_len = current_line.len() - current_line.trim_start().len();
             let content = &current_line[indentation_len..];
@@ -544,9 +545,11 @@ impl Editor {
 
         let mut new_line_prefix = indentation.clone();
 
-        if trimmed_line.starts_with("- [ ] ") || trimmed_line.starts_with("- [x] ") {
+        if (trimmed_line.starts_with("- [ ] ") || trimmed_line.starts_with("- [x] "))
+            && self.cursor_x >= new_line_prefix.len() + 6
+        {
             new_line_prefix.push_str("- [ ] ");
-        } else if trimmed_line.starts_with("- ") {
+        } else if trimmed_line.starts_with("- ") && self.cursor_x >= new_line_prefix.len() + 2 {
             new_line_prefix.push_str("- ");
         }
 
