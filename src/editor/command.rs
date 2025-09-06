@@ -54,6 +54,14 @@ pub fn execute_command(line: &str) -> CommandResult {
                 Err(e) => CommandResult::Error(format!("Failed to execute xurl: {e}")),
             }
         }
+        _ if line.starts_with("/qiita ") => {
+            let input = line.trim_start_matches("/qiita ").trim();
+            let _ = Command::new("gomi-qiita").arg(input).spawn();
+            CommandResult::Success {
+                new_line_content: Some(format!("# {line}")),
+                status_message: "/qiita".to_string(),
+            }
+        }
         _ => CommandResult::NoCommand,
     }
 }
