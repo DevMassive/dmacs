@@ -181,22 +181,8 @@ impl Editor {
                 // Calculate character width
                 let char_width = if ch == '\t' {
                     TAB_STOP - (display_x % TAB_STOP)
-                } else if ch.is_ascii() {
-                    1
                 } else {
-                    match ch {
-                        // Hiragana
-                        '\u{3040}'..='\u{309F}' => 2,
-                        // Katakana
-                        '\u{30A0}'..='\u{30FF}' => 2,
-                        // CJK Unified Ideographs
-                        '\u{4E00}'..='\u{9FFF}' => 2,
-                        // CJK Symbols and Punctuation
-                        '\u{3000}'..='\u{303F}' => 2,
-                        // Full-width ASCII
-                        '\u{FF01}'..='\u{FF5E}' => 2,
-                        _ => ch.width().unwrap_or(0),
-                    }
+                    UnicodeWidthChar::width(ch).unwrap_or(0)
                 };
                 display_x += char_width;
 
@@ -239,7 +225,7 @@ impl Editor {
 
                 // Draw character
                 let screen_x = char_start_display_x.saturating_sub(self.scroll.col_offset);
-                if screen_x < screen_cols {
+                if screen_x + char_width <= screen_cols {
                     let display_string = if ch == '\t' {
                         " ".repeat(char_width)
                     } else {
