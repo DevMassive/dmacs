@@ -148,9 +148,8 @@ impl Scroll {
     ) {
         *last_action_was_kill = false;
         *cursor_y = document.lines.len().saturating_sub(1);
-        *cursor_x =
-            self.get_display_width(&document.lines[*cursor_y], document.lines[*cursor_y].len());
-        *desired_cursor_x = *cursor_x;
+        *cursor_x = document.lines[*cursor_y].len();
+        *desired_cursor_x = self.get_display_width(&document.lines[*cursor_y], *cursor_x);
         let screen_height = self.screen_rows.saturating_sub(1);
         if *cursor_y >= self.row_offset + screen_height {
             self.row_offset = cursor_y.saturating_sub(screen_height) + 1;

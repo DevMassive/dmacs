@@ -6,7 +6,9 @@ use pancurses::Input;
 fn test_editor_horizontal_scroll_right() {
     let mut editor = Editor::new(None);
     editor.document.lines[0] = "0123456789abcdef".to_string();
-    editor.update_screen_size(10, 20);
+    let screen_cols = 20;
+    let scroll_margin = 10;
+    editor.update_screen_size(10, screen_cols);
 
     // Move cursor to the right, beyond the screen width
     for i in 0..12 {
@@ -16,30 +18,25 @@ fn test_editor_horizontal_scroll_right() {
         let (x, _) = editor.cursor_pos();
         assert_eq!(x, i + 1);
 
-        if (i + 1) < editor.scroll.screen_cols {
-            // Still within the screen, no scroll
+        let display_x = i + 1;
+        if display_x < screen_cols - scroll_margin {
             assert_eq!(editor.scroll.col_offset, 0);
         } else {
-            // Scrolled past the screen edge
-            // display_cursor_x = i + 1
-            // col_offset = display_cursor_x - screen_width + 1
-            // Note: screen_width is not directly used here, but the logic implies it.
-            // For testing purposes, we can assume a fixed screen_width for this assertion.
-            assert_eq!(
-                editor.scroll.col_offset,
-                ((i + 1) as isize - editor.scroll.screen_cols as isize + 1).max(0) as usize
-            );
+            let expected_offset = display_x.saturating_sub(screen_cols - scroll_margin);
+            assert_eq!(editor.scroll.col_offset, expected_offset);
         }
     }
     assert_eq!(editor.cursor_pos(), (12, 0));
-    assert_eq!(editor.scroll.col_offset, 0);
+    assert_eq!(editor.scroll.col_offset, 12 - (screen_cols - scroll_margin));
 }
 
 #[test]
 fn test_editor_horizontal_scroll_left() {
     let mut editor = Editor::new(None);
     editor.document.lines[0] = "0123456789abcdef".to_string();
-    editor.update_screen_size(10, 20);
+    let screen_cols = 20;
+    let scroll_margin = 10;
+    editor.update_screen_size(10, screen_cols);
 
     // First, scroll to the right
     for _ in 0..15 {
@@ -47,12 +44,7 @@ fn test_editor_horizontal_scroll_left() {
     }
     editor.scroll();
     assert_eq!(editor.cursor_pos(), (15, 0));
-    // Note: screen_width is not directly used here, but the logic implies it.
-    // For testing purposes, we can assume a fixed screen_width for this assertion.
-    assert_eq!(
-        editor.scroll.col_offset,
-        (15_isize - editor.scroll.screen_cols as isize + 1).max(0) as usize
-    );
+    assert_eq!(editor.scroll.col_offset, 15 - (screen_cols - scroll_margin));
 
     // Now, move cursor to the left, back into the scrolled area
     for i in 0..10 {
@@ -74,17 +66,17 @@ fn test_editor_horizontal_scroll_line_change() {
         "a very long line to test scrolling".to_string(), // len = 34
         "short line".to_string(),                         // len = 10
     ];
-    editor.update_screen_size(15, 20);
+    let screen_cols = 20;
+    let scroll_margin = 10;
+    editor.update_screen_size(15, screen_cols);
 
     // Go to the end of the long line to force scrolling
     editor
         .process_input(Input::Character('\x05'), false)
         .unwrap(); // Ctrl-E (end of line)
     editor.scroll();
-    // Note: screen_width is not directly used here, but the logic implies it.
-    // For testing purposes, we can assume a fixed screen_width for this assertion.
     assert_eq!(editor.cursor_pos(), (34, 0));
-    assert_eq!(editor.scroll.col_offset, 34 - editor.scroll.screen_cols + 1);
+    assert_eq!(editor.scroll.col_offset, 34 - (screen_cols - scroll_margin));
 
     // Move down to the shorter line
     editor.process_input(Input::KeyDown, false).unwrap();
@@ -93,7 +85,7 @@ fn test_editor_horizontal_scroll_line_change() {
     // Cursor should be clamped to the end of the shorter line
     assert_eq!(editor.cursor_pos(), (10, 1));
     // The view should scroll left so the cursor is visible
-    assert_eq!(editor.scroll.col_offset, 10);
+    assert_eq!(editor.scroll.col_offset, 0);
 }
 
 #[test]

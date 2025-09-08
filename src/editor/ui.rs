@@ -176,12 +176,18 @@ impl Editor {
             let mut byte_idx = start_byte;
             let line_len = line.len();
             let mut current_display_x = display_x_at_start;
+            let mut screen_x = display_x_at_start.saturating_sub(self.scroll.col_offset);
+
             for ch in line[start_byte..].chars() {
                 let char_width = if ch == '\t' {
                     TAB_STOP - (current_display_x % TAB_STOP)
                 } else {
                     UnicodeWidthChar::width(ch).unwrap_or(0)
                 };
+
+                if screen_x + char_width > screen_cols {
+                    break;
+                }
 
                 // Check if this character is part of a search result
                 let is_highlighted = self.search.mode
@@ -221,26 +227,19 @@ impl Editor {
                 }
 
                 // Draw character
-                let screen_x = current_display_x.saturating_sub(self.scroll.col_offset);
-                if screen_x < screen_cols {
-                    let display_string = if ch == '\t' {
-                        " ".repeat(char_width)
-                    } else {
-                        ch.to_string()
-                    };
-                    window.mvaddstr(row as i32, screen_x as i32, &display_string);
-                }
+                let display_string = if ch == '\t' {
+                    " ".repeat(char_width)
+                } else {
+                    ch.to_string()
+                };
+                window.mvaddstr(row as i32, screen_x as i32, &display_string);
 
                 if is_highlighted || is_selected {
                     window.attroff(A_REVERSE);
                 }
 
+                screen_x += char_width;
                 current_display_x += char_width;
-
-                // Stop drawing if we reach the end of the screen
-                if screen_x >= screen_cols {
-                    break;
-                }
                 byte_idx += ch.len_utf8();
             }
 
@@ -354,14 +353,19 @@ impl Editor {
         }
 
         // Horizontal scroll
+        let scroll_margin = 10;
         let display_cursor_x = self
             .scroll
             .get_display_width(&self.document.lines[self.cursor_y], self.cursor_x);
-        if display_cursor_x < self.scroll.col_offset {
-            self.scroll.col_offset = display_cursor_x;
+
+        // Scroll right
+        if display_cursor_x >= self.scroll.col_offset + self.scroll.screen_cols - scroll_margin {
+            self.scroll.col_offset =
+                display_cursor_x.saturating_sub(self.scroll.screen_cols - scroll_margin);
         }
-        if display_cursor_x >= self.scroll.col_offset + self.scroll.screen_cols {
-            self.scroll.col_offset = display_cursor_x.saturating_sub(self.scroll.screen_cols) + 1;
+        // Scroll left
+        else if display_cursor_x < self.scroll.col_offset + scroll_margin {
+            self.scroll.col_offset = display_cursor_x.saturating_sub(scroll_margin);
         }
     }
 }
