@@ -166,7 +166,7 @@ impl Editor {
                 continue;
             }
 
-            let (start_byte, mut display_x) = if self.scroll.col_offset > 0 {
+            let (start_byte, display_x_at_start) = if self.scroll.col_offset > 0 {
                 self.scroll
                     .get_byte_pos_from_display_width(line, self.scroll.col_offset)
             } else {
@@ -175,16 +175,13 @@ impl Editor {
 
             let mut byte_idx = start_byte;
             let line_len = line.len();
+            let mut current_display_x = display_x_at_start;
             for ch in line[start_byte..].chars() {
-                let char_start_display_x = display_x;
-
-                // Calculate character width
                 let char_width = if ch == '\t' {
-                    TAB_STOP - (display_x % TAB_STOP)
+                    TAB_STOP - (current_display_x % TAB_STOP)
                 } else {
                     UnicodeWidthChar::width(ch).unwrap_or(0)
                 };
-                display_x += char_width;
 
                 // Check if this character is part of a search result
                 let is_highlighted = self.search.mode
@@ -224,8 +221,8 @@ impl Editor {
                 }
 
                 // Draw character
-                let screen_x = char_start_display_x.saturating_sub(self.scroll.col_offset);
-                if screen_x + char_width <= screen_cols {
+                let screen_x = current_display_x.saturating_sub(self.scroll.col_offset);
+                if screen_x < screen_cols {
                     let display_string = if ch == '\t' {
                         " ".repeat(char_width)
                     } else {
@@ -237,6 +234,8 @@ impl Editor {
                 if is_highlighted || is_selected {
                     window.attroff(A_REVERSE);
                 }
+
+                current_display_x += char_width;
 
                 // Stop drawing if we reach the end of the screen
                 if screen_x >= screen_cols {
@@ -264,7 +263,7 @@ impl Editor {
                 };
 
                 if highlight_eol_char {
-                    let eol_screen_x = display_x.saturating_sub(self.scroll.col_offset);
+                    let eol_screen_x = current_display_x.saturating_sub(self.scroll.col_offset);
                     if eol_screen_x < screen_cols {
                         window.attron(A_REVERSE);
                         window.mvaddch(row as i32, eol_screen_x as i32, ' '); // Draw a reversed space
