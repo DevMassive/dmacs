@@ -1,8 +1,7 @@
-use pancurses::{A_BOLD, A_DIM, A_REVERSE, Window};
-use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
-
 use crate::editor::Editor;
+use pancurses::{A_BOLD, A_DIM, A_REVERSE, Window};
 use std::cmp::min;
+use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
 const TAB_STOP: usize = 4;
 pub const STATUS_BAR_HEIGHT: usize = 2;
@@ -166,12 +165,24 @@ impl Editor {
                 continue;
             }
 
-            let (start_byte, display_x_at_start) = if self.scroll.col_offset > 0 {
+            let (mut start_byte, mut display_x_at_start) = if self.scroll.col_offset > 0 {
                 self.scroll
                     .get_byte_pos_from_display_width(line, self.scroll.col_offset)
             } else {
                 (0, 0)
             };
+
+            if display_x_at_start < self.scroll.col_offset {
+                if let Some(ch) = line[start_byte..].chars().next() {
+                    let first_char_width = if ch == '\t' {
+                        TAB_STOP - (display_x_at_start % TAB_STOP)
+                    } else {
+                        ch.width().unwrap_or(0)
+                    };
+                    display_x_at_start += first_char_width;
+                    start_byte += ch.len_utf8();
+                }
+            }
 
             let mut byte_idx = start_byte;
             let line_len = line.len();
@@ -327,7 +338,7 @@ impl Editor {
             .get_display_width(&self.document.lines[self.cursor_y], self.cursor_x);
         window.mv(
             (self.cursor_y - self.scroll.row_offset + document_start_row) as i32,
-            (display_cursor_x - self.scroll.col_offset) as i32,
+            (display_cursor_x.saturating_sub(self.scroll.col_offset)) as i32,
         );
         window.refresh();
     }
