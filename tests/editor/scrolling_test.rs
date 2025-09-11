@@ -230,3 +230,88 @@ fn test_editor_vertical_scroll_up() {
     assert_eq!(editor.cursor_pos(), (0, 10));
     assert_eq!(editor.scroll.row_offset, 10);
 }
+
+#[test]
+#[ignore = "This test interacts with the terminal and is best run manually"]
+fn test_horizontal_scroll_visual_and_cursor_pinning() {
+    // This test initializes a pancurses window to check the actual visual output.
+    // It might interfere with your terminal if it panics.
+
+    // 1. Setup
+    let window = pancurses::initscr();
+    window.keypad(true);
+    pancurses::noecho();
+    pancurses::curs_set(0); // Hide cursor for stable testing
+
+    let mut editor = Editor::new(None);
+    let screen_rows = 10;
+    let screen_cols = 40;
+    let scroll_margin = 10;
+    editor.update_screen_size(screen_rows, screen_cols);
+    editor.document.lines[0] = "This is a very long line of text to test the horizontal scrolling behavior of the editor.".to_string();
+
+    // 2. Action: Move cursor to trigger scrolling
+    let move_count = 45;
+    for _ in 0..move_count {
+        editor.process_input(Input::KeyRight, false).unwrap();
+    }
+    editor.draw(&window);
+
+    // 3. Assertions for scrolled state
+    assert_eq!(editor.cursor_pos().0, move_count);
+    let expected_cursor_x = screen_cols - scroll_margin;
+
+    // Check cursor position on screen
+    let (cury, curx) = window.get_cur_yx();
+    assert_eq!(cury, STATUS_BAR_HEIGHT as i32, "Cursor Y position is incorrect");
+    assert_eq!(curx, expected_cursor_x as i32, "Cursor should be pinned to the right margin");
+
+    // Check displayed text on the line
+    let line_y = STATUS_BAR_HEIGHT as i32;
+    let mut displayed_line = String::new();
+    for x in 0..screen_cols {
+        let ch = window.mvinch(line_y, x as i32);
+        displayed_line.push((ch & pancurses::A_CHARTEXT) as u8 as char);
+    }
+    
+    let expected_col_offset = move_count - expected_cursor_x;
+    assert_eq!(editor.scroll.col_offset, expected_col_offset);
+    let expected_line_slice = &editor.document.lines[0][expected_col_offset..expected_col_offset + screen_cols];
+    assert_eq!(displayed_line, expected_line_slice, "Displayed text is not scrolled correctly");
+
+    // 4. Action: Move cursor left, still in scrolled mode
+    editor.process_input(Input::KeyLeft, false).unwrap();
+    editor.draw(&window);
+
+    // 5. Assertions for continued scrolled state
+    let (cury, curx) = window.get_cur_yx();
+    assert_eq!(cury, STATUS_BAR_HEIGHT as i32, "Cursor Y should not change");
+    assert_eq!(curx, expected_cursor_x as i32, "Cursor should remain pinned");
+
+    // 6. Action: Move cursor left until scrolling stops
+    // Current cursor_x is `move_count - 1`.
+    // We need to move left until cursor_x becomes smaller than `expected_cursor_x`.
+    let moves_to_unpin = (move_count - 1) - (expected_cursor_x - 1);
+    for _ in 0..moves_to_unpin {
+        editor.process_input(Input::KeyLeft, false).unwrap();
+    }
+    assert_eq!(editor.cursor_pos().0, expected_cursor_x - 1); // e.g. 29
+    editor.draw(&window);
+
+    // 7. Assertions for unscrolled state
+    assert_eq!(editor.scroll.col_offset, 0, "col_offset should be 0");
+    let (cury, curx) = window.get_cur_yx();
+    assert_eq!(cury, STATUS_BAR_HEIGHT as i32);
+    assert_eq!(curx, (expected_cursor_x - 1) as i32, "Cursor should now move freely");
+
+    let mut displayed_line_unscrolled = String::new();
+    for x in 0..screen_cols {
+        let ch = window.mvinch(line_y, x as i32);
+        displayed_line_unscrolled.push((ch & pancurses::A_CHARTEXT) as u8 as char);
+    }
+    let expected_line_slice_unscrolled = &editor.document.lines[0][0..screen_cols];
+    assert_eq!(displayed_line_unscrolled, expected_line_slice_unscrolled);
+
+    // 8. Teardown
+    pancurses::endwin();
+}
