@@ -76,23 +76,31 @@ impl Editor {
         }
 
         let after_indent = &line[byte_pos..];
+        let mut comment_prefix_len = 0;
+        let mut content_after_comment = after_indent;
 
-        let marker_bytes =
-            if after_indent.starts_with("- [ ] ") || after_indent.starts_with("- [x] ") {
-                6
-            } else if after_indent.starts_with("- ") {
-                2
-            } else if after_indent.starts_with('/') {
-                if let Some(end_pos) = after_indent.find(' ') {
-                    end_pos + 1
-                } else {
-                    0
-                }
+        if after_indent.starts_with("# ") {
+            comment_prefix_len = 2; // "# "
+            content_after_comment = &after_indent[comment_prefix_len..];
+        }
+
+        let marker_bytes = if content_after_comment.starts_with("- [ ] ")
+            || content_after_comment.starts_with("- [x] ")
+        {
+            6
+        } else if content_after_comment.starts_with("- ") {
+            2
+        } else if content_after_comment.starts_with('/') {
+            if let Some(end_pos) = content_after_comment.find(' ') {
+                end_pos + 1
             } else {
                 0
-            };
+            }
+        } else {
+            0
+        };
 
-        let prefix_byte_len = byte_pos + marker_bytes;
+        let prefix_byte_len = byte_pos + comment_prefix_len + marker_bytes;
         let prefix_display_width = self
             .scroll
             .get_display_width_from_bytes(line, prefix_byte_len);
