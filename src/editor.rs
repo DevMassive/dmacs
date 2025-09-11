@@ -236,7 +236,7 @@ impl Editor {
             self.cursor_y = current_cursor_y;
             self.desired_cursor_x = self
                 .scroll
-                .get_display_width(&self.document.lines[self.cursor_y], self.cursor_x);
+                .get_display_width_from_bytes(&self.document.lines[self.cursor_y], self.cursor_x);
             self.status_message = "Undo successful.".to_string();
             debug!("Document after undo: {:?}", self.document.lines);
         } else {
@@ -280,7 +280,7 @@ impl Editor {
             self.cursor_y = current_cursor_y;
             self.desired_cursor_x = self
                 .scroll
-                .get_display_width(&self.document.lines[self.cursor_y], self.cursor_x);
+                .get_display_width_from_bytes(&self.document.lines[self.cursor_y], self.cursor_x);
             self.status_message = "Redo successful.".to_string();
             debug!("Document after redo: {:?}", self.document.lines);
         } else {
@@ -299,7 +299,7 @@ impl Editor {
         self.cursor_y = new_y;
         self.desired_cursor_x = self
             .scroll
-            .get_display_width(&self.document.lines[self.cursor_y], self.cursor_x);
+            .get_display_width_from_bytes(&self.document.lines[self.cursor_y], self.cursor_x);
     }
 
     pub fn insert_text(&mut self, text: &str) -> Result<()> {
@@ -803,7 +803,7 @@ impl Editor {
         self.cursor_x = self.document.lines[y].len();
         self.desired_cursor_x = self
             .scroll
-            .get_display_width(&self.document.lines[y], self.cursor_x);
+            .get_display_width_from_bytes(&self.document.lines[y], self.cursor_x);
     }
 
     pub fn move_cursor_word_left(&mut self) -> Result<()> {
@@ -812,9 +812,10 @@ impl Editor {
             if self.cursor_y > 0 {
                 self.cursor_y -= 1;
                 self.cursor_x = self.document.lines[self.cursor_y].len();
-                self.desired_cursor_x = self
-                    .scroll
-                    .get_display_width(&self.document.lines[self.cursor_y], self.cursor_x);
+                self.desired_cursor_x = self.scroll.get_display_width_from_bytes(
+                    &self.document.lines[self.cursor_y],
+                    self.cursor_x,
+                );
             }
             return Ok(());
         }
@@ -846,7 +847,9 @@ impl Editor {
         }
 
         self.cursor_x = new_cursor_x;
-        self.desired_cursor_x = self.scroll.get_display_width(line, self.cursor_x);
+        self.desired_cursor_x = self
+            .scroll
+            .get_display_width_from_bytes(line, self.cursor_x);
         Ok(())
     }
 
@@ -892,7 +895,9 @@ impl Editor {
         }
 
         self.cursor_x = new_cursor_x;
-        self.desired_cursor_x = self.scroll.get_display_width(current_line, self.cursor_x);
+        self.desired_cursor_x = self
+            .scroll
+            .get_display_width_from_bytes(current_line, self.cursor_x);
         Ok(())
     }
 

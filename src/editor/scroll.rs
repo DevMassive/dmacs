@@ -42,7 +42,7 @@ impl Scroll {
     }
 
     // Helper functions that were in Editor, now in Scroll
-    pub fn get_display_width(&self, line: &str, until_byte: usize) -> usize {
+    pub fn get_display_width_from_bytes(&self, line: &str, until_byte: usize) -> usize {
         let mut width = 0;
         let mut bytes = 0;
         for ch in line.chars() {
@@ -149,7 +149,8 @@ impl Scroll {
         *last_action_was_kill = false;
         *cursor_y = document.lines.len().saturating_sub(1);
         *cursor_x = document.lines[*cursor_y].len();
-        *desired_cursor_x = self.get_display_width(&document.lines[*cursor_y], *cursor_x);
+        *desired_cursor_x =
+            self.get_display_width_from_bytes(&document.lines[*cursor_y], *cursor_x);
         let screen_height = self.screen_rows.saturating_sub(1);
         if *cursor_y >= self.row_offset + screen_height {
             self.row_offset = cursor_y.saturating_sub(screen_height) + 1;
@@ -193,7 +194,8 @@ impl Scroll {
                 .0;
         } else {
             *cursor_x = document.lines[*cursor_y].len();
-            *desired_cursor_x = self.get_display_width(&document.lines[*cursor_y], *cursor_x);
+            *desired_cursor_x =
+                self.get_display_width_from_bytes(&document.lines[*cursor_y], *cursor_x);
         }
     }
 
@@ -213,11 +215,12 @@ impl Scroll {
                 new_pos -= 1;
             }
             *cursor_x = new_pos;
-            *desired_cursor_x = self.get_display_width(line, *cursor_x);
+            *desired_cursor_x = self.get_display_width_from_bytes(line, *cursor_x);
         } else if *cursor_y > 0 {
             *cursor_y -= 1;
             *cursor_x = document.lines[*cursor_y].len();
-            *desired_cursor_x = self.get_display_width(&document.lines[*cursor_y], *cursor_x);
+            *desired_cursor_x =
+                self.get_display_width_from_bytes(&document.lines[*cursor_y], *cursor_x);
         }
     }
 
@@ -237,7 +240,7 @@ impl Scroll {
                 new_pos += 1;
             }
             *cursor_x = new_pos;
-            *desired_cursor_x = self.get_display_width(line, *cursor_x);
+            *desired_cursor_x = self.get_display_width_from_bytes(line, *cursor_x);
         } else if *cursor_y < document.lines.len().saturating_sub(1) {
             *cursor_y += 1;
             *cursor_x = 0;

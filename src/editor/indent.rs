@@ -117,7 +117,7 @@ impl Editor {
 
         self.desired_cursor_x = self
             .scroll
-            .get_display_width(&self.document.lines[self.cursor_y], self.cursor_x);
+            .get_display_width_from_bytes(&self.document.lines[self.cursor_y], self.cursor_x);
 
         Ok(())
     }
