@@ -165,14 +165,20 @@ impl Editor {
                 continue;
             }
 
-            let (mut start_byte, mut display_x_at_start) = if self.scroll.col_offset > 0 {
+            let col_offset = if index == self.cursor_y {
+                self.scroll.col_offset
+            } else {
+                0
+            };
+
+            let (mut start_byte, mut display_x_at_start) = if col_offset > 0 {
                 self.scroll
-                    .get_byte_pos_from_display_width(line, self.scroll.col_offset)
+                    .get_byte_pos_from_display_width(line, col_offset)
             } else {
                 (0, 0)
             };
 
-            if display_x_at_start < self.scroll.col_offset {
+            if display_x_at_start < col_offset {
                 if let Some(ch) = line[start_byte..].chars().next() {
                     let first_char_width = if ch == '\t' {
                         TAB_STOP - (display_x_at_start % TAB_STOP)
@@ -187,7 +193,7 @@ impl Editor {
             let mut byte_idx = start_byte;
             let line_len = line.len();
             let mut current_display_x = display_x_at_start;
-            let mut screen_x = display_x_at_start.saturating_sub(self.scroll.col_offset);
+            let mut screen_x = display_x_at_start.saturating_sub(col_offset);
 
             for ch in line[start_byte..].chars() {
                 let char_width = if ch == '\t' {
@@ -273,7 +279,7 @@ impl Editor {
                 };
 
                 if highlight_eol_char {
-                    let eol_screen_x = current_display_x.saturating_sub(self.scroll.col_offset);
+                    let eol_screen_x = current_display_x.saturating_sub(col_offset);
                     if eol_screen_x < screen_cols {
                         window.attron(A_REVERSE);
                         window.mvaddch(row as i32, eol_screen_x as i32, ' '); // Draw a reversed space
