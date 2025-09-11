@@ -197,7 +197,11 @@ impl Editor {
             }
 
             let (prefix_byte_len, _) = self.get_prefix_info(line);
-            let content_col_offset = if index == self.cursor_y { self.scroll.col_offset } else { 0 };
+            let content_col_offset = if index == self.cursor_y {
+                self.scroll.col_offset
+            } else {
+                0
+            };
 
             let mut current_display_x = 0;
             let mut screen_x = 0;
@@ -235,7 +239,11 @@ impl Editor {
                     should_draw = true;
                 } else {
                     if !ellipsis_drawn && content_col_offset > 0 {
-                        let ellipsis = if wide_char_scroll_adjust { "… " } else { "…" };
+                        let ellipsis = if wide_char_scroll_adjust {
+                            "… "
+                        } else {
+                            "…"
+                        };
                         let ellipsis_width = UnicodeWidthStr::width(ellipsis);
                         if screen_x + ellipsis_width <= screen_cols {
                             window.mvaddstr(row as i32, screen_x as i32, ellipsis);
@@ -320,7 +328,7 @@ impl Editor {
 
         let filename_display = self.document.filename.as_deref().unwrap_or("[No Name]");
         let modified_indicator = if self.document.is_dirty() { "*" } else { "" };
-        let filename_and_modified = format!("{}{}", filename_display, modified_indicator);
+        let filename_and_modified = format!("{filename_display}{modified_indicator}");
         window.attron(A_BOLD);
         window.mvaddstr(0, 0, &filename_and_modified);
         window.attroff(A_BOLD);
@@ -366,9 +374,9 @@ impl Editor {
         } else {
             let content_display_cursor_x = display_cursor_x.saturating_sub(prefix_display_width);
             let content_line = &self.document.lines[self.cursor_y][prefix_byte_len..];
-            let (_, display_pos) =
-                self.scroll
-                    .get_byte_pos_from_display_width(content_line, self.scroll.col_offset);
+            let (_, display_pos) = self
+                .scroll
+                .get_byte_pos_from_display_width(content_line, self.scroll.col_offset);
             let wide_char_scroll_adjust =
                 self.scroll.col_offset > 0 && display_pos < self.scroll.col_offset;
 
@@ -434,14 +442,14 @@ impl Editor {
 
             let will_be_scrolled = self.scroll.col_offset > 0
                 || content_display_cursor_x
-                    >= available_width.saturating_sub(scroll_margin.min(available_width));
-            let ellipsis_width = if will_be_scrolled {
+                    > available_width.saturating_sub(scroll_margin.min(available_width));
+            let _ellipsis_width = if will_be_scrolled {
                 UnicodeWidthStr::width("…")
             } else {
                 0
             };
 
-            let available_content_width = available_width.saturating_sub(ellipsis_width);
+            let available_content_width = available_width;
 
             let desired_cursor_screen_x = if available_content_width > scroll_margin {
                 available_content_width.saturating_sub(scroll_margin)
