@@ -432,8 +432,9 @@ impl Editor {
             let content_display_cursor_x = display_cursor_x.saturating_sub(prefix_display_width);
             let available_width = screen_width.saturating_sub(prefix_display_width);
 
-            let will_be_scrolled =
-                self.scroll.col_offset > 0 || content_display_cursor_x >= available_width;
+            let will_be_scrolled = self.scroll.col_offset > 0
+                || content_display_cursor_x
+                    >= available_width.saturating_sub(scroll_margin.min(available_width));
             let ellipsis_width = if will_be_scrolled {
                 UnicodeWidthStr::width("…")
             } else {
