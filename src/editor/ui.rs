@@ -371,18 +371,17 @@ impl Editor {
 
         // Horizontal scroll
         let scroll_margin = 10;
+        let screen_width = self.scroll.screen_cols;
         let display_cursor_x = self
             .scroll
             .get_display_width(&self.document.lines[self.cursor_y], self.cursor_x);
 
-        // Scroll right
-        if display_cursor_x >= self.scroll.col_offset + self.scroll.screen_cols - scroll_margin {
-            self.scroll.col_offset =
-                display_cursor_x.saturating_sub(self.scroll.screen_cols - scroll_margin);
-        }
-        // Scroll left
-        else if display_cursor_x < self.scroll.col_offset + scroll_margin {
-            self.scroll.col_offset = display_cursor_x.saturating_sub(scroll_margin);
+        let desired_cursor_screen_x = screen_width.saturating_sub(scroll_margin);
+
+        if self.scroll.col_offset > 0 || display_cursor_x >= desired_cursor_screen_x {
+            self.scroll.col_offset = display_cursor_x.saturating_sub(desired_cursor_screen_x);
+        } else {
+            self.scroll.col_offset = 0;
         }
     }
 }
