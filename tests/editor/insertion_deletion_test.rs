@@ -316,3 +316,14 @@ fn test_editor_newline_empty_list_item() {
     assert_eq!(editor.document.lines[0], "- [ ]   ");
     assert_eq!(editor.document.lines[1], "- [ ] ");
 }
+
+#[test]
+fn test_editor_smart_space_insertion() {
+    let mut editor = Editor::new(None);
+    editor.document.lines[0] = "Hello ".to_string();
+    editor.set_cursor_pos(6, 0); // Cursor after "Hello "
+    editor.insert_text(" ").unwrap(); // Insert another space
+
+    assert_eq!(editor.document.lines[0], "Hello -> ");
+    assert_eq!(editor.cursor_pos(), (9, 0)); // Cursor after "Hello -> "
+}
