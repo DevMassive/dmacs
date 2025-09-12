@@ -1,3 +1,4 @@
+use dmacs::config::Keymap;
 use dmacs::editor::Editor;
 use pancurses::Input;
 use std::fs;
@@ -82,6 +83,31 @@ fn test_alt_s_saves_file() {
     assert_eq!(saved_content, "THello, world!\n");
 
     // Clean up the temporary file (done automatically by NamedTempFile drop)
+}
+
+#[test]
+fn test_custom_keymap_overrides_default() {
+    let mut editor = Editor::new(None);
+    let custom_toml = r#"
+        up = "Quit"
+    "#;
+    let keymap: Keymap = toml::from_str(custom_toml).unwrap();
+
+    // The user config loader will extend the default map, so we simulate that.
+    editor.keymap.bindings.extend(keymap.bindings);
+
+    // Process the 'up' arrow key, which is now mapped to Quit
+    editor.process_input(Input::KeyUp, false).unwrap();
+
+    // Assert that the editor should quit
+    assert!(editor.should_quit);
+
+    // Let's also test that a default binding still works in a fresh editor
+    let mut editor2 = Editor::new(None);
+    // Process the 'down' arrow key, which should just move the cursor
+    editor2.process_input(Input::KeyDown, false).unwrap();
+    assert_eq!(editor2.cursor_pos(), (0, 0)); // Stays at 0,0 on a single line doc
+    assert!(!editor2.should_quit);
 }
 
 #[test]
