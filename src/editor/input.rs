@@ -1,122 +1,102 @@
-use log::debug;
-use pancurses::Input;
-
+use crate::editor::actions::Action;
 use crate::editor::Editor;
 use crate::editor::EditorMode;
 use crate::error::Result;
+use log::debug;
+use pancurses::Input;
+
+fn key_to_string(key: Input, is_alt_pressed: bool) -> String {
+    // Handle keys that should ignore the 'alt' modifier first.
+    if let Input::Character(c) = key {
+        // These are control characters, their meaning is fixed and not combined with Alt.
+        if c.is_control() {
+            return match c {
+                '\x00' => "ctrl-space".to_string(),
+                '\t' => "tab".to_string(),
+                '\x0a' | '\x0d' => "enter".to_string(),
+                '\x1b' => "esc".to_string(),
+                '\x1f' => "ctrl-_".to_string(),
+                '\x7f' | '\x08' => "backspace".to_string(),
+                // Map other Ctrl+<char> combinations
+                '\x01'..='\x1a' => format!("ctrl-{}", ((c as u8 - 1 + b'a') as char)),
+                // Other control chars are unknown
+                _ => "unknown".to_string(),
+            };
+        }
+    }
+    // Shift-Tab is also special and ignores alt
+    if let Input::KeySTab = key {
+        return "shift-tab".to_string();
+    }
+
+    // For all other keys, the 'alt' modifier is relevant.
+    let mut key_str = String::new();
+    if is_alt_pressed {
+        key_str.push_str("alt-");
+    }
+
+    match key {
+        Input::Character(c) => {
+            // It's a normal character, append it.
+            // Control characters were already handled above.
+            key_str.push(c);
+        }
+        Input::KeyUp => key_str.push_str("up"),
+        Input::KeyDown => key_str.push_str("down"),
+        Input::KeyLeft => key_str.push_str("left"),
+        Input::KeyRight => key_str.push_str("right"),
+        Input::KeyHome => key_str.push_str("home"),
+        Input::KeyEnd => key_str.push_str("end"),
+        Input::KeyBackspace => key_str.push_str("backspace"),
+        Input::KeyDC => key_str.push_str("delete"),
+        Input::KeyPPage => key_str.push_str("pageup"),
+        Input::KeyNPage => key_str.push_str("pagedown"),
+        // KeySTab and Character(control) are handled above
+        _ => {
+            if key_str.is_empty() {
+                return "unknown".to_string();
+            }
+        }
+    }
+
+    key_str
+}
+
 
 impl Editor {
     pub fn process_input(&mut self, key: Input, is_alt_pressed: bool) -> Result<()> {
-        debug!("Processing input: {key:?}, Alt pressed: {is_alt_pressed}");
+        debug!("Processing input: {:?}, Alt pressed: {}", key, is_alt_pressed);
         self.set_alt_pressed(is_alt_pressed);
 
+        // Handle mode-specific inputs first
         if self.search.mode {
             self.handle_search_input(key);
             return Ok(());
         }
-
         if self.mode == EditorMode::TaskSelection {
             self.handle_task_selection_input(key);
             return Ok(());
         }
-
         if self.mode == EditorMode::FuzzySearch {
             self.handle_fuzzy_search_input(key);
             return Ok(());
         }
 
-        match key {
-            Input::Character('/') if is_alt_pressed => self.toggle_comment()?,
-            // Alt/Option + V for page up (often sends ESC v)
-            Input::Character('v') if is_alt_pressed => self.scroll_page_up(),
-            // Alt/Option + <
-            Input::Character('<') if is_alt_pressed => self.go_to_start_of_file(),
-            // Alt/Option + >
-            Input::Character('>') if is_alt_pressed => self.go_to_end_of_file(),
-            // Alt/Option + Left Arrow (often sends ESC b)
-            Input::Character('b') if is_alt_pressed => self.move_cursor_word_left()?,
-            // Alt/Option + Right Arrow (often sends ESC f)
-            Input::Character('f') if is_alt_pressed => self.move_cursor_word_right()?,
-            // Alt/Option + Up Arrow (often sends ESC [A)
-            Input::KeyUp if is_alt_pressed => self.move_line_up(),
-            // Alt/Option + Down Arrow (often sends ESC [B)
-            Input::KeyDown if is_alt_pressed => self.move_line_down(),
-            // Alt/Option + Backspace
-            Input::KeyBackspace if is_alt_pressed => self.hungry_delete()?,
-            Input::Character('w') if is_alt_pressed => self.copy_selection_action()?, // Option-W
-            Input::Character('_') if is_alt_pressed => self.redo(), // Alt + _ for redo
-            Input::Character('s') if is_alt_pressed => {
-                self.document.save(None)?;
-                self.status_message = "File saved!".to_string();
-            }
-            _ => self.handle_keypress(key)?,
-        }
-        Ok(())
-    }
+        // Normal mode input handling using keymap
+        let key_string = key_to_string(key, is_alt_pressed);
+        debug!("Key string: '{}'", key_string);
 
-    fn handle_keypress(&mut self, key: Input) -> Result<()> {
-        self.status_message.clear();
-        match key {
-            Input::Character(c) => match c {
-                '\x18' => {
-                    if self.no_exit_on_save {
-                        self.save_document()?;
-                        self.set_message("File saved. Editor will not exit.");
-                    } else {
-                        self.quit()?;
-                    }
-                },
-                '\x13' => self.enter_search_mode(), // Ctrl + S
-                '\x01' => self.go_to_start_of_line(),
-                '\x05' => self.go_to_end_of_line(),
-                '\x04' => self.delete_forward_char()?,
-                '\x0b' => {
-                    let _ = self.kill_line();
-                    self.last_action_was_kill = true;
-                }
-                '\x19' => self.yank()?,                      // Ctrl + Y
-                '\x16' => self.scroll_page_down(),           // Ctrl + V
-                '\x0e' => self.move_to_next_delimiter(),     // Ctrl + N
-                '\x10' => self.move_to_previous_delimiter(), // Ctrl + P
-                '\x7f' | '\x08' => self.delete_char()?,      // Backspace
-                '\x0a' | '\x0d' => self.insert_newline()?,
-                '\x02' => self.move_cursor_word_left()?, // Ctrl + B
-                '\x06' => self.enter_fuzzy_search_mode(), // Ctrl + F
-                '\x14' => self.toggle_checkbox()?,             // Ctrl + T
-                '\x1f' => self.undo(),                   // Ctrl + _ for undo
-                '\x03' | // Ctrl+C
-                '\x0c' | // Ctrl+L
-                '\x0f' | // Ctrl+O
-                '\x11' | // Ctrl+Q
-                '\x12' | // Ctrl+R
-                '\x15' | // Ctrl+U
-                '\x17' => self.cut_selection_action()?, // Ctrl+W
-                '\x00' => self.set_marker_action(), // Ctrl+Space
-                '\x07' => self.clear_marker_action(), // Ctrl+G
-                '\x1a' | // Ctrl+Z
-                '\x1b' => {
-                    if self.mode == EditorMode::Normal {
-                        // Do nothing special in normal mode for Esc yet
-                    } else {
-                        self.mode = EditorMode::Normal;
-                    }
-                }, // Ctrl+[ (ESC)
-                '\x1c' | // Ctrl+\
-                '\x1d' | // Ctrl+] 
-                '\x1e' => {}, // Ctrl+^
-                '\t' => self.indent_line()?,
-                _ => self.insert_text(&c.to_string())?,
-            },
-            Input::KeyBackspace => self.delete_char()?,
-            Input::KeyUp => self.move_cursor_up(),
-            Input::KeyDown => self.move_cursor_down(),
-            Input::KeyLeft => self.move_cursor_left(),
-            Input::KeyRight => self.move_cursor_right(),
-            Input::KeySTab | Input::KeyBTab => self.outdent_line()?,
-            _ => {}
+        if let Some(action) = self.keymap.bindings.get(&key_string).cloned() {
+            self.execute_action(action)?;
+        } else if let Input::Character(c) = key {
+            // If no specific action is bound, and it's a character, insert it.
+            // We exclude control characters from being inserted directly.
+            if !c.is_control() {
+                self.execute_action(Action::InsertChar(c))?;
+            }
         }
-        self.scroll
-            .clamp_cursor_x(&mut self.cursor_x, &self.cursor_y, &self.document);
+        // If no binding and not a character, do nothing.
+
         Ok(())
     }
 }

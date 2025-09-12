@@ -18,7 +18,10 @@ pub mod selection;
 pub mod task;
 pub mod ui;
 use crate::editor::scroll::Scroll;
+pub mod actions;
 pub mod fuzzy_search;
+use crate::config::Keymap;
+use crate::editor::actions::Action;
 use crate::editor::task::Task;
 
 #[derive(PartialEq, Debug)]
@@ -67,6 +70,7 @@ pub struct Editor {
     pub task: Task,
     pub fuzzy_search: fuzzy_search::FuzzySearch,
     clipboard_enabled: bool,
+    pub keymap: Keymap,
 }
 
 impl Editor {
@@ -109,6 +113,7 @@ impl Editor {
                                 task: Task::new(),
                                 fuzzy_search: fuzzy_search::FuzzySearch::new(),
                                 clipboard_enabled: true,
+                                keymap: Keymap::load_user_config(),
                             };
                         } else {
                             debug!(
@@ -158,7 +163,80 @@ impl Editor {
             task: Task::new(),
             fuzzy_search: fuzzy_search::FuzzySearch::new(),
             clipboard_enabled: true,
+            keymap: Keymap::load_user_config(),
         }
+    }
+
+    pub fn execute_action(&mut self, action: Action) -> Result<()> {
+        self.status_message.clear();
+        match action {
+            // File
+            Action::Save => {
+                self.document.save(None)?;
+                self.status_message = "File saved!".to_string();
+            }
+            Action::Quit => {
+                if self.no_exit_on_save {
+                    self.save_document()?;
+                    self.set_message("File saved. Editor will not exit.");
+                } else {
+                    self.quit()?;
+                }
+            }
+            // Cursor
+            Action::MoveUp => self.move_cursor_up(),
+            Action::MoveDown => self.move_cursor_down(),
+            Action::MoveLeft => self.move_cursor_left(),
+            Action::MoveRight => self.move_cursor_right(),
+            Action::GoToStartOfLine => self.go_to_start_of_line(),
+            Action::GoToEndOfLine => self.go_to_end_of_line(),
+            Action::MoveWordLeft => self.move_cursor_word_left()?,
+            Action::MoveWordRight => self.move_cursor_word_right()?,
+            Action::PageUp => self.scroll_page_up(),
+            Action::PageDown => self.scroll_page_down(),
+            Action::GoToStartOfFile => self.go_to_start_of_file(),
+            Action::GoToEndOfFile => self.go_to_end_of_file(),
+            Action::MoveToNextDelimiter => self.move_to_next_delimiter(),
+            Action::MoveToPreviousDelimiter => self.move_to_previous_delimiter(),
+            // Editing
+            Action::InsertChar(c) => self.insert_text(&c.to_string())?,
+            Action::InsertNewline => self.insert_newline()?,
+            Action::DeleteChar => self.delete_char()?,
+            Action::DeleteForwardChar => self.delete_forward_char()?,
+            Action::DeleteWord => self.hungry_delete()?,
+            Action::KillLine => {
+                let _ = self.kill_line();
+                self.last_action_was_kill = true;
+            }
+            Action::Yank => self.yank()?,
+            Action::Undo => self.undo(),
+            Action::Redo => self.redo(),
+            Action::Indent => self.indent_line()?,
+            Action::Outdent => self.outdent_line()?,
+            Action::ToggleComment => self.toggle_comment()?,
+            Action::ToggleCheckbox => self.toggle_checkbox()?,
+            // Selection
+            Action::SetMarker => self.set_marker_action(),
+            Action::ClearMarker => self.clear_marker_action(),
+            Action::CutSelection => self.cut_selection_action()?,
+            Action::CopySelection => self.copy_selection_action()?,
+            // Search
+            Action::EnterSearchMode => self.enter_search_mode(),
+            Action::EnterFuzzySearchMode => self.enter_fuzzy_search_mode(),
+            // Modes
+            Action::EnterNormalMode => {
+                if self.mode != EditorMode::Normal {
+                    self.mode = EditorMode::Normal;
+                }
+            }
+            // Misc
+            Action::MoveLineUp => self.move_line_up(),
+            Action::MoveLineDown => self.move_line_down(),
+            _ => { /* NoOp, etc. */ }
+        }
+        self.scroll
+            .clamp_cursor_x(&mut self.cursor_x, &self.cursor_y, &self.document);
+        Ok(())
     }
 
     pub fn update_screen_size(&mut self, screen_rows: usize, screen_cols: usize) {

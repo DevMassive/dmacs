@@ -1,4 +1,5 @@
 pub mod backup;
+pub mod config;
 pub mod document;
 pub mod editor;
 pub mod error;
