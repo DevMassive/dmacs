@@ -303,6 +303,37 @@ impl Editor {
     }
 
     pub fn insert_text(&mut self, text: &str) -> Result<()> {
+        // Special case for inserting " " at the end of a line followed by a space
+        // Insert "-> "
+        if text == " " {
+            let y = self.cursor_y;
+            let x = self.cursor_x;
+            if x > 0
+                && x == self.document.lines[y].len()
+                && !self.document.lines[y][0..x].trim().is_empty()
+            {
+                let last_char = self.document.lines[y].chars().last().unwrap();
+                if last_char == ' ' {
+                    self.commit(
+                        LastActionType::Insertion,
+                        &ActionDiff {
+                            cursor_start_x: self.cursor_x,
+                            cursor_start_y: self.cursor_y,
+                            cursor_end_x: self.cursor_x + 3,
+                            cursor_end_y: self.cursor_y,
+                            start_x: self.cursor_x,
+                            start_y: self.cursor_y,
+                            end_x: self.cursor_x + 3,
+                            end_y: self.cursor_y,
+                            new: vec!["-> ".to_string()],
+                            old: vec![],
+                        },
+                    );
+                    self.status_message = "->".to_string();
+                    return Ok(());
+                }
+            }
+        }
         self.commit(
             LastActionType::Insertion,
             &ActionDiff {
