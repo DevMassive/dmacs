@@ -7,11 +7,8 @@ impl Editor {
     where
         F: Fn(&str) -> String,
     {
-        self.last_action_was_kill = false;
-
-        // Store original selection points
         let original_cursor_pos = self.cursor_pos();
-        let original_marker_pos = self.selection.marker_pos.unwrap();
+        let original_marker_pos = self.selection.marker_pos.unwrap_or(original_cursor_pos);
 
         let (start, end) = self
             .selection
@@ -51,55 +48,6 @@ impl Editor {
             return Ok(());
         }
 
-        let original_end_x = self.document.lines.get(end_y).map_or(0, |l| l.len());
-
-        self.save_state_for_undo(LastActionType::Other);
-
-        // 1. Delete the original lines
-        let delete_diff = ActionDiff {
-            cursor_start_x: self.cursor_x,
-            cursor_start_y: self.cursor_y,
-            cursor_end_x: 0,
-            cursor_end_y: start_y,
-            start_x: 0,
-            start_y,
-            end_x: original_end_x,
-            end_y,
-            new: vec![],
-            old: original_lines,
-        };
-        if let Some(last_transaction) = self.undo_stack.last_mut() {
-            last_transaction.push(delete_diff.clone());
-        }
-        let (new_x, new_y) = self
-            .document
-            .apply_action_diff(&delete_diff, false)
-            .unwrap();
-        self.cursor_x = new_x;
-        self.cursor_y = new_y;
-
-        // 2. Insert the new lines
-        let new_last_line_len = new_lines.last().map_or(0, |l| l.len());
-        let insert_diff = ActionDiff {
-            cursor_start_x: self.cursor_x,
-            cursor_start_y: self.cursor_y,
-            cursor_end_x: self.cursor_x, // Keep cursor at start of modified region
-            cursor_end_y: self.cursor_y,
-            start_x: self.cursor_x,
-            start_y: self.cursor_y,
-            end_x: new_last_line_len,
-            end_y: self.cursor_y + new_lines.len() - 1,
-            new: new_lines,
-            old: vec![],
-        };
-        if let Some(last_transaction) = self.undo_stack.last_mut() {
-            last_transaction.push(insert_diff.clone());
-        }
-        self.document
-            .apply_action_diff(&insert_diff, false)
-            .unwrap();
-
-        // 3. Calculate and set new selection points
         let mut new_cursor_pos = original_cursor_pos;
         if let Some(delta) = line_deltas.get(&new_cursor_pos.1) {
             new_cursor_pos.0 = (new_cursor_pos.0 as isize + delta).max(0) as usize;
@@ -110,9 +58,41 @@ impl Editor {
             new_marker_pos.0 = (new_marker_pos.0 as isize + delta).max(0) as usize;
         }
 
-        // 4. Update state
-        self.cursor_x = new_cursor_pos.0;
-        self.cursor_y = new_cursor_pos.1;
+        // Use two commits to ensure undo works as a single transaction
+        // 1. Delete the original lines
+        self.commit(
+            LastActionType::Other,
+            &ActionDiff {
+                cursor_start_x: self.cursor_x,
+                cursor_start_y: self.cursor_y,
+                cursor_end_x: 0,
+                cursor_end_y: start_y,
+                start_x: 0,
+                start_y,
+                end_x: original_lines.last().map_or(0, |l| l.len()),
+                end_y,
+                new: vec![],
+                old: original_lines,
+            },
+        );
+
+        // 2. Insert the new lines, ammend to the previous action
+        self.commit(
+            LastActionType::Ammend,
+            &ActionDiff {
+                cursor_start_x: self.cursor_x,
+                cursor_start_y: self.cursor_y,
+                cursor_end_x: new_cursor_pos.0,
+                cursor_end_y: new_cursor_pos.1,
+                start_x: 0,
+                start_y,
+                end_x: new_lines.last().map_or(0, |l| l.len()),
+                end_y: start_y + new_lines.len() - 1,
+                new: new_lines,
+                old: vec![],
+            },
+        );
+
         self.selection.marker_pos = Some(new_marker_pos);
 
         self.desired_cursor_x = self
@@ -130,22 +110,40 @@ impl Editor {
             if y >= self.document.lines.len() {
                 return Ok(());
             }
+            let original_line = self.document.lines[y].clone();
+            let new_line = format!("  {original_line}");
+            let new_cursor_x = self.cursor_x + 2;
+
             self.commit(
-                LastActionType::Other,
+                LastActionType::Indent,
                 &ActionDiff {
                     cursor_start_x: self.cursor_x,
                     cursor_start_y: self.cursor_y,
-                    cursor_end_x: self.cursor_x + 2,
-                    cursor_end_y: self.cursor_y,
+                    cursor_end_x: 0,
+                    cursor_end_y: y,
                     start_x: 0,
                     start_y: y,
-                    end_x: 0,
+                    end_x: original_line.len(),
                     end_y: y,
-                    new: vec!["  ".to_string()],
+                    new: vec![],
+                    old: vec![original_line],
+                },
+            );
+            self.commit(
+                LastActionType::Ammend,
+                &ActionDiff {
+                    cursor_start_x: 0,
+                    cursor_start_y: y,
+                    cursor_end_x: new_cursor_x,
+                    cursor_end_y: y,
+                    start_x: 0,
+                    start_y: y,
+                    end_x: new_line.len(),
+                    end_y: y,
+                    new: vec![new_line],
                     old: vec![],
                 },
             );
-            self.last_action_was_kill = false;
             Ok(())
         }
     }
@@ -166,41 +164,50 @@ impl Editor {
             if y >= self.document.lines.len() {
                 return Ok(());
             }
-            let line = &self.document.lines[y];
-            if line.starts_with("  ") {
-                self.commit(
-                    LastActionType::Other,
-                    &ActionDiff {
-                        cursor_start_x: self.cursor_x,
-                        cursor_start_y: self.cursor_y,
-                        cursor_end_x: self.cursor_x.saturating_sub(2),
-                        cursor_end_y: self.cursor_y,
-                        start_x: 0,
-                        start_y: y,
-                        end_x: 2,
-                        end_y: y,
-                        new: vec![],
-                        old: vec!["  ".to_string()],
-                    },
-                );
-            } else if line.starts_with(' ') {
-                self.commit(
-                    LastActionType::Other,
-                    &ActionDiff {
-                        cursor_start_x: self.cursor_x,
-                        cursor_start_y: self.cursor_y,
-                        cursor_end_x: self.cursor_x.saturating_sub(1),
-                        cursor_end_y: self.cursor_y,
-                        start_x: 0,
-                        start_y: y,
-                        end_x: 1,
-                        end_y: y,
-                        new: vec![],
-                        old: vec![" ".to_string()],
-                    },
-                );
+            let original_line = self.document.lines[y].clone();
+            let (new_line, new_cursor_x) = if let Some(stripped) = original_line.strip_prefix("  ")
+            {
+                (stripped.to_string(), self.cursor_x.saturating_sub(2))
+            } else if let Some(stripped) = original_line.strip_prefix(' ') {
+                (stripped.to_string(), self.cursor_x.saturating_sub(1))
+            } else {
+                (original_line.clone(), self.cursor_x)
+            };
+
+            if original_line == new_line {
+                return Ok(()); // Nothing to outdent
             }
-            self.last_action_was_kill = false;
+
+            self.commit(
+                LastActionType::Outdent,
+                &ActionDiff {
+                    cursor_start_x: self.cursor_x,
+                    cursor_start_y: self.cursor_y,
+                    cursor_end_x: 0,
+                    cursor_end_y: y,
+                    start_x: 0,
+                    start_y: y,
+                    end_x: original_line.len(),
+                    end_y: y,
+                    new: vec![],
+                    old: vec![original_line],
+                },
+            );
+            self.commit(
+                LastActionType::Ammend,
+                &ActionDiff {
+                    cursor_start_x: 0,
+                    cursor_start_y: y,
+                    cursor_end_x: new_cursor_x,
+                    cursor_end_y: y,
+                    start_x: 0,
+                    start_y: y,
+                    end_x: new_line.len(),
+                    end_y: y,
+                    new: vec![new_line],
+                    old: vec![],
+                },
+            );
             Ok(())
         }
     }

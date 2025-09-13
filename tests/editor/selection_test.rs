@@ -46,7 +46,7 @@ fn test_cut_selection() {
         .process_input(Input::Character('\x17'), true)
         .unwrap(); // Ctrl-W
     assert_eq!(editor.document.lines[0], "hello ");
-    assert_eq!(editor.kill_buffer, "world");
+    assert_eq!(editor.clipboard_manager.kill_buffer, "world");
     assert_eq!(editor.selection.marker_pos, None); // Marker should be cleared
     assert_eq!(editor.cursor_pos(), (6, 0)); // Cursor should be at the start of the cut
 }
@@ -61,7 +61,7 @@ fn test_copy_selection() {
     // Copy "world"
     editor.process_input(Input::Character('w'), true).unwrap(); // Option-W
     assert_eq!(editor.document.lines[0], "hello world"); // Document unchanged
-    assert_eq!(editor.kill_buffer, "world");
+    assert_eq!(editor.clipboard_manager.kill_buffer, "world");
     assert_eq!(editor.selection.marker_pos, None); // Marker should be cleared
     assert_eq!(editor.cursor_pos(), (11, 0)); // Cursor should remain
 }
@@ -93,7 +93,7 @@ fn test_cut_selection_from_start_of_line() {
         .process_input(Input::Character('\x17'), true)
         .unwrap(); // Ctrl-W
     assert_eq!(editor.document.lines[0], " world");
-    assert_eq!(editor.kill_buffer, "hello");
+    assert_eq!(editor.clipboard_manager.kill_buffer, "hello");
     assert_eq!(editor.selection.marker_pos, None);
     assert_eq!(editor.cursor_pos(), (0, 0));
 }
@@ -110,7 +110,7 @@ fn test_cut_selection_to_end_of_line() {
         .process_input(Input::Character('\x17'), true)
         .unwrap(); // Ctrl-W
     assert_eq!(editor.document.lines[0], "hello ");
-    assert_eq!(editor.kill_buffer, "world");
+    assert_eq!(editor.clipboard_manager.kill_buffer, "world");
     assert_eq!(editor.selection.marker_pos, None);
     assert_eq!(editor.cursor_pos(), (6, 0));
 }
@@ -127,7 +127,7 @@ fn test_cut_entire_line() {
         .process_input(Input::Character('\x17'), true)
         .unwrap(); // Ctrl-W
     assert_eq!(editor.document.lines, vec!["".to_string()]); // Line should be empty
-    assert_eq!(editor.kill_buffer, "hello world");
+    assert_eq!(editor.clipboard_manager.kill_buffer, "hello world");
     assert_eq!(editor.selection.marker_pos, None);
     assert_eq!(editor.cursor_pos(), (0, 0));
 }
@@ -148,7 +148,10 @@ fn test_cut_multiple_lines() {
         .process_input(Input::Character('\x17'), true)
         .unwrap(); // Ctrl-W
     assert_eq!(editor.document.lines, vec!["".to_string()]); // All lines should be cut
-    assert_eq!(editor.kill_buffer, "line one\nline two\nline three");
+    assert_eq!(
+        editor.clipboard_manager.kill_buffer,
+        "line one\nline two\nline three"
+    );
     assert_eq!(editor.selection.marker_pos, None);
     assert_eq!(editor.cursor_pos(), (0, 0));
 }
@@ -165,7 +168,7 @@ fn test_cut_selection_marker_after_cursor() {
         .process_input(Input::Character('\x17'), true)
         .unwrap(); // Ctrl-W
     assert_eq!(editor.document.lines[0], "hello ");
-    assert_eq!(editor.kill_buffer, "world");
+    assert_eq!(editor.clipboard_manager.kill_buffer, "world");
     assert_eq!(editor.selection.marker_pos, None);
     assert_eq!(editor.cursor_pos(), (6, 0));
 }

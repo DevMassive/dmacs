@@ -25,9 +25,9 @@ pub enum Action {
     // -- Text editing --
     InsertChar(char),
     InsertNewline,
-    DeleteChar,         // Backspace
-    DeleteForwardChar,  // Delete key
-    DeleteWord,         // Alt-Backspace
+    DeleteChar,        // Backspace
+    DeleteForwardChar, // Delete key
+    DeleteWord,        // Alt-Backspace
     KillLine,
     Yank,
     Undo,

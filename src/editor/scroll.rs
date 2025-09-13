@@ -99,9 +99,7 @@ impl Scroll {
         cursor_y: &mut usize,
         cursor_x: &mut usize,
         document: &Document,
-        last_action_was_kill: &mut bool,
     ) {
-        *last_action_was_kill = false;
         let page_height = self.screen_rows.saturating_sub(STATUS_BAR_HEIGHT).max(1);
         self.row_offset = self.row_offset.saturating_add(page_height);
         self.row_offset = self.row_offset.min(document.lines.len().saturating_sub(1));
@@ -114,9 +112,7 @@ impl Scroll {
         cursor_y: &mut usize,
         cursor_x: &mut usize,
         document: &Document,
-        last_action_was_kill: &mut bool,
     ) {
-        *last_action_was_kill = false;
         let page_height = self.screen_rows.saturating_sub(STATUS_BAR_HEIGHT).max(1);
         self.row_offset = self.row_offset.saturating_sub(page_height);
         *cursor_y = self.row_offset;
@@ -128,9 +124,7 @@ impl Scroll {
         cursor_y: &mut usize,
         cursor_x: &mut usize,
         desired_cursor_x: &mut usize,
-        last_action_was_kill: &mut bool,
     ) {
-        *last_action_was_kill = false;
         *cursor_y = 0;
         *cursor_x = 0;
         *desired_cursor_x = 0;
@@ -144,9 +138,7 @@ impl Scroll {
         cursor_x: &mut usize,
         desired_cursor_x: &mut usize,
         document: &Document,
-        last_action_was_kill: &mut bool,
     ) {
-        *last_action_was_kill = false;
         *cursor_y = document.lines.len().saturating_sub(1);
         *cursor_x = document.lines[*cursor_y].len();
         *desired_cursor_x =
@@ -164,9 +156,7 @@ impl Scroll {
         cursor_x: &mut usize,
         desired_cursor_x: &mut usize,
         document: &Document,
-        last_action_was_kill: &mut bool,
     ) {
-        *last_action_was_kill = false;
         if *cursor_y > 0 {
             *cursor_y -= 1;
             *cursor_x = self
@@ -184,9 +174,7 @@ impl Scroll {
         cursor_x: &mut usize,
         desired_cursor_x: &mut usize,
         document: &Document,
-        last_action_was_kill: &mut bool,
     ) {
-        *last_action_was_kill = false;
         if *cursor_y < document.lines.len().saturating_sub(1) {
             *cursor_y += 1;
             *cursor_x = self
@@ -205,9 +193,7 @@ impl Scroll {
         cursor_x: &mut usize,
         desired_cursor_x: &mut usize,
         document: &Document,
-        last_action_was_kill: &mut bool,
     ) {
-        *last_action_was_kill = false;
         let line = &document.lines[*cursor_y];
         if *cursor_x > 0 {
             let mut new_pos = *cursor_x - 1;
@@ -230,9 +216,7 @@ impl Scroll {
         cursor_x: &mut usize,
         desired_cursor_x: &mut usize,
         document: &Document,
-        last_action_was_kill: &mut bool,
     ) {
-        *last_action_was_kill = false;
         let line = &document.lines[*cursor_y];
         if *cursor_x < line.len() {
             let mut new_pos = *cursor_x + 1;
