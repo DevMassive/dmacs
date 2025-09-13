@@ -1,6 +1,6 @@
-use crate::editor::actions::Action;
 use crate::editor::Editor;
 use crate::editor::EditorMode;
+use crate::editor::actions::Action;
 use crate::error::Result;
 use log::debug;
 use pancurses::Input;
@@ -62,10 +62,9 @@ fn key_to_string(key: Input, is_alt_pressed: bool) -> String {
     key_str
 }
 
-
 impl Editor {
     pub fn process_input(&mut self, key: Input, is_alt_pressed: bool) -> Result<()> {
-        debug!("Processing input: {:?}, Alt pressed: {}", key, is_alt_pressed);
+        debug!("Processing input: {key:?}, Alt pressed: {is_alt_pressed}");
         self.set_alt_pressed(is_alt_pressed);
 
         // Handle mode-specific inputs first
@@ -84,7 +83,7 @@ impl Editor {
 
         // Normal mode input handling using keymap
         let key_string = key_to_string(key, is_alt_pressed);
-        debug!("Key string: '{}'", key_string);
+        debug!("Key string: '{key_string}'");
 
         if let Some(action) = self.keymap.bindings.get(&key_string).cloned() {
             self.execute_action(action)?;

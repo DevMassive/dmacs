@@ -53,8 +53,6 @@ impl Editor {
 
         let original_end_x = self.document.lines.get(end_y).map_or(0, |l| l.len());
 
-        self.save_state_for_undo(LastActionType::Other);
-
         // 1. Delete the original lines
         let delete_diff = ActionDiff {
             cursor_start_x: self.cursor_x,
@@ -68,15 +66,7 @@ impl Editor {
             new: vec![],
             old: original_lines,
         };
-        if let Some(last_transaction) = self.undo_stack.last_mut() {
-            last_transaction.push(delete_diff.clone());
-        }
-        let (new_x, new_y) = self
-            .document
-            .apply_action_diff(&delete_diff, false)
-            .unwrap();
-        self.cursor_x = new_x;
-        self.cursor_y = new_y;
+        self.commit(LastActionType::Other, &delete_diff);
 
         // 2. Insert the new lines
         let new_last_line_len = new_lines.last().map_or(0, |l| l.len());
@@ -92,12 +82,7 @@ impl Editor {
             new: new_lines,
             old: vec![],
         };
-        if let Some(last_transaction) = self.undo_stack.last_mut() {
-            last_transaction.push(insert_diff.clone());
-        }
-        self.document
-            .apply_action_diff(&insert_diff, false)
-            .unwrap();
+        self.commit(LastActionType::Ammend, &insert_diff);
 
         // 3. Calculate and set new selection points
         let mut new_cursor_pos = original_cursor_pos;

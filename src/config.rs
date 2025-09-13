@@ -30,7 +30,7 @@ impl Keymap {
                             keymap.bindings.extend(user_keymap.bindings);
                         }
                         Err(e) => {
-                            log::error!("Failed to parse keymap.toml: {}", e);
+                            log::error!("Failed to parse keymap.toml: {e}");
                         }
                     }
                 }

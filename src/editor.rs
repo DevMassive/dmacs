@@ -5,8 +5,6 @@ use crate::persistence::{self, CursorPosition};
 use arboard::Clipboard;
 use log::debug;
 
-use std::time::{Duration, Instant};
-
 pub mod checkbox;
 pub mod command;
 pub mod comment;
@@ -17,25 +15,14 @@ pub mod search;
 pub mod selection;
 pub mod task;
 pub mod ui;
+pub mod undo;
 use crate::editor::scroll::Scroll;
 pub mod actions;
 pub mod fuzzy_search;
 use crate::config::Keymap;
 use crate::editor::actions::Action;
 use crate::editor::task::Task;
-
-#[derive(PartialEq, Debug)]
-pub enum LastActionType {
-    None,
-    Insertion,
-    Deletion,
-    Newline,
-    LineMovement,
-    Ammend,
-    ToggleCheckbox, // For checkbox toggling
-    ToggleComment,  // For comment toggling
-    Other,          // For actions like kill_line, yank, etc.
-}
+use crate::editor::undo::{LastActionType, UndoRedo};
 
 #[derive(PartialEq, Debug)]
 pub enum EditorMode {
@@ -53,18 +40,13 @@ pub struct Editor {
     pub desired_cursor_x: usize, // column index
     pub status_message: String,
     pub scroll: Scroll,
-    pub undo_stack: Vec<Vec<ActionDiff>>,
-    pub redo_stack: Vec<Vec<ActionDiff>>,
+    pub undo_redo: UndoRedo,
     pub kill_buffer: String,
     pub last_action_was_kill: bool,
     pub is_alt_pressed: bool,
     pub search: Search,
     pub selection: selection::Selection,
     pub no_exit_on_save: bool,
-    // New fields for debouncing
-    last_action_time: Option<Instant>,
-    last_action_type: LastActionType,
-    undo_debounce_threshold: Duration,
     // New fields for task command
     pub mode: EditorMode,
     pub task: Task,
@@ -97,17 +79,13 @@ impl Editor {
                                 desired_cursor_x: x,
                                 status_message: "".to_string(),
                                 scroll: Scroll::new_with_offset(scroll_row, scroll_col),
-                                undo_stack: Vec::new(),
-                                redo_stack: Vec::new(),
+                                undo_redo: UndoRedo::new(),
                                 kill_buffer: String::new(),
                                 last_action_was_kill: false,
                                 is_alt_pressed: false,
                                 search: Search::new(),
                                 selection: selection::Selection::new(),
                                 no_exit_on_save: false,
-                                last_action_time: None,
-                                last_action_type: LastActionType::None,
-                                undo_debounce_threshold: Duration::from_millis(500),
                                 // New fields for task command
                                 mode: EditorMode::Normal,
                                 task: Task::new(),
@@ -146,18 +124,13 @@ impl Editor {
             desired_cursor_x: 0,
             status_message: "".to_string(),
             scroll: Scroll::new(),
-            undo_stack: Vec::new(),
-            redo_stack: Vec::new(),
+            undo_redo: UndoRedo::new(),
             kill_buffer: String::new(),
             last_action_was_kill: false,
             is_alt_pressed: false,
             search: Search::new(),
             selection: selection::Selection::new(),
             no_exit_on_save: false,
-            // Initialize new fields
-            last_action_time: None,
-            last_action_type: LastActionType::None,
-            undo_debounce_threshold: Duration::from_millis(500),
             // New fields for task command
             mode: EditorMode::Normal,
             task: Task::new(),
@@ -243,135 +216,36 @@ impl Editor {
         self.scroll.update_screen_size(screen_rows, screen_cols);
     }
 
-    pub fn save_state_for_undo(&mut self, current_action_type: LastActionType) {
-        let now = Instant::now();
-        debug!(
-            "save_state_for_undo: current_action_type={:?}, last_action_type={:?}, undo_debounce_threshold={:?}",
-            current_action_type, self.last_action_type, self.undo_debounce_threshold
-        );
-
-        let should_start_new_group = if self.last_action_time.is_none() {
-            debug!("save_state_for_undo: First action ever");
-            true // Always start new group for the very first action
-        } else if current_action_type == LastActionType::Ammend {
-            debug!("save_state_for_undo: Ammend");
-            false
-        } else if current_action_type == LastActionType::ToggleCheckbox {
-            debug!("save_state_for_undo: ToggleCheckbox always starts a new group");
-            true
-        } else {
-            let time_since_last_action = now.duration_since(self.last_action_time.unwrap());
-            debug!("save_state_for_undo: time_since_last_action={time_since_last_action:?}");
-            self.last_action_type != current_action_type // Action type changed
-            || time_since_last_action >= self.undo_debounce_threshold // Debounce time exceeded
-        };
-
-        if should_start_new_group {
-            debug!("save_state_for_undo: Pushing new undo group");
-            self.undo_stack.push(Vec::new()); // Push a new empty vector for the new transaction
-            self.redo_stack.clear(); // Clear redo stack on new action
-        }
-        self.last_action_time = Some(now);
-        if current_action_type != LastActionType::Ammend {
-            self.last_action_type = current_action_type;
-        }
-    }
-
     pub fn undo(&mut self) {
         self.last_action_was_kill = false;
-        debug!(
-            "Undo called. Current undo_stack length: {}. Current document: {:?}",
-            self.undo_stack.len(),
-            self.document.lines
-        );
-        if let Some(mut actions_to_undo) = self.undo_stack.pop() {
-            let mut actions_for_redo = Vec::new();
-            let mut current_cursor_x = self.cursor_x;
-            let mut current_cursor_y = self.cursor_y;
-
-            // Apply actions in reverse order for undo
-            actions_to_undo.reverse();
-            for action_diff in actions_to_undo.iter() {
-                match self.document.apply_action_diff(action_diff, true) {
-                    Ok((new_x, new_y)) => {
-                        current_cursor_x = new_x;
-                        current_cursor_y = new_y;
-                        actions_for_redo.push(action_diff.clone()); // Store for redo
-                    }
-                    Err(e) => {
-                        self.status_message = format!("Undo failed: {e:?}");
-                        debug!("Undo failed: {e:?}");
-                        // Re-push the failed transaction back to undo_stack if partial undo is not desired
-                        self.undo_stack.push(actions_to_undo);
-                        return;
-                    }
-                }
-            }
-            actions_for_redo.reverse();
-            self.redo_stack.push(actions_for_redo);
-
-            self.cursor_x = current_cursor_x;
-            self.cursor_y = current_cursor_y;
-            self.desired_cursor_x = self
-                .scroll
-                .get_display_width_from_bytes(&self.document.lines[self.cursor_y], self.cursor_x);
-            self.status_message = "Undo successful.".to_string();
-            debug!("Document after undo: {:?}", self.document.lines);
-        } else {
-            self.status_message = "Nothing to undo.".to_string();
-            debug!("Undo stack is empty. Nothing to undo.");
+        match self.undo_redo.undo(
+            &mut self.document,
+            &mut self.cursor_x,
+            &mut self.cursor_y,
+            &mut self.desired_cursor_x,
+            &self.scroll,
+        ) {
+            Ok(_) => self.status_message = "Undo successful.".to_string(),
+            Err(msg) => self.status_message = msg,
         }
     }
 
     pub fn redo(&mut self) {
         self.last_action_was_kill = false;
-        debug!(
-            "Redo called. Current redo_stack length: {}. Current document: {:?}",
-            self.redo_stack.len(),
-            self.document.lines
-        );
-        if let Some(actions_to_redo) = self.redo_stack.pop() {
-            let mut actions_for_undo = Vec::new();
-            let mut current_cursor_x = self.cursor_x;
-            let mut current_cursor_y = self.cursor_y;
-
-            // Apply actions in original order for redo
-            for action_diff in actions_to_redo.iter() {
-                match self.document.apply_action_diff(action_diff, false) {
-                    Ok((new_x, new_y)) => {
-                        current_cursor_x = new_x;
-                        current_cursor_y = new_y;
-                        actions_for_undo.push(action_diff.clone()); // Store for undo
-                    }
-                    Err(e) => {
-                        self.status_message = format!("Redo failed: {e:?}");
-                        debug!("Redo failed: {e:?}");
-                        // Re-push the failed transaction back to redo_stack if partial redo is not desired
-                        self.redo_stack.push(actions_to_redo);
-                        return;
-                    }
-                }
-            }
-            self.undo_stack.push(actions_for_undo);
-
-            self.cursor_x = current_cursor_x;
-            self.cursor_y = current_cursor_y;
-            self.desired_cursor_x = self
-                .scroll
-                .get_display_width_from_bytes(&self.document.lines[self.cursor_y], self.cursor_x);
-            self.status_message = "Redo successful.".to_string();
-            debug!("Document after redo: {:?}", self.document.lines);
-        } else {
-            self.status_message = "Nothing to redo.".to_string();
-            debug!("Redo stack is empty. Nothing to redo.");
+        match self.undo_redo.redo(
+            &mut self.document,
+            &mut self.cursor_x,
+            &mut self.cursor_y,
+            &mut self.desired_cursor_x,
+            &self.scroll,
+        ) {
+            Ok(_) => self.status_message = "Redo successful.".to_string(),
+            Err(msg) => self.status_message = msg,
         }
     }
 
     pub(super) fn commit(&mut self, action_type: LastActionType, action_diff: &ActionDiff) {
-        self.save_state_for_undo(action_type);
-        if let Some(last_transaction) = self.undo_stack.last_mut() {
-            last_transaction.push(action_diff.clone());
-        }
+        self.undo_redo.record_action(action_type, action_diff);
         let (new_x, new_y) = self.document.apply_action_diff(action_diff, false).unwrap();
         self.cursor_x = new_x;
         self.cursor_y = new_y;
@@ -1367,7 +1241,7 @@ impl Editor {
     }
 
     pub fn set_undo_debounce_threshold(&mut self, threshold_ms: u64) {
-        self.undo_debounce_threshold = Duration::from_millis(threshold_ms);
+        self.undo_redo.set_undo_debounce_threshold(threshold_ms);
     }
 
     pub fn set_no_exit_on_save(&mut self, value: bool) {
