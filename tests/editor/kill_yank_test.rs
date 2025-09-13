@@ -16,7 +16,7 @@ fn test_editor_kill_line_middle_of_line() {
         .process_input(Input::Character('\x0b'), false)
         .unwrap();
     assert_eq!(editor.document.lines[0], "hello ");
-    assert_eq!(editor.kill_buffer, "world");
+    assert_eq!(editor.clipboard_manager.kill_buffer, "world");
     assert_eq!(editor.cursor_pos(), (6, 0));
 }
 
@@ -30,7 +30,7 @@ fn test_editor_kill_line_end_of_line_not_last_line() {
         .unwrap();
     assert_eq!(editor.document.lines.len(), 1);
     assert_eq!(editor.document.lines[0], "helloworld");
-    assert_eq!(editor.kill_buffer, "\n"); // Newline
+    assert_eq!(editor.clipboard_manager.kill_buffer, "\n"); // Newline
     assert_eq!(editor.cursor_pos(), (5, 0));
 }
 
@@ -45,7 +45,7 @@ fn test_editor_kill_line_empty_line_not_last_line() {
     assert_eq!(editor.document.lines.len(), 2);
     assert_eq!(editor.document.lines[0], "line1");
     assert_eq!(editor.document.lines[1], "line3");
-    assert_eq!(editor.kill_buffer, "\n"); // Only newline killed
+    assert_eq!(editor.clipboard_manager.kill_buffer, "\n"); // Only newline killed
     assert_eq!(editor.cursor_pos(), (0, 1));
 }
 
@@ -58,14 +58,14 @@ fn test_editor_kill_line_last_line() {
         .process_input(Input::Character('\x0b'), false)
         .unwrap();
     assert_eq!(editor.document.lines[0], "");
-    assert_eq!(editor.kill_buffer, "last line");
+    assert_eq!(editor.clipboard_manager.kill_buffer, "last line");
     assert_eq!(editor.cursor_pos(), (0, 0));
 }
 
 #[test]
 fn test_editor_yank_single_line() {
     let mut editor = editor_with_clipboard_disabled();
-    editor.kill_buffer = "yanked text".to_string();
+    editor.clipboard_manager.kill_buffer = "yanked text".to_string();
     editor.document.lines = vec!["start ".to_string(), "end".to_string()];
     editor.set_cursor_pos(6, 0); // After "start "
     editor
@@ -78,7 +78,7 @@ fn test_editor_yank_single_line() {
 #[test]
 fn test_editor_yank_multiple_lines() {
     let mut editor = editor_with_clipboard_disabled();
-    editor.kill_buffer = "line1\nline2\nline3".to_string();
+    editor.clipboard_manager.kill_buffer = "line1\nline2\nline3".to_string();
     editor.document.lines = vec!["start".to_string(), "end".to_string()];
     editor.set_cursor_pos(5, 0); // After "start"
     editor
@@ -106,7 +106,7 @@ fn test_editor_consecutive_kill_line() {
     editor
         .process_input(Input::Character('\x0b'), false)
         .unwrap(); // Ctrl-K
-    assert_eq!(editor.kill_buffer, "line one");
+    assert_eq!(editor.clipboard_manager.kill_buffer, "line one");
     assert_eq!(editor.document.lines.len(), 3);
     assert_eq!(editor.document.lines[0], ""); // "line one" should be removed
 
@@ -114,7 +114,7 @@ fn test_editor_consecutive_kill_line() {
     editor
         .process_input(Input::Character('\x0b'), false)
         .unwrap(); // Ctrl-K
-    assert_eq!(editor.kill_buffer, "line one\n");
+    assert_eq!(editor.clipboard_manager.kill_buffer, "line one\n");
     assert_eq!(editor.document.lines.len(), 2);
     assert_eq!(editor.document.lines[0], "line two"); // "line one\n" should be removed
 
@@ -123,7 +123,7 @@ fn test_editor_consecutive_kill_line() {
     editor
         .process_input(Input::Character('\x0b'), false)
         .unwrap(); // Ctrl-K
-    assert_eq!(editor.kill_buffer, "line one\nline two"); // Should append
+    assert_eq!(editor.clipboard_manager.kill_buffer, "line one\nline two"); // Should append
     assert_eq!(editor.document.lines.len(), 2);
     assert_eq!(editor.document.lines[0], ""); // "line two" should be removed
 
@@ -131,7 +131,7 @@ fn test_editor_consecutive_kill_line() {
     editor
         .process_input(Input::Character('\x0b'), false)
         .unwrap(); // Ctrl-K
-    assert_eq!(editor.kill_buffer, "line one\nline two\n"); // Should append
+    assert_eq!(editor.clipboard_manager.kill_buffer, "line one\nline two\n"); // Should append
     assert_eq!(editor.document.lines.len(), 1);
     assert_eq!(editor.document.lines[0], "line three"); // "line two" should be removed
 
@@ -149,7 +149,7 @@ fn test_editor_consecutive_kill_line() {
 #[test]
 fn test_editor_yank_empty_kill_buffer() {
     let mut editor = editor_with_clipboard_disabled();
-    editor.kill_buffer = "".to_string();
+    editor.clipboard_manager.kill_buffer = "".to_string();
     editor.document.lines = vec!["original".to_string()];
     editor.set_cursor_pos(0, 0);
     editor

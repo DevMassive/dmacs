@@ -4,8 +4,6 @@ use crate::error::Result;
 
 impl Editor {
     pub fn toggle_checkbox(&mut self) -> Result<()> {
-        self.last_action_was_kill = false;
-
         if self.selection.is_selection_active() {
             if let Some(((_start_x, start_y), (_end_x, end_y))) =
                 self.selection.get_selection_range(self.cursor_pos())
