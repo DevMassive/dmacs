@@ -2,10 +2,10 @@ use crate::document::{ActionDiff, Document};
 use crate::editor::search::Search;
 use crate::error::Result;
 use crate::persistence::{self, CursorPosition};
-use arboard::Clipboard;
 use log::debug;
 
 pub mod checkbox;
+pub mod clipboard;
 pub mod command;
 pub mod comment;
 pub mod indent;
@@ -41,8 +41,7 @@ pub struct Editor {
     pub status_message: String,
     pub scroll: Scroll,
     pub undo_redo: UndoRedo,
-    pub kill_buffer: String,
-    pub last_action_was_kill: bool,
+    pub clipboard: clipboard::Clipboard,
     pub is_alt_pressed: bool,
     pub search: Search,
     pub selection: selection::Selection,
@@ -51,7 +50,6 @@ pub struct Editor {
     pub mode: EditorMode,
     pub task: Task,
     pub fuzzy_search: fuzzy_search::FuzzySearch,
-    clipboard_enabled: bool,
     pub keymap: Keymap,
 }
 
@@ -80,8 +78,7 @@ impl Editor {
                                 status_message: "".to_string(),
                                 scroll: Scroll::new_with_offset(scroll_row, scroll_col),
                                 undo_redo: UndoRedo::new(),
-                                kill_buffer: String::new(),
-                                last_action_was_kill: false,
+                                clipboard: clipboard::Clipboard::new(),
                                 is_alt_pressed: false,
                                 search: Search::new(),
                                 selection: selection::Selection::new(),
@@ -90,7 +87,6 @@ impl Editor {
                                 mode: EditorMode::Normal,
                                 task: Task::new(),
                                 fuzzy_search: fuzzy_search::FuzzySearch::new(),
-                                clipboard_enabled: true,
                                 keymap: Keymap::load_user_config(),
                             };
                         } else {
@@ -125,8 +121,7 @@ impl Editor {
             status_message: "".to_string(),
             scroll: Scroll::new(),
             undo_redo: UndoRedo::new(),
-            kill_buffer: String::new(),
-            last_action_was_kill: false,
+            clipboard: clipboard::Clipboard::new(),
             is_alt_pressed: false,
             search: Search::new(),
             selection: selection::Selection::new(),
@@ -135,7 +130,6 @@ impl Editor {
             mode: EditorMode::Normal,
             task: Task::new(),
             fuzzy_search: fuzzy_search::FuzzySearch::new(),
-            clipboard_enabled: true,
             keymap: Keymap::load_user_config(),
         }
     }
@@ -179,7 +173,7 @@ impl Editor {
             Action::DeleteWord => self.hungry_delete()?,
             Action::KillLine => {
                 let _ = self.kill_line();
-                self.last_action_was_kill = true;
+                self.clipboard.last_action_was_kill = true;
             }
             Action::Yank => self.yank()?,
             Action::Undo => self.undo(),
@@ -217,7 +211,7 @@ impl Editor {
     }
 
     pub fn undo(&mut self) {
-        self.last_action_was_kill = false;
+        self.clipboard.last_action_was_kill = false;
         match self.undo_redo.undo(
             &mut self.document,
             &mut self.cursor_x,
@@ -231,7 +225,7 @@ impl Editor {
     }
 
     pub fn redo(&mut self) {
-        self.last_action_was_kill = false;
+        self.clipboard.last_action_was_kill = false;
         match self.undo_redo.redo(
             &mut self.document,
             &mut self.cursor_x,
@@ -306,7 +300,7 @@ impl Editor {
     }
 
     pub fn delete_char(&mut self) -> Result<()> {
-        self.last_action_was_kill = false;
+        self.clipboard.last_action_was_kill = false;
         // Backspace
         if self.cursor_x > 0 {
             let line = self.document.lines[self.cursor_y].clone();
@@ -407,7 +401,7 @@ impl Editor {
     }
 
     pub fn delete_forward_char(&mut self) -> Result<()> {
-        self.last_action_was_kill = false;
+        self.clipboard.last_action_was_kill = false;
         // Ctrl-D
         let y = self.cursor_y;
         let x = self.cursor_x;
@@ -465,7 +459,7 @@ impl Editor {
     }
 
     pub fn insert_newline(&mut self) -> Result<()> {
-        self.last_action_was_kill = false;
+        self.clipboard.last_action_was_kill = false;
 
         let y = self.cursor_y;
         let x = self.cursor_x;
@@ -617,9 +611,9 @@ impl Editor {
             return Ok(());
         }
 
-        let should_clear_kill_buffer = !self.last_action_was_kill;
+        let should_clear_kill_buffer = !self.clipboard.last_action_was_kill;
         if should_clear_kill_buffer {
-            self.kill_buffer.clear();
+            self.clipboard.kill_buffer.clear();
         }
 
         let current_line_len = self.document.lines[y].len();
@@ -629,7 +623,7 @@ impl Editor {
             // Kill from cursor to end of line
             let current_line = self.document.lines[y].clone();
             let killed_text = current_line[x..].to_string();
-            self.kill_buffer.push_str(&killed_text);
+            self.clipboard.kill_buffer.push_str(&killed_text);
             self.commit(
                 LastActionType::Deletion,
                 &ActionDiff {
@@ -647,39 +641,28 @@ impl Editor {
             );
         } else {
             self.delete_forward_char()?;
-            self.kill_buffer.push('\x0a');
+            self.clipboard.kill_buffer.push('\x0a');
         }
 
-        self.set_clipboard(&self.kill_buffer.clone());
+        self.set_clipboard(&self.clipboard.kill_buffer.clone());
 
-        self.last_action_was_kill = true;
+        self.clipboard.last_action_was_kill = true;
 
         Ok(())
     }
 
     fn set_clipboard(&mut self, text: &str) {
-        if !self.clipboard_enabled {
-            return;
-        }
-        if let Ok(mut clipboard) = Clipboard::new() {
-            if let Err(e) = clipboard.set_text(text.to_string()) {
-                self.status_message = format!("Failed to set clipboard: {e}");
-            }
-        } else {
-            self.status_message = "Failed to initialize clipboard.".to_string();
+        if let Err(e) = self.clipboard.set_clipboard(text) {
+            self.status_message = format!("Failed to set clipboard: {e}");
         }
     }
 
     pub fn yank(&mut self) -> Result<()> {
-        if self.clipboard_enabled {
-            if let Ok(mut clipboard) = Clipboard::new() {
-                if let Ok(text) = clipboard.get_text() {
-                    self.kill_buffer = text;
-                }
-            }
+        if let Some(text) = self.clipboard.get_clipboard_text() {
+            self.clipboard.kill_buffer = text;
         }
 
-        let text_to_yank = self.kill_buffer.clone();
+        let text_to_yank = self.clipboard.kill_buffer.clone();
         if text_to_yank.is_empty() {
             self.status_message = "Kill buffer is empty.".to_string();
             return Ok(());
@@ -728,13 +711,13 @@ impl Editor {
             );
         }
 
-        self.last_action_was_kill = false;
+        self.clipboard.last_action_was_kill = false;
         Ok(())
     }
 
     #[doc(hidden)]
     pub fn _set_clipboard_enabled_for_test(&mut self, enabled: bool) {
-        self.clipboard_enabled = enabled;
+        self.clipboard._set_clipboard_enabled_for_test(enabled);
     }
 
     pub fn hungry_delete(&mut self) -> Result<()> {
@@ -775,13 +758,13 @@ impl Editor {
     }
 
     pub fn go_to_start_of_line(&mut self) {
-        self.last_action_was_kill = false;
+        self.clipboard.last_action_was_kill = false;
         self.cursor_x = 0;
         self.desired_cursor_x = 0;
     }
 
     pub fn go_to_end_of_line(&mut self) {
-        self.last_action_was_kill = false;
+        self.clipboard.last_action_was_kill = false;
         let y = self.cursor_y;
         self.cursor_x = self.document.lines[y].len();
         self.desired_cursor_x = self
@@ -790,7 +773,7 @@ impl Editor {
     }
 
     pub fn move_cursor_word_left(&mut self) -> Result<()> {
-        self.last_action_was_kill = false;
+        self.clipboard.last_action_was_kill = false;
         if self.cursor_x == 0 {
             if self.cursor_y > 0 {
                 self.cursor_y -= 1;
@@ -837,7 +820,7 @@ impl Editor {
     }
 
     pub fn move_cursor_word_right(&mut self) -> Result<()> {
-        self.last_action_was_kill = false;
+        self.clipboard.last_action_was_kill = false;
         let current_line = &self.document.lines[self.cursor_y];
         let line_len = current_line.len();
 
@@ -885,7 +868,7 @@ impl Editor {
     }
 
     pub fn save_document(&mut self) -> Result<()> {
-        self.last_action_was_kill = false;
+        self.clipboard.last_action_was_kill = false;
         self.document.save(None)?;
         self.status_message = "File saved successfully.".to_string();
         debug!("Document saved.");
@@ -893,7 +876,7 @@ impl Editor {
     }
 
     pub fn quit(&mut self) -> Result<()> {
-        self.last_action_was_kill = false;
+        self.clipboard.last_action_was_kill = false;
         self.document.save(None)?;
         if let Some(file_path) = &self.document.filename {
             if let Ok(last_modified) = self.document.last_modified() {
@@ -991,7 +974,7 @@ impl Editor {
                 old: vec![],
             },
         );
-        self.last_action_was_kill = false;
+        self.clipboard.last_action_was_kill = false;
     }
 
     pub fn move_line_down(&mut self) {
@@ -1039,7 +1022,7 @@ impl Editor {
                 old: vec![],
             },
         );
-        self.last_action_was_kill = false;
+        self.clipboard.last_action_was_kill = false;
     }
 
     pub fn scroll_page_down(&mut self) {
@@ -1047,7 +1030,7 @@ impl Editor {
             &mut self.cursor_y,
             &mut self.cursor_x,
             &self.document,
-            &mut self.last_action_was_kill,
+            &mut self.clipboard.last_action_was_kill,
         );
     }
 
@@ -1056,7 +1039,7 @@ impl Editor {
             &mut self.cursor_y,
             &mut self.cursor_x,
             &self.document,
-            &mut self.last_action_was_kill,
+            &mut self.clipboard.last_action_was_kill,
         );
     }
 
@@ -1065,7 +1048,7 @@ impl Editor {
             &mut self.cursor_y,
             &mut self.cursor_x,
             &mut self.desired_cursor_x,
-            &mut self.last_action_was_kill,
+            &mut self.clipboard.last_action_was_kill,
         );
     }
 
@@ -1075,7 +1058,7 @@ impl Editor {
             &mut self.cursor_x,
             &mut self.desired_cursor_x,
             &self.document,
-            &mut self.last_action_was_kill,
+            &mut self.clipboard.last_action_was_kill,
         );
     }
 
@@ -1085,7 +1068,7 @@ impl Editor {
             &mut self.cursor_x,
             &mut self.desired_cursor_x,
             &self.document,
-            &mut self.last_action_was_kill,
+            &mut self.clipboard.last_action_was_kill,
         );
     }
 
@@ -1095,7 +1078,7 @@ impl Editor {
             &mut self.cursor_x,
             &mut self.desired_cursor_x,
             &self.document,
-            &mut self.last_action_was_kill,
+            &mut self.clipboard.last_action_was_kill,
         );
     }
 
@@ -1105,7 +1088,7 @@ impl Editor {
             &mut self.cursor_x,
             &mut self.desired_cursor_x,
             &self.document,
-            &mut self.last_action_was_kill,
+            &mut self.clipboard.last_action_was_kill,
         );
     }
 
@@ -1115,7 +1098,7 @@ impl Editor {
             &mut self.cursor_x,
             &mut self.desired_cursor_x,
             &self.document,
-            &mut self.last_action_was_kill,
+            &mut self.clipboard.last_action_was_kill,
         );
     }
 
@@ -1142,25 +1125,31 @@ impl Editor {
             self.commit(LastActionType::Deletion, &action_diff);
         }
 
-        self.kill_buffer = killed_text;
-        self.set_clipboard(&self.kill_buffer.clone());
+        self.clipboard.kill_buffer = killed_text;
+        self.set_clipboard(&self.clipboard.kill_buffer.clone());
         self.status_message = "Selection cut to clipboard.".to_string();
-        debug!("Selection cut. Kill buffer: '{}'", self.kill_buffer);
+        debug!(
+            "Selection cut. Kill buffer: '{}'",
+            self.clipboard.kill_buffer
+        );
 
         Ok(())
     }
 
     pub fn copy_selection_action(&mut self) -> Result<()> {
         let cursor_pos = self.cursor_pos();
-        self.kill_buffer = self.selection.copy_selection(&self.document, cursor_pos)?;
-        self.set_clipboard(&self.kill_buffer.clone());
+        self.clipboard.kill_buffer = self.selection.copy_selection(&self.document, cursor_pos)?;
+        self.set_clipboard(&self.clipboard.kill_buffer.clone());
         self.status_message = "Selection copied to clipboard.".to_string();
-        debug!("Selection copied. Kill buffer: '{}'", self.kill_buffer);
+        debug!(
+            "Selection copied. Kill buffer: '{}'",
+            self.clipboard.kill_buffer
+        );
         Ok(())
     }
 
     pub fn move_to_next_delimiter(&mut self) {
-        self.last_action_was_kill = false;
+        self.clipboard.last_action_was_kill = false;
         let current_line_idx = self.cursor_y;
         let num_lines = self.document.lines.len();
 
@@ -1202,7 +1191,7 @@ impl Editor {
     }
 
     pub fn move_to_previous_delimiter(&mut self) {
-        self.last_action_was_kill = false;
+        self.clipboard.last_action_was_kill = false;
         let current_line_idx = self.cursor_y;
         let num_lines = self.document.lines.len();
 

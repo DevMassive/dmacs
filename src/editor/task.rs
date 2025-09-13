@@ -152,7 +152,7 @@ impl Editor {
 
                             let current_line = self.document.lines[y].clone();
                             let killed_text = current_line[x..].to_string();
-                            self.kill_buffer.push_str(&killed_text);
+                            self.clipboard.kill_buffer.push_str(&killed_text);
                             self.commit(
                                 LastActionType::Other,
                                 &ActionDiff {

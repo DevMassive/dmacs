@@ -6,7 +6,7 @@ const COMMENT_PREFIX: &str = "# ";
 
 impl Editor {
     pub fn toggle_comment(&mut self) -> Result<()> {
-        self.last_action_was_kill = false;
+        self.clipboard.last_action_was_kill = false;
 
         if self.selection.is_selection_active() {
             if let Some(((_start_x, start_y), (_end_x, end_y))) =

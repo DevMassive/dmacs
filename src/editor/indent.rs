@@ -7,7 +7,7 @@ impl Editor {
     where
         F: Fn(&str) -> String,
     {
-        self.last_action_was_kill = false;
+        self.clipboard.last_action_was_kill = false;
 
         // Store original selection points
         let original_cursor_pos = self.cursor_pos();
@@ -130,7 +130,7 @@ impl Editor {
                     old: vec![],
                 },
             );
-            self.last_action_was_kill = false;
+            self.clipboard.last_action_was_kill = false;
             Ok(())
         }
     }
@@ -185,7 +185,7 @@ impl Editor {
                     },
                 );
             }
-            self.last_action_was_kill = false;
+            self.clipboard.last_action_was_kill = false;
             Ok(())
         }
     }
