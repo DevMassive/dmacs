@@ -1,5 +1,6 @@
 use dmacs::persistence::{self, CursorPosition};
 use filetime::{FileTime, set_file_mtime};
+use serial_test::serial;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime};
@@ -35,6 +36,7 @@ fn get_test_cursor_pos_file_path(base_dir: &Path, file_path: &str) -> PathBuf {
 }
 
 #[test]
+#[serial]
 fn test_cleanup_old_cursor_position_files() {
     let temp_dir = setup_test_env();
 
@@ -138,6 +140,7 @@ fn test_cleanup_old_cursor_position_files() {
 }
 
 #[test]
+#[serial]
 fn test_get_cursor_position_with_scroll_restoration() {
     let temp_dir = setup_test_env();
     let file_path = "/path/to/test_file.txt";
