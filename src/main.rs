@@ -62,8 +62,8 @@ fn main() -> Result<()> {
     if let Some(path) = restore_path {
         let backup_manager = BackupManager::new()?;
         match backup_manager.restore_backup(&path) {
-            Ok(_) => println!("Successfully restored {}", path),
-            Err(e) => eprintln!("Failed to restore {}: {}", path, e),
+            Ok(_) => println!("Successfully restored {path}"),
+            Err(e) => eprintln!("Failed to restore {path}: {e}"),
         }
         return Ok(());
     }

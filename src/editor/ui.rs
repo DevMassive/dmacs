@@ -175,6 +175,7 @@ impl Editor {
                 window.attron(A_DIM);
             }
             if is_unchecked {
+                window.color_set(3);
                 window.attron(A_BOLD);
             }
 
@@ -323,15 +324,18 @@ impl Editor {
             }
             if is_unchecked {
                 window.attroff(A_BOLD);
+                window.color_set(1);
             }
         }
 
         let filename_display = self.document.filename.as_deref().unwrap_or("[No Name]");
         let modified_indicator = if self.document.is_dirty() { "*" } else { "" };
         let filename_and_modified = format!("{filename_display}{modified_indicator}");
+        window.color_set(3);
         window.attron(A_BOLD);
         window.mvaddstr(0, 0, &filename_and_modified);
         window.attroff(A_BOLD);
+        window.color_set(1);
 
         window.attron(A_DIM);
         for i in 0..screen_cols {

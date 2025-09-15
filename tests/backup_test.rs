@@ -42,9 +42,13 @@ fn test_save_backup() {
     let mut hasher = Sha256::new();
     hasher.update(canonical_path.to_string_lossy().as_bytes());
     let result = hasher.finalize();
-    let hash_str = format!("{:x}", result);
+    let hash_str = format!("{result:x}");
     let short_hash = &hash_str[..8];
-    let expected_prefix = format!("{}-{}", filename.file_name().unwrap().to_str().unwrap(), short_hash);
+    let expected_prefix = format!(
+        "{}-{}",
+        filename.file_name().unwrap().to_str().unwrap(),
+        short_hash
+    );
 
     let backup_dir = temp_dir.join(".dmacs").join("backup");
     let mut found_backup = false;
@@ -138,7 +142,9 @@ fn test_restore_backup() {
     // Create and back up version 1
     let content_v1 = "version 1";
     fs::write(&filename, content_v1).unwrap();
-    backup_manager.save_backup(filename_str, content_v1).unwrap();
+    backup_manager
+        .save_backup(filename_str, content_v1)
+        .unwrap();
 
     // Wait a moment to ensure a different timestamp
     std::thread::sleep(std::time::Duration::from_secs(1));
@@ -146,7 +152,9 @@ fn test_restore_backup() {
     // Create and back up version 2
     let content_v2 = "version 2";
     fs::write(&filename, content_v2).unwrap();
-    backup_manager.save_backup(filename_str, content_v2).unwrap();
+    backup_manager
+        .save_backup(filename_str, content_v2)
+        .unwrap();
 
     // Modify the file to a different state
     fs::write(&filename, "latest content").unwrap();

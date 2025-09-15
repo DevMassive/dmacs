@@ -1,6 +1,6 @@
 use pancurses::{
-    COLOR_BLACK, COLOR_WHITE, Input, Window, curs_set, endwin, init_pair, initscr, noecho,
-    start_color, use_default_colors,
+    COLOR_BLACK, COLOR_WHITE, COLOR_YELLOW, Input, Window, can_change_color, curs_set, endwin,
+    init_color, init_pair, initscr, noecho, start_color, use_default_colors,
 };
 use std::io::{self, stdin};
 use std::os::unix::io::AsRawFd;
@@ -83,6 +83,20 @@ impl Terminal {
             use_default_colors();
             init_pair(1, COLOR_WHITE, -1);
             init_pair(2, COLOR_BLACK, COLOR_WHITE); // For highlighting
+
+            if can_change_color() {
+                // Define a custom orange color (e.g., color number 12)
+                // RGB values for orange: (255, 165, 0)
+                // Pancurses' init_color uses values from 0 to 1000
+                let r = (255i32 * 1000 / 255) as i16;
+                let g = (165i32 * 1000 / 255) as i16;
+                let b = (0i32 * 1000 / 255) as i16;
+                init_color(12, r, g, b);
+                init_pair(3, 12, -1);
+            } else {
+                // Fallback to yellow if the terminal cannot change colors
+                init_pair(3, COLOR_YELLOW, -1);
+            }
         }
 
         let (tx, rx) = mpsc::channel();

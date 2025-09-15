@@ -36,7 +36,7 @@ impl BackupManager {
         if let Some(latest_backup_path) = self.find_latest_backup(filename)? {
             if let Ok(latest_content) = fs::read_to_string(&latest_backup_path) {
                 if latest_content == content {
-                    debug!("Content for {} has not changed, skipping backup.", filename);
+                    debug!("Content for {filename} has not changed, skipping backup.");
                     return Ok(());
                 }
             }
@@ -94,11 +94,7 @@ impl BackupManager {
         if let Some(backup_to_restore) = self.find_latest_backup(filename)? {
             let content = fs::read_to_string(&backup_to_restore).map_err(DmacsError::Io)?;
             fs::write(filename, content).map_err(DmacsError::Io)?;
-            debug!(
-                "Restored {} from {}",
-                filename,
-                backup_to_restore.display()
-            );
+            debug!("Restored {} from {}", filename, backup_to_restore.display());
             fs::remove_file(&backup_to_restore).map_err(DmacsError::Io)?;
             debug!("Deleted backup file: {}", backup_to_restore.display());
             Ok(())
@@ -155,9 +151,9 @@ impl BackupManager {
         let mut hasher = Sha256::new();
         hasher.update(canonical_path.to_string_lossy().as_bytes());
         let result = hasher.finalize();
-        let hash_str = format!("{:x}", result);
+        let hash_str = format!("{result:x}");
         let short_hash = &hash_str[..8];
 
-        format!("{}-{}", file_name, short_hash)
+        format!("{file_name}-{short_hash}")
     }
 }
