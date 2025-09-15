@@ -1,3 +1,4 @@
+use dmacs::config::Config as DmacsConfig;
 use dmacs::backup::BackupManager;
 use dmacs::error::Result;
 use dmacs::run_editor;
@@ -88,8 +89,15 @@ fn main() -> Result<()> {
         None
     };
 
-    let terminal = Terminal::new()?;
-    run_editor(&terminal, absolute_filename, no_exit_on_save)?;
+    let dmacs_config = DmacsConfig::load();
+
+    let terminal = Terminal::new(&dmacs_config.colors)?;
+    run_editor(
+        &terminal,
+        absolute_filename,
+        no_exit_on_save,
+        dmacs_config.keymap,
+    )?;
 
     Ok(())
 }

@@ -4,7 +4,92 @@ use std::collections::HashMap;
 use std::fs;
 use toml;
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Default)]
+struct PartialConfig {
+    #[serde(default)]
+    colors: PartialColors,
+    #[serde(default)]
+    keymap: Keymap,
+}
+
+#[derive(Deserialize, Debug, Default)]
+struct PartialColors {
+    bg: Option<String>,
+    fg: Option<String>,
+    bold: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct Colors {
+    pub bg: String,
+    pub fg: String,
+    pub bold: String,
+}
+
+impl Default for Colors {
+    fn default() -> Self {
+        Self {
+            bg: "#33302d".to_string(),
+            fg: "#d0d0d0".to_string(),
+            bold: "#f5c373".to_string(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct Config {
+    pub colors: Colors,
+    pub keymap: Keymap,
+}
+
+impl Config {
+    pub fn load() -> Self {
+        let mut config = Config::default();
+
+        if let Some(home_dir) = dirs::home_dir() {
+            let config_path = home_dir.join(".dmacs").join("config.toml");
+            if config_path.exists() {
+                if let Ok(contents) = fs::read_to_string(&config_path) {
+                    match toml::from_str::<PartialConfig>(&contents) {
+                        Ok(user_config) => {
+                            if let Some(bg) = user_config.colors.bg {
+                                config.colors.bg = bg;
+                            }
+                            if let Some(fg) = user_config.colors.fg {
+                                config.colors.fg = fg;
+                            }
+                            if let Some(bold) = user_config.colors.bold {
+                                config.colors.bold = bold;
+                            }
+                            config.keymap.bindings.extend(user_config.keymap.bindings);
+                        }
+                        Err(e) => {
+                            log::error!("Failed to parse config.toml: {e}");
+                        }
+                    }
+                }
+            } else {
+                // Backward compatibility: load old keymap.toml if config.toml doesn't exist
+                let keymap_path = home_dir.join(".dmacs").join("keymap.toml");
+                if keymap_path.exists() {
+                    if let Ok(contents) = fs::read_to_string(&keymap_path) {
+                        match toml::from_str::<Keymap>(&contents) {
+                            Ok(user_keymap) => {
+                                config.keymap.bindings.extend(user_keymap.bindings);
+                            }
+                            Err(e) => {
+                                log::error!("Failed to parse keymap.toml: {e}");
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        config
+    }
+}
+
+#[derive(Deserialize, Debug, Clone)]
 pub struct Keymap {
     #[serde(flatten)]
     pub bindings: HashMap<String, Action>,
@@ -15,28 +100,6 @@ impl Keymap {
         Self {
             bindings: HashMap::new(),
         }
-    }
-
-    pub fn load_user_config() -> Self {
-        let mut keymap = Keymap::default(); // Start with default keymap
-
-        if let Some(home_dir) = dirs::home_dir() {
-            let config_path = home_dir.join(".dmacs").join("keymap.toml");
-            if config_path.exists() {
-                if let Ok(contents) = fs::read_to_string(&config_path) {
-                    match toml::from_str::<Keymap>(&contents) {
-                        Ok(user_keymap) => {
-                            // Override defaults with user settings
-                            keymap.bindings.extend(user_keymap.bindings);
-                        }
-                        Err(e) => {
-                            log::error!("Failed to parse keymap.toml: {e}");
-                        }
-                    }
-                }
-            }
-        }
-        keymap
     }
 }
 

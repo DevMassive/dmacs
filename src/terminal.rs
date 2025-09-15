@@ -7,7 +7,7 @@ use std::os::unix::io::AsRawFd;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::mpsc::{self, Receiver};
 
-use crate::Event;
+use crate::{config::Colors, Event};
 
 use crate::error::{DmacsError, Result};
 
@@ -52,7 +52,7 @@ pub struct Terminal {
 }
 
 impl Terminal {
-    pub fn new() -> Result<Self> {
+    pub fn new(colors: &Colors) -> Result<Self> {
         let window = initscr();
         window.keypad(true);
         noecho();
@@ -102,17 +102,13 @@ impl Terminal {
         if pancurses::has_colors() {
             start_color();
             if can_change_color() {
-                const COLOR_BG: &str = "#33302d";
-                const COLOR_FG: &str = "#d0d0d0";
-                const COLOR_BOLD: &str = "#f5c373";
-
-                let (r, g, b) = hex_to_rgb_1000(COLOR_BG)?;
+                let (r, g, b) = hex_to_rgb_1000(&colors.bg)?;
                 init_color(13, r, g, b);
 
-                let (r, g, b) = hex_to_rgb_1000(COLOR_FG)?;
+                let (r, g, b) = hex_to_rgb_1000(&colors.fg)?;
                 init_color(14, r, g, b);
 
-                let (r, g, b) = hex_to_rgb_1000(COLOR_BOLD)?;
+                let (r, g, b) = hex_to_rgb_1000(&colors.bold)?;
                 init_color(15, r, g, b);
 
                 init_pair(1, 14, 13); // Background

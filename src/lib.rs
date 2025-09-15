@@ -21,9 +21,11 @@ pub fn run_editor(
     terminal: &Terminal,
     filename: Option<String>,
     no_exit_on_save: bool,
+    keymap: config::Keymap,
 ) -> Result<()> {
     let (screen_rows, screen_cols) = terminal.size();
     let mut editor = Editor::new(filename);
+    editor.set_keymap(keymap);
     editor.set_no_exit_on_save(no_exit_on_save);
     editor.update_screen_size(screen_rows, screen_cols);
 

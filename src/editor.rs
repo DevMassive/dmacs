@@ -87,7 +87,7 @@ impl Editor {
                                 mode: EditorMode::Normal,
                                 task: Task::new(),
                                 fuzzy_search: fuzzy_search::FuzzySearch::new(),
-                                keymap: Keymap::load_user_config(),
+                                keymap: Keymap::default(),
                             };
                         } else {
                             debug!(
@@ -130,7 +130,7 @@ impl Editor {
             mode: EditorMode::Normal,
             task: Task::new(),
             fuzzy_search: fuzzy_search::FuzzySearch::new(),
-            keymap: Keymap::load_user_config(),
+            keymap: Keymap::default(),
         }
     }
 
@@ -1235,6 +1235,10 @@ impl Editor {
 
     pub fn set_no_exit_on_save(&mut self, value: bool) {
         self.no_exit_on_save = value;
+    }
+
+    pub fn set_keymap(&mut self, keymap: Keymap) {
+        self.keymap = keymap;
     }
 
     // Method to calculate task UI height
