@@ -33,6 +33,15 @@ impl BackupManager {
             return Ok(());
         }
 
+        if let Some(latest_backup_path) = self.find_latest_backup(filename)? {
+            if let Ok(latest_content) = fs::read_to_string(&latest_backup_path) {
+                if latest_content == content {
+                    debug!("Content for {} has not changed, skipping backup.", filename);
+                    return Ok(());
+                }
+            }
+        }
+
         let prefix = self.get_backup_file_prefix(filename);
         let now: DateTime<Local> = Local::now();
         let timestamp = now.format("%Y%m%d%H%M%S").to_string();
@@ -82,6 +91,21 @@ impl BackupManager {
     }
 
     pub fn restore_backup(&self, filename: &str) -> Result<()> {
+        if let Some(backup_to_restore) = self.find_latest_backup(filename)? {
+            let content = fs::read_to_string(&backup_to_restore).map_err(DmacsError::Io)?;
+            fs::write(filename, content).map_err(DmacsError::Io)?;
+            debug!(
+                "Restored {} from {}",
+                filename,
+                backup_to_restore.display()
+            );
+            Ok(())
+        } else {
+            Err(DmacsError::BackupNotFound(filename.to_string()))
+        }
+    }
+
+    fn find_latest_backup(&self, filename: &str) -> Result<Option<PathBuf>> {
         let prefix = self.get_backup_file_prefix(filename);
         let mut latest_backup: Option<PathBuf> = None;
         let mut latest_timestamp: Option<NaiveDateTime> = None;
@@ -112,18 +136,7 @@ impl BackupManager {
             }
         }
 
-        if let Some(backup_to_restore) = latest_backup {
-            let content = fs::read_to_string(&backup_to_restore).map_err(DmacsError::Io)?;
-            fs::write(filename, content).map_err(DmacsError::Io)?;
-            debug!(
-                "Restored {} from {}",
-                filename,
-                backup_to_restore.display()
-            );
-            Ok(())
-        } else {
-            Err(DmacsError::BackupNotFound(filename.to_string()))
-        }
+        Ok(latest_backup)
     }
 
     fn get_backup_file_prefix(&self, filename: &str) -> String {
