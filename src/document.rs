@@ -49,9 +49,11 @@ impl Document {
         if let Some(filename) = &self.filename {
             let backup_manager = BackupManager::new_with_base_dir(base_dir)?;
 
-            // Backup original content if it exists
-            if let Some(original_content) = &self.original_content {
-                backup_manager.save_backup(filename, original_content)?;
+            // Backup original content if it exists and the document is dirty
+            if self.is_dirty() {
+                if let Some(original_content) = &self.original_content {
+                    backup_manager.save_backup(filename, original_content)?;
+                }
             }
 
             let mut file = std::fs::File::create(filename).map_err(DmacsError::Io)?;
