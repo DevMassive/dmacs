@@ -8,6 +8,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::mpsc::{self, Receiver};
 
 use crate::Event;
+
 use crate::error::{DmacsError, Result};
 
 // Import necessary types and functions from the libc crate
@@ -20,6 +21,26 @@ use libc::{
 use libc::{
     _POSIX_VDISABLE, TCSANOW, VLNEXT, VREPRINT, VSTOP, VSUSP, tcgetattr, tcsetattr, termios,
 };
+
+// Function to convert hex color string to RGB values on a 0-1000 scale
+fn hex_to_rgb_1000(hex: &str) -> Result<(i16, i16, i16)> {
+    let hex = hex.trim_start_matches('#');
+    if hex.len() != 6 {
+        return Err(DmacsError::Terminal("Invalid hex color format".to_string()));
+    }
+    let r = i32::from_str_radix(&hex[0..2], 16)
+        .map_err(|_| DmacsError::Terminal("Invalid hex color format".to_string()))?;
+    let g = i32::from_str_radix(&hex[2..4], 16)
+        .map_err(|_| DmacsError::Terminal("Invalid hex color format".to_string()))?;
+    let b = i32::from_str_radix(&hex[4..6], 16)
+        .map_err(|_| DmacsError::Terminal("Invalid hex color format".to_string()))?;
+
+    Ok((
+        (r * 1000 / 255) as i16,
+        (g * 1000 / 255) as i16,
+        (b * 1000 / 255) as i16,
+    ))
+}
 
 pub static CTRL_C_COUNT: AtomicUsize = AtomicUsize::new(0);
 
@@ -80,25 +101,32 @@ impl Terminal {
 
         if pancurses::has_colors() {
             start_color();
-            use_default_colors();
-            init_pair(1, COLOR_WHITE, -1);
-            init_pair(2, COLOR_BLACK, COLOR_WHITE); // For highlighting
-
             if can_change_color() {
-                // Define a custom orange color (e.g., color number 12)
-                // RGB values for orange: (255, 165, 0)
-                // Pancurses' init_color uses values from 0 to 1000
-                let r = (255i32 * 1000 / 255) as i16;
-                let g = (165i32 * 1000 / 255) as i16;
-                let b = (0i32 * 1000 / 255) as i16;
-                init_color(12, r, g, b);
-                init_pair(3, 12, -1);
+                const COLOR_BG: &str = "#33302d";
+                const COLOR_FG: &str = "#d0d0d0";
+                const COLOR_BOLD: &str = "#f5c373";
+
+                let (r, g, b) = hex_to_rgb_1000(COLOR_BG)?;
+                init_color(13, r, g, b);
+
+                let (r, g, b) = hex_to_rgb_1000(COLOR_FG)?;
+                init_color(14, r, g, b);
+
+                let (r, g, b) = hex_to_rgb_1000(COLOR_BOLD)?;
+                init_color(15, r, g, b);
+
+                init_pair(1, 14, 13); // Background
+                init_pair(2, 13, 14); // For highlighting
+                init_pair(3, 15, 13); // Bold
+                window.bkgd(pancurses::COLOR_PAIR(1));
             } else {
-                // Fallback to yellow if the terminal cannot change colors
+                use_default_colors();
+                init_pair(1, COLOR_WHITE, -1);
+                init_pair(2, COLOR_BLACK, COLOR_WHITE); // For highlighting
                 init_pair(3, COLOR_YELLOW, -1);
+                window.bkgd(pancurses::COLOR_PAIR(1));
             }
         }
-
         let (tx, rx) = mpsc::channel();
         let tx_clone_for_handler = tx.clone();
 
