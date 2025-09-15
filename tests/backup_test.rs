@@ -1,5 +1,6 @@
 use chrono::{Duration, Local};
 use dmacs::backup::BackupManager;
+use sha2::{Digest, Sha256};
 use std::fs;
 use std::path::PathBuf;
 
@@ -31,28 +32,33 @@ fn test_save_backup() {
     let temp_dir = setup_test_env();
     let backup_manager = BackupManager::new_with_base_dir(Some(temp_dir.clone())).unwrap();
 
-    let filename = "test_file.txt";
+    let filename = temp_dir.join("test_file.txt");
+    fs::write(&filename, "content").unwrap(); // Ensure file exists for canonicalization
+    let filename_str = filename.to_str().unwrap();
     let content = "This is some test content.";
-    backup_manager.save_backup(filename, content).unwrap();
+    backup_manager.save_backup(filename_str, content).unwrap();
+
+    let canonical_path = std::fs::canonicalize(&filename).unwrap();
+    let mut hasher = Sha256::new();
+    hasher.update(canonical_path.to_string_lossy().as_bytes());
+    let result = hasher.finalize();
+    let hash_str = format!("{:x}", result);
+    let short_hash = &hash_str[..8];
+    let expected_prefix = format!("{}-{}", filename.file_name().unwrap().to_str().unwrap(), short_hash);
 
     let backup_dir = temp_dir.join(".dmacs").join("backup");
     let mut found_backup = false;
     for entry in fs::read_dir(&backup_dir).unwrap() {
         let entry = entry.unwrap();
         let path = entry.path();
-        if path.is_file()
-            && path
-                .file_name()
-                .unwrap()
-                .to_str()
-                .unwrap()
-                .starts_with("test_file.txt.")
-            && path.extension().unwrap() == "bak"
-        {
-            let saved_content = fs::read_to_string(&path).unwrap();
-            assert_eq!(saved_content, content);
-            found_backup = true;
-            break;
+        if path.is_file() {
+            let backup_filename = path.file_name().unwrap().to_str().unwrap();
+            if backup_filename.starts_with(&expected_prefix) && backup_filename.ends_with(".bak") {
+                let saved_content = fs::read_to_string(&path).unwrap();
+                assert_eq!(saved_content, content);
+                found_backup = true;
+                break;
+            }
         }
     }
     assert!(found_backup, "Backup file not found or incorrect.");

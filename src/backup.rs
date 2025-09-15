@@ -1,6 +1,7 @@
 use crate::error::{DmacsError, Result};
 use chrono::{DateTime, Duration, Local, NaiveDateTime, TimeZone};
 use log::debug;
+use sha2::{Digest, Sha256};
 use std::fs;
 use std::path::PathBuf;
 
@@ -95,7 +96,7 @@ impl BackupManager {
                     {
                         let timestamp_part = backup_filename_str
                             .trim_start_matches(&prefix)
-                            .trim_start_matches('.')
+                            .trim_start_matches('.') // The timestamp is preceded by a dot
                             .trim_end_matches(".bak");
 
                         if let Ok(timestamp) =
@@ -127,19 +128,21 @@ impl BackupManager {
 
     fn get_backup_file_prefix(&self, filename: &str) -> String {
         let original_path = PathBuf::from(filename);
-        let file_stem = original_path
-            .file_stem()
+        let file_name = original_path
+            .file_name()
             .and_then(|s| s.to_str())
-            .unwrap_or("unnamed");
-        let file_extension = original_path
-            .extension()
-            .and_then(|s| s.to_str())
-            .unwrap_or("");
+            .unwrap_or("unnamed")
+            .to_string();
 
-        if file_extension.is_empty() {
-            file_stem.to_string()
-        } else {
-            format!("{file_stem}.{file_extension}")
-        }
+        // To ensure consistency, use the canonical path for hashing.
+        let canonical_path = std::fs::canonicalize(&original_path).unwrap_or(original_path);
+
+        let mut hasher = Sha256::new();
+        hasher.update(canonical_path.to_string_lossy().as_bytes());
+        let result = hasher.finalize();
+        let hash_str = format!("{:x}", result);
+        let short_hash = &hash_str[..8];
+
+        format!("{}-{}", file_name, short_hash)
     }
 }
