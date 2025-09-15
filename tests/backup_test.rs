@@ -151,12 +151,19 @@ fn test_restore_backup() {
     // Modify the file to a different state
     fs::write(&filename, "latest content").unwrap();
 
-    // Restore from backup
+    // Restore from backup (should restore version 2)
     backup_manager.restore_backup(filename_str).unwrap();
+    let restored_content_v2 = fs::read_to_string(&filename).unwrap();
+    assert_eq!(restored_content_v2, content_v2);
 
-    // Check if the file is restored to version 2
-    let restored_content = fs::read_to_string(&filename).unwrap();
-    assert_eq!(restored_content, content_v2);
+    // Restore again (should restore version 1)
+    backup_manager.restore_backup(filename_str).unwrap();
+    let restored_content_v1 = fs::read_to_string(&filename).unwrap();
+    assert_eq!(restored_content_v1, content_v1);
+
+    // No more backups should be found
+    let result = backup_manager.restore_backup(filename_str);
+    assert!(result.is_err());
 
     teardown_test_env(&temp_dir);
 }

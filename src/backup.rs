@@ -99,6 +99,8 @@ impl BackupManager {
                 filename,
                 backup_to_restore.display()
             );
+            fs::remove_file(&backup_to_restore).map_err(DmacsError::Io)?;
+            debug!("Deleted backup file: {}", backup_to_restore.display());
             Ok(())
         } else {
             Err(DmacsError::BackupNotFound(filename.to_string()))
