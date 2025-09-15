@@ -10,6 +10,8 @@ pub enum DmacsError {
     Editor(String),
     #[error("Document error: {0}")]
     Document(String),
+    #[error("Backup not found for {0}")]
+    BackupNotFound(String),
     #[error("Unknown error")]
     Unknown,
 }

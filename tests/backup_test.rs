@@ -120,3 +120,55 @@ fn test_save_backup_empty_content() {
     );
     teardown_test_env(&temp_dir);
 }
+
+#[test]
+fn test_restore_backup() {
+    let temp_dir = setup_test_env();
+    let backup_manager = BackupManager::new_with_base_dir(Some(temp_dir.clone())).unwrap();
+
+    let filename = temp_dir.join("test_file.txt");
+    let filename_str = filename.to_str().unwrap();
+
+    // Create and back up version 1
+    let content_v1 = "version 1";
+    fs::write(&filename, content_v1).unwrap();
+    backup_manager.save_backup(filename_str, content_v1).unwrap();
+
+    // Wait a moment to ensure a different timestamp
+    std::thread::sleep(std::time::Duration::from_secs(1));
+
+    // Create and back up version 2
+    let content_v2 = "version 2";
+    fs::write(&filename, content_v2).unwrap();
+    backup_manager.save_backup(filename_str, content_v2).unwrap();
+
+    // Modify the file to a different state
+    fs::write(&filename, "latest content").unwrap();
+
+    // Restore from backup
+    backup_manager.restore_backup(filename_str).unwrap();
+
+    // Check if the file is restored to version 2
+    let restored_content = fs::read_to_string(&filename).unwrap();
+    assert_eq!(restored_content, content_v2);
+
+    teardown_test_env(&temp_dir);
+}
+
+#[test]
+fn test_restore_backup_not_found() {
+    let temp_dir = setup_test_env();
+    let backup_manager = BackupManager::new_with_base_dir(Some(temp_dir.clone())).unwrap();
+
+    let filename = "non_existent_file.txt";
+    let result = backup_manager.restore_backup(filename);
+
+    assert!(result.is_err());
+    if let Some(dmacs::error::DmacsError::BackupNotFound(name)) = result.err() {
+        assert_eq!(name, filename);
+    } else {
+        panic!("Expected BackupNotFound error");
+    }
+
+    teardown_test_env(&temp_dir);
+}

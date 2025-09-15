@@ -32,24 +32,11 @@ impl BackupManager {
             return Ok(());
         }
 
-        let original_path = PathBuf::from(filename);
-        let file_stem = original_path
-            .file_stem()
-            .and_then(|s| s.to_str())
-            .unwrap_or("unnamed");
-        let file_extension = original_path
-            .extension()
-            .and_then(|s| s.to_str())
-            .unwrap_or("");
-
+        let prefix = self.get_backup_file_prefix(filename);
         let now: DateTime<Local> = Local::now();
         let timestamp = now.format("%Y%m%d%H%M%S").to_string();
 
-        let backup_filename = if file_extension.is_empty() {
-            format!("{file_stem}.{timestamp}.bak")
-        } else {
-            format!("{file_stem}.{file_extension}.{timestamp}.bak")
-        };
+        let backup_filename = format!("{prefix}.{timestamp}.bak");
         let backup_path = self.backup_dir.join(backup_filename);
 
         fs::write(&backup_path, content).map_err(DmacsError::Io)?;
@@ -91,5 +78,68 @@ impl BackupManager {
             }
         }
         Ok(())
+    }
+
+    pub fn restore_backup(&self, filename: &str) -> Result<()> {
+        let prefix = self.get_backup_file_prefix(filename);
+        let mut latest_backup: Option<PathBuf> = None;
+        let mut latest_timestamp: Option<NaiveDateTime> = None;
+
+        for entry in fs::read_dir(&self.backup_dir).map_err(DmacsError::Io)? {
+            let entry = entry.map_err(DmacsError::Io)?;
+            let path = entry.path();
+            if path.is_file() {
+                if let Some(backup_filename_str) = path.file_name().and_then(|s| s.to_str()) {
+                    if backup_filename_str.starts_with(&prefix)
+                        && backup_filename_str.ends_with(".bak")
+                    {
+                        let timestamp_part = backup_filename_str
+                            .trim_start_matches(&prefix)
+                            .trim_start_matches('.')
+                            .trim_end_matches(".bak");
+
+                        if let Ok(timestamp) =
+                            NaiveDateTime::parse_from_str(timestamp_part, "%Y%m%d%H%M%S")
+                        {
+                            if latest_timestamp.is_none() || timestamp > latest_timestamp.unwrap() {
+                                latest_timestamp = Some(timestamp);
+                                latest_backup = Some(path.clone());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if let Some(backup_to_restore) = latest_backup {
+            let content = fs::read_to_string(&backup_to_restore).map_err(DmacsError::Io)?;
+            fs::write(filename, content).map_err(DmacsError::Io)?;
+            debug!(
+                "Restored {} from {}",
+                filename,
+                backup_to_restore.display()
+            );
+            Ok(())
+        } else {
+            Err(DmacsError::BackupNotFound(filename.to_string()))
+        }
+    }
+
+    fn get_backup_file_prefix(&self, filename: &str) -> String {
+        let original_path = PathBuf::from(filename);
+        let file_stem = original_path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("unnamed");
+        let file_extension = original_path
+            .extension()
+            .and_then(|s| s.to_str())
+            .unwrap_or("");
+
+        if file_extension.is_empty() {
+            file_stem.to_string()
+        } else {
+            format!("{file_stem}.{file_extension}")
+        }
     }
 }

@@ -1,3 +1,4 @@
+use dmacs::backup::BackupManager;
 use dmacs::error::Result;
 use dmacs::run_editor;
 use dmacs::terminal::Terminal;
@@ -22,19 +23,31 @@ fn main() -> Result<()> {
 
     let args: Vec<String> = env::args().collect();
     let mut filename: Option<String> = None;
-
-    // Parse arguments to find filename and debug flag
     let mut debug_mode = false;
     let mut no_exit_on_save = false;
-    for (i, arg) in args.iter().enumerate() {
-        if arg == "--debug" {
-            debug_mode = true;
-        } else if arg == "--no-exit-on-save" {
-            no_exit_on_save = true;
-        } else if i == 1 && !arg.starts_with("--") {
-            // Assume the first non-flag argument is the filename
-            filename = Some(arg.clone());
+    let mut restore_path: Option<String> = None;
+
+    // Simple argument parsing
+    let mut i = 1;
+    while i < args.len() {
+        match args[i].as_str() {
+            "--debug" => debug_mode = true,
+            "--no-exit-on-save" => no_exit_on_save = true,
+            "--restore" => {
+                if i + 1 < args.len() {
+                    restore_path = Some(args[i + 1].clone());
+                    i += 1; // Skip next argument
+                } else {
+                    eprintln!("Error: --restore requires a file path.");
+                    return Ok(());
+                }
+            }
+            arg if !arg.starts_with('-') && filename.is_none() => {
+                filename = Some(arg.to_string());
+            }
+            _ => {}
         }
+        i += 1;
     }
 
     if debug_mode {
@@ -44,6 +57,15 @@ fn main() -> Result<()> {
             File::create("dmacs_debug.log").unwrap(),
         )
         .unwrap();
+    }
+
+    if let Some(path) = restore_path {
+        let backup_manager = BackupManager::new()?;
+        match backup_manager.restore_backup(&path) {
+            Ok(_) => println!("Successfully restored {}", path),
+            Err(e) => eprintln!("Failed to restore {}: {}", path, e),
+        }
+        return Ok(());
     }
 
     let absolute_filename = if let Some(fname) = filename {
