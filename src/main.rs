@@ -1,5 +1,5 @@
-use dmacs::config::Config as DmacsConfig;
 use dmacs::backup::BackupManager;
+use dmacs::config::Config as DmacsConfig;
 use dmacs::error::Result;
 use dmacs::run_editor;
 use dmacs::terminal::Terminal;

@@ -7,7 +7,7 @@ use std::os::unix::io::AsRawFd;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::mpsc::{self, Receiver};
 
-use crate::{config::Colors, Event};
+use crate::{Event, config::Colors};
 
 use crate::error::{DmacsError, Result};
 
