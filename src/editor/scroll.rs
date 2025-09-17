@@ -103,9 +103,17 @@ impl Scroll {
     ) {
         *last_action_was_kill = false;
         let page_height = self.screen_rows.saturating_sub(STATUS_BAR_HEIGHT).max(1);
+        let old_row_offset = self.row_offset;
         self.row_offset = self.row_offset.saturating_add(page_height);
         self.row_offset = self.row_offset.min(document.lines.len().saturating_sub(1));
-        *cursor_y = self.row_offset;
+
+        if old_row_offset == self.row_offset && *cursor_y < document.lines.len().saturating_sub(1) {
+            *cursor_y = document.lines.len().saturating_sub(1);
+        } else {
+            let scroll_amount = self.row_offset - old_row_offset;
+            *cursor_y = cursor_y.saturating_add(scroll_amount);
+            *cursor_y = (*cursor_y).min(document.lines.len().saturating_sub(1));
+        }
         self.clamp_cursor_x(cursor_x, cursor_y, document);
     }
 
@@ -118,8 +126,15 @@ impl Scroll {
     ) {
         *last_action_was_kill = false;
         let page_height = self.screen_rows.saturating_sub(STATUS_BAR_HEIGHT).max(1);
+        let old_row_offset = self.row_offset;
         self.row_offset = self.row_offset.saturating_sub(page_height);
-        *cursor_y = self.row_offset;
+
+        if old_row_offset == self.row_offset && *cursor_y > 0 {
+            *cursor_y = 0;
+        } else {
+            let scroll_amount = old_row_offset - self.row_offset;
+            *cursor_y = cursor_y.saturating_sub(scroll_amount);
+        }
         self.clamp_cursor_x(cursor_x, cursor_y, document);
     }
 

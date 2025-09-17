@@ -421,11 +421,11 @@ impl Editor {
         }
 
         // Vertical scroll
-        if self.cursor_y < self.scroll.row_offset {
-            self.scroll.row_offset = self.cursor_y;
-        }
-        if self.cursor_y >= self.scroll.row_offset + visible_content_height {
-            self.scroll.row_offset = self.cursor_y - visible_content_height + 1;
+        let scroll_margin = visible_content_height / 4;
+        if self.cursor_y < self.scroll.row_offset + scroll_margin {
+            self.scroll.row_offset = self.cursor_y.saturating_sub(scroll_margin);
+        } else if self.cursor_y >= self.scroll.row_offset + visible_content_height - scroll_margin {
+            self.scroll.row_offset = self.cursor_y.saturating_sub(visible_content_height - scroll_margin);
         }
 
         // Horizontal scroll

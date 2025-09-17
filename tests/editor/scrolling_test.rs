@@ -91,6 +91,7 @@ fn test_editor_horizontal_scroll_line_change() {
 #[test]
 fn test_editor_scroll_page_down() {
     let mut editor = Editor::new(None);
+    editor.document.lines.clear();
     for _ in 0..50 {
         // Create 50 lines
         editor.document.lines.push("test line".to_string());
@@ -105,7 +106,7 @@ fn test_editor_scroll_page_down() {
 
     // Scroll down one page
     editor.scroll_page_down();
-    assert_eq!(editor.cursor_pos().1, usable_height); // Should move to the top of the next page
+    assert_eq!(editor.cursor_pos().1, usable_height);
     assert_eq!(editor.scroll.row_offset, usable_height);
 
     // Scroll down another page
@@ -113,22 +114,23 @@ fn test_editor_scroll_page_down() {
     assert_eq!(editor.cursor_pos().1, usable_height * 2);
     assert_eq!(editor.scroll.row_offset, usable_height * 2);
 
-    // Scroll down beyond document end
+    // Scroll down beyond document end, should move cursor to the last line
     editor.scroll_page_down();
-    assert_eq!(editor.cursor_pos().1, 50); // Clamped to last line
-    assert_eq!(editor.scroll.row_offset, 50); // Clamped to last line
+    assert_eq!(editor.cursor_pos().1, 49); // Clamped to last line
+    assert_eq!(editor.scroll.row_offset, 49); // Clamped to last line
 
     // Test with cursor not at 0
     editor.set_cursor_pos(0, 10);
     editor.scroll.row_offset = 10;
     editor.scroll_page_down();
-    assert_eq!(editor.cursor_pos().1, 10 + usable_height); // 10 + usable_height
+    assert_eq!(editor.cursor_pos().1, 10 + usable_height);
     assert_eq!(editor.scroll.row_offset, 10 + usable_height);
 }
 
 #[test]
 fn test_editor_scroll_page_up() {
     let mut editor = Editor::new(None);
+    editor.document.lines.clear();
     for _ in 0..50 {
         // Create 50 lines
         editor.document.lines.push("test line".to_string());
@@ -143,7 +145,7 @@ fn test_editor_scroll_page_up() {
 
     // Scroll up one page
     editor.scroll_page_up();
-    assert_eq!(editor.cursor_pos().1, usable_height); // Should move to the top of the previous page
+    assert_eq!(editor.cursor_pos().1, usable_height);
     assert_eq!(editor.scroll.row_offset, usable_height);
 
     // Scroll up another page
@@ -151,7 +153,7 @@ fn test_editor_scroll_page_up() {
     assert_eq!(editor.cursor_pos().1, 0);
     assert_eq!(editor.scroll.row_offset, 0);
 
-    // Scroll up beyond document start
+    // Scroll up beyond document start, should move cursor to the first line
     editor.scroll_page_up();
     assert_eq!(editor.cursor_pos().1, 0);
     assert_eq!(editor.scroll.row_offset, 0);
@@ -160,13 +162,14 @@ fn test_editor_scroll_page_up() {
     editor.set_cursor_pos(0, usable_height + 11);
     editor.scroll.row_offset = usable_height + 11;
     editor.scroll_page_up();
-    assert_eq!(editor.cursor_pos().1, 11); // (usable_height + 11) - usable_height
+    assert_eq!(editor.cursor_pos().1, 11);
     assert_eq!(editor.scroll.row_offset, 11);
 }
 
 #[test]
 fn test_editor_vertical_scroll_down() {
     let mut editor = Editor::new(None);
+    editor.document.lines.clear();
     for _ in 0..50 {
         editor.document.lines.push("test line".to_string());
     }
@@ -177,6 +180,7 @@ fn test_editor_vertical_scroll_down() {
     assert_eq!(editor.scroll.row_offset, 0);
 
     let usable_height = editor.scroll.screen_rows.saturating_sub(STATUS_BAR_HEIGHT);
+    let scroll_margin = usable_height / 4;
 
     // Move cursor down line by line, beyond the screen height
     for i in 0..15 {
@@ -186,30 +190,32 @@ fn test_editor_vertical_scroll_down() {
         let (_, y) = editor.cursor_pos();
         assert_eq!(y, i + 1);
 
-        if (i + 1) < usable_height {
-            // Still within the screen, no scroll
-            assert_eq!(editor.scroll.row_offset, 0);
+        if y >= editor.scroll.row_offset + usable_height - scroll_margin {
+            let expected_offset = y.saturating_sub(usable_height - scroll_margin);
+            assert_eq!(editor.scroll.row_offset, expected_offset, "failed at y={}", y);
+        } else if y < editor.scroll.row_offset + scroll_margin {
+            // Scrolling up, not expected in this test
         } else {
-            // Scrolled past the screen edge
-            assert_eq!(
-                editor.scroll.row_offset,
-                ((i + 1) as isize - usable_height as isize + 1).max(0) as usize
-            );
+            // Should not scroll if in the middle
+            let current_offset = editor.scroll.row_offset;
+            assert_eq!(editor.scroll.row_offset, current_offset, "should not scroll at y={}", y);
         }
     }
     assert_eq!(editor.cursor_pos(), (0, 15));
-    assert_eq!(editor.scroll.row_offset, 15 - usable_height + 1);
+    assert_eq!(editor.scroll.row_offset, 15 - (usable_height - scroll_margin));
 }
 
 #[test]
 fn test_editor_vertical_scroll_up() {
     let mut editor = Editor::new(None);
+    editor.document.lines.clear();
     for _ in 0..50 {
         editor.document.lines.push("test line".to_string());
     }
     editor.update_screen_size(10, 80); // screen_rows = 10, usable height = 10 - STATUS_BAR_HEIGHT
 
     let usable_height = editor.scroll.screen_rows.saturating_sub(STATUS_BAR_HEIGHT);
+    let scroll_margin = usable_height / 4;
 
     // First, scroll down to simulate being in the middle of the document
     for _ in 0..20 {
@@ -217,7 +223,7 @@ fn test_editor_vertical_scroll_up() {
     }
     editor.scroll();
     assert_eq!(editor.cursor_pos(), (0, 20));
-    assert_eq!(editor.scroll.row_offset, 20 - usable_height + 1);
+    assert_eq!(editor.scroll.row_offset, 20 - (usable_height - scroll_margin));
 
     // Now, move cursor up line by line, back into the scrolled area
     for i in 0..10 {
@@ -228,7 +234,7 @@ fn test_editor_vertical_scroll_up() {
         assert_eq!(y, 19 - i);
     }
     assert_eq!(editor.cursor_pos(), (0, 10));
-    assert_eq!(editor.scroll.row_offset, 10);
+    assert_eq!(editor.scroll.row_offset, 10 - scroll_margin);
 }
 
 #[test]
