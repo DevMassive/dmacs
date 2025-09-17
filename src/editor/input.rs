@@ -28,6 +28,9 @@ fn key_to_string(key: Input, is_alt_pressed: bool) -> String {
     if let Input::KeySTab = key {
         return "shift-tab".to_string();
     }
+    if let Input::KeyBTab = key {
+        return "shift-tab".to_string();
+    }
 
     // For all other keys, the 'alt' modifier is relevant.
     let mut key_str = String::new();
