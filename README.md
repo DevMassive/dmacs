@@ -21,12 +21,10 @@
 You need to have Rust and Cargo installed. Please install them from [rust-lang.org](https://www.rust-lang.org/tools/install).
 
 ```bash
-git clone https://github.com/your-username/dmacs.git
+git clone https://github.com/DevMassive/dmacs.git
 cd dmacs
-cargo build --release
+cargo install --path .
 ```
-
-The executable will be generated at `target/release/dmacs`. It is convenient to add this to your path.
 
 ## Usage
 
