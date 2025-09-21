@@ -24,6 +24,8 @@ fn main() -> Result<()> {
 
     let args: Vec<String> = env::args().collect();
     let mut filename: Option<String> = None;
+    let mut line: Option<usize> = None;
+    let mut column: Option<usize> = None;
     let mut debug_mode = false;
     let mut no_exit_on_save = false;
     let mut restore_path: Option<String> = None;
@@ -31,22 +33,50 @@ fn main() -> Result<()> {
     // Simple argument parsing
     let mut i = 1;
     while i < args.len() {
-        match args[i].as_str() {
-            "--debug" => debug_mode = true,
-            "--no-exit-on-save" => no_exit_on_save = true,
-            "--restore" => {
-                if i + 1 < args.len() {
-                    restore_path = Some(args[i + 1].clone());
-                    i += 1; // Skip next argument
-                } else {
-                    eprintln!("Error: --restore requires a file path.");
-                    return Ok(());
-                }
+        let arg = &args[i];
+        if arg.starts_with('+') && line.is_none() {
+            if let Ok(line_num) = arg[1..].parse::<usize>() {
+                line = Some(line_num);
             }
-            arg if !arg.starts_with('-') && filename.is_none() => {
+        } else if !arg.starts_with('-') && filename.is_none() {
+            let mut parts: Vec<&str> = arg.rsplitn(3, ':').collect();
+            parts.reverse(); // Now in [file, line, col] or [file, line] or [file] order
+
+            if parts.len() == 3 {
+                if let (Ok(l), Ok(c)) = (parts[1].parse::<usize>(), parts[2].parse::<usize>()) {
+                    // file:line:col
+                    filename = Some(parts[0].to_string());
+                    line = Some(l);
+                    column = Some(c);
+                } else {
+                    filename = Some(arg.to_string());
+                }
+            } else if parts.len() == 2 {
+                if let Ok(l) = parts[1].parse::<usize>() {
+                    // file:line
+                    filename = Some(parts[0].to_string());
+                    line = Some(l);
+                } else {
+                    filename = Some(arg.to_string());
+                }
+            } else {
                 filename = Some(arg.to_string());
             }
-            _ => {}
+        } else {
+            match arg.as_str() {
+                "--debug" => debug_mode = true,
+                "--no-exit-on-save" => no_exit_on_save = true,
+                "--restore" => {
+                    if i + 1 < args.len() {
+                        restore_path = Some(args[i + 1].clone());
+                        i += 1; // Skip next argument
+                    } else {
+                        eprintln!("Error: --restore requires a file path.");
+                        return Ok(());
+                    }
+                }
+                _ => {}
+            }
         }
         i += 1;
     }
@@ -95,6 +125,8 @@ fn main() -> Result<()> {
     run_editor(
         &terminal,
         absolute_filename,
+        line,
+        column,
         no_exit_on_save,
         dmacs_config.keymap,
     )?;

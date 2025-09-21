@@ -3,7 +3,7 @@ use pancurses::Input;
 
 #[test]
 fn test_editor_insert_char() {
-    let mut editor = Editor::new(None);
+    let mut editor = Editor::new(None, None, None);
     editor.process_input(Input::Character('a'), false).unwrap();
     assert_eq!(editor.document.lines[0], "a");
     assert_eq!(editor.cursor_pos(), (1, 0));
@@ -11,7 +11,7 @@ fn test_editor_insert_char() {
 
 #[test]
 fn test_editor_delete_char() {
-    let mut editor = Editor::new(None);
+    let mut editor = Editor::new(None, None, None);
     editor.process_input(Input::Character('a'), false).unwrap();
     editor.process_input(Input::KeyBackspace, false).unwrap();
     assert_eq!(editor.document.lines[0], "");
@@ -20,7 +20,7 @@ fn test_editor_delete_char() {
 
 #[test]
 fn test_editor_delete_forward_char() {
-    let mut editor = Editor::new(None);
+    let mut editor = Editor::new(None, None, None);
     editor.process_input(Input::Character('a'), false).unwrap();
     editor.process_input(Input::KeyLeft, false).unwrap();
     editor
@@ -32,7 +32,7 @@ fn test_editor_delete_forward_char() {
 
 #[test]
 fn test_editor_insert_newline() {
-    let mut editor = Editor::new(None);
+    let mut editor = Editor::new(None, None, None);
     editor.process_input(Input::Character('a'), false).unwrap();
     editor
         .process_input(Input::Character('\x0A'), false)
@@ -45,7 +45,7 @@ fn test_editor_insert_newline() {
 
 #[test]
 fn test_editor_insert_newline_with_indent() {
-    let mut editor = Editor::new(None);
+    let mut editor = Editor::new(None, None, None);
     editor.document.lines[0] = "  Hello".to_string();
     editor.set_cursor_pos(7, 0); // End of line
     editor.insert_newline().unwrap();
@@ -59,7 +59,7 @@ fn test_editor_insert_newline_with_indent() {
 
 #[test]
 fn test_editor_insert_newline_with_list_marker() {
-    let mut editor = Editor::new(None);
+    let mut editor = Editor::new(None, None, None);
     editor.document.lines[0] = "  - Hello".to_string();
     editor.set_cursor_pos(9, 0); // End of line
     editor.insert_newline().unwrap();
@@ -73,7 +73,7 @@ fn test_editor_insert_newline_with_list_marker() {
 
 #[test]
 fn test_editor_insert_newline_with_task_marker() {
-    let mut editor = Editor::new(None);
+    let mut editor = Editor::new(None, None, None);
     editor.document.lines[0] = "  - [ ] Task 1".to_string();
     editor.set_cursor_pos(15, 0); // End of line
     editor.insert_newline().unwrap();
@@ -87,7 +87,7 @@ fn test_editor_insert_newline_with_task_marker() {
 
 #[test]
 fn test_editor_insert_newline_with_checked_task_marker() {
-    let mut editor = Editor::new(None);
+    let mut editor = Editor::new(None, None, None);
     editor.document.lines[0] = "  - [x] Task 1".to_string();
     editor.set_cursor_pos(15, 0); // End of line
     editor.insert_newline().unwrap();
@@ -101,7 +101,7 @@ fn test_editor_insert_newline_with_checked_task_marker() {
 
 #[test]
 fn test_editor_backspace_indentation() {
-    let mut editor = Editor::new(None);
+    let mut editor = Editor::new(None, None, None);
     editor.document.lines[0] = "    Hello".to_string();
     editor.set_cursor_pos(4, 0); // After indentation
     editor.delete_char().unwrap(); // Backspace
@@ -122,7 +122,7 @@ fn test_editor_backspace_indentation() {
 
 #[test]
 fn test_editor_backspace_line_join() {
-    let mut editor = Editor::new(None);
+    let mut editor = Editor::new(None, None, None);
     editor.document.lines = vec!["hello".to_string(), "world".to_string()];
     editor.set_cursor_pos(0, 1); // Set cursor to beginning of "world"
     editor.process_input(Input::KeyBackspace, false).unwrap();
@@ -133,7 +133,7 @@ fn test_editor_backspace_line_join() {
 
 #[test]
 fn test_editor_delete_to_end_of_line() {
-    let mut editor = Editor::new(None);
+    let mut editor = Editor::new(None, None, None);
     editor.document.lines[0] = "hello world".to_string();
     editor.process_input(Input::KeyRight, false).unwrap();
     editor.process_input(Input::KeyRight, false).unwrap();
@@ -149,7 +149,7 @@ fn test_editor_delete_to_end_of_line() {
 
 #[test]
 fn test_editor_delete_to_end_of_line_at_end() {
-    let mut editor = Editor::new(None);
+    let mut editor = Editor::new(None, None, None);
     editor.document.lines = vec!["hello".to_string(), "world".to_string()];
     editor
         .process_input(Input::Character('\x05'), false)
@@ -164,7 +164,7 @@ fn test_editor_delete_to_end_of_line_at_end() {
 
 #[test]
 fn test_editor_del_key() {
-    let mut editor = Editor::new(None);
+    let mut editor = Editor::new(None, None, None);
     editor.process_input(Input::Character('a'), false).unwrap();
     editor
         .process_input(Input::Character('\x7f'), false)
@@ -175,7 +175,7 @@ fn test_editor_del_key() {
 
 #[test]
 fn test_editor_hungry_delete() {
-    let mut editor = Editor::new(None);
+    let mut editor = Editor::new(None, None, None);
 
     // Test deleting word and preceding whitespace
     editor.document.lines[0] = "    hello".to_string();
@@ -216,7 +216,7 @@ fn test_editor_hungry_delete() {
 
 #[test]
 fn test_editor_backspace_empty_list_item() {
-    let mut editor = Editor::new(None);
+    let mut editor = Editor::new(None, None, None);
 
     // Test deleting "- "
     editor.document.lines[0] = "- ".to_string();
@@ -270,7 +270,7 @@ fn test_editor_backspace_empty_list_item() {
 
 #[test]
 fn test_editor_newline_empty_list_item() {
-    let mut editor = Editor::new(None);
+    let mut editor = Editor::new(None, None, None);
 
     // Test with "- "
     editor.document.lines[0] = "- ".to_string();
@@ -319,7 +319,7 @@ fn test_editor_newline_empty_list_item() {
 
 #[test]
 fn test_editor_smart_space_insertion() {
-    let mut editor = Editor::new(None);
+    let mut editor = Editor::new(None, None, None);
     editor.document.lines[0] = "Hello ".to_string();
     editor.set_cursor_pos(6, 0); // Cursor after "Hello "
     editor.insert_text(" ").unwrap(); // Insert another space

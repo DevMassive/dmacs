@@ -4,7 +4,7 @@ use pancurses::Input;
 
 #[test]
 fn test_editor_horizontal_scroll_right() {
-    let mut editor = Editor::new(None);
+    let mut editor = Editor::new(None, None, None);
     editor.document.lines[0] = "0123456789abcdef".to_string();
     let screen_cols = 20;
     let scroll_margin = 10;
@@ -32,7 +32,7 @@ fn test_editor_horizontal_scroll_right() {
 
 #[test]
 fn test_editor_horizontal_scroll_left() {
-    let mut editor = Editor::new(None);
+    let mut editor = Editor::new(None, None, None);
     editor.document.lines[0] = "0123456789abcdef".to_string();
     let screen_cols = 20;
     let scroll_margin = 10;
@@ -61,7 +61,7 @@ fn test_editor_horizontal_scroll_left() {
 
 #[test]
 fn test_editor_horizontal_scroll_line_change() {
-    let mut editor = Editor::new(None);
+    let mut editor = Editor::new(None, None, None);
     editor.document.lines = vec![
         "a very long line to test scrolling".to_string(), // len = 34
         "short line".to_string(),                         // len = 10
@@ -90,7 +90,7 @@ fn test_editor_horizontal_scroll_line_change() {
 
 #[test]
 fn test_editor_scroll_page_down() {
-    let mut editor = Editor::new(None);
+    let mut editor = Editor::new(None, None, None);
     editor.document.lines.clear();
     for _ in 0..50 {
         // Create 50 lines
@@ -129,7 +129,7 @@ fn test_editor_scroll_page_down() {
 
 #[test]
 fn test_editor_scroll_page_up() {
-    let mut editor = Editor::new(None);
+    let mut editor = Editor::new(None, None, None);
     editor.document.lines.clear();
     for _ in 0..50 {
         // Create 50 lines
@@ -168,7 +168,7 @@ fn test_editor_scroll_page_up() {
 
 #[test]
 fn test_editor_vertical_scroll_down() {
-    let mut editor = Editor::new(None);
+    let mut editor = Editor::new(None, None, None);
     editor.document.lines.clear();
     for _ in 0..50 {
         editor.document.lines.push("test line".to_string());
@@ -207,7 +207,7 @@ fn test_editor_vertical_scroll_down() {
 
 #[test]
 fn test_editor_vertical_scroll_up() {
-    let mut editor = Editor::new(None);
+    let mut editor = Editor::new(None, None, None);
     editor.document.lines.clear();
     for _ in 0..50 {
         editor.document.lines.push("test line".to_string());
@@ -249,7 +249,7 @@ fn test_horizontal_scroll_visual_and_cursor_pinning() {
     pancurses::noecho();
     pancurses::curs_set(0); // Hide cursor for stable testing
 
-    let mut editor = Editor::new(None);
+    let mut editor = Editor::new(None, None, None);
     let screen_rows = 10;
     let screen_cols = 40;
     let scroll_margin = 10;

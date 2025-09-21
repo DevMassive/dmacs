@@ -2,7 +2,7 @@ use dmacs::editor::Editor;
 use pancurses::Input;
 
 fn create_editor_with_content(content: &str) -> Editor {
-    let mut editor = Editor::new(None);
+    let mut editor = Editor::new(None, None, None);
     editor.document.lines = content.lines().map(|s| s.to_string()).collect();
     if editor.document.lines.is_empty() {
         editor.document.lines.push(String::new());

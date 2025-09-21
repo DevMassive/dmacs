@@ -3,7 +3,7 @@ use pancurses::Input;
 
 #[test]
 fn test_editor_move_cursor() {
-    let mut editor = Editor::new(None);
+    let mut editor = Editor::new(None, None, None);
     editor.document.lines = vec!["one".to_string(), "two".to_string()];
     editor.process_input(Input::KeyDown, false).unwrap();
     assert_eq!(editor.cursor_pos(), (0, 1));
@@ -17,7 +17,7 @@ fn test_editor_move_cursor() {
 
 #[test]
 fn test_editor_go_to_line_boundaries() {
-    let mut editor = Editor::new(None);
+    let mut editor = Editor::new(None, None, None);
     editor.document.lines[0] = "hello".to_string();
     editor.process_input(Input::KeyRight, false).unwrap();
     editor.process_input(Input::KeyRight, false).unwrap();
@@ -34,7 +34,7 @@ fn test_editor_go_to_line_boundaries() {
 
 #[test]
 fn test_editor_move_cursor_up_at_top_line() {
-    let mut editor = Editor::new(None);
+    let mut editor = Editor::new(None, None, None);
     editor.document.lines = vec!["line1".to_string(), "line2".to_string()];
     editor.set_cursor_pos(3, 0); // Set cursor to (3, 0)
     editor.process_input(Input::KeyUp, false).unwrap();
@@ -43,7 +43,7 @@ fn test_editor_move_cursor_up_at_top_line() {
 
 #[test]
 fn test_editor_move_cursor_down_at_bottom_line() {
-    let mut editor = Editor::new(None);
+    let mut editor = Editor::new(None, None, None);
     editor.document.lines = vec!["line1".to_string(), "line2".to_string()];
     editor.set_cursor_pos(0, 1); // Set cursor to (0, 1)
     editor.process_input(Input::KeyDown, false).unwrap();
@@ -52,7 +52,7 @@ fn test_editor_move_cursor_down_at_bottom_line() {
 
 #[test]
 fn test_editor_move_cursor_left_across_lines() {
-    let mut editor = Editor::new(None);
+    let mut editor = Editor::new(None, None, None);
     editor.document.lines = vec!["line1".to_string(), "line2".to_string()];
     editor.set_cursor_pos(0, 1); // Start at beginning of line2
     editor.process_input(Input::KeyLeft, false).unwrap();
@@ -61,7 +61,7 @@ fn test_editor_move_cursor_left_across_lines() {
 
 #[test]
 fn test_editor_move_cursor_right_across_lines() {
-    let mut editor = Editor::new(None);
+    let mut editor = Editor::new(None, None, None);
     editor.document.lines = vec!["line1".to_string(), "line2".to_string()];
     editor.set_cursor_pos(5, 0); // Start at end of line1
     editor.process_input(Input::KeyRight, false).unwrap();
@@ -70,7 +70,7 @@ fn test_editor_move_cursor_right_across_lines() {
 
 #[test]
 fn test_editor_move_cursor_word_left() {
-    let mut editor = Editor::new(None);
+    let mut editor = Editor::new(None, None, None);
     editor.document.lines = vec!["word1 word2 word3".to_string()];
     editor.set_cursor_pos(17, 0); // End of "word3"
 
@@ -106,7 +106,7 @@ fn test_editor_move_cursor_word_left() {
 
 #[test]
 fn test_editor_move_cursor_word_right() {
-    let mut editor = Editor::new(None);
+    let mut editor = Editor::new(None, None, None);
     editor.document.lines = vec!["word1 word2 word3".to_string()];
     editor.set_cursor_pos(0, 0); // Beginning of "word1"
 
@@ -135,7 +135,7 @@ fn test_editor_move_cursor_word_right() {
 
 #[test]
 fn test_go_to_start_of_file() {
-    let mut editor = Editor::new(None);
+    let mut editor = Editor::new(None, None, None);
     editor.process_input(Input::Character('a'), false).unwrap();
     editor.insert_newline().unwrap();
     editor.process_input(Input::Character('b'), false).unwrap();
@@ -151,7 +151,7 @@ fn test_go_to_start_of_file() {
 
 #[test]
 fn test_go_to_end_of_file() {
-    let mut editor = Editor::new(None);
+    let mut editor = Editor::new(None, None, None);
     editor.process_input(Input::Character('a'), false).unwrap();
     editor.insert_newline().unwrap();
     editor.process_input(Input::Character('b'), false).unwrap();
@@ -163,7 +163,7 @@ fn test_go_to_end_of_file() {
 
 #[test]
 fn test_editor_move_cursor_word_right_japanese() {
-    let mut editor = Editor::new(None);
+    let mut editor = Editor::new(None, None, None);
     editor.document.lines = vec!["漢字とひらがなとカタカナと英字123。".to_string()];
     editor.set_cursor_pos(0, 0);
 
@@ -202,7 +202,7 @@ fn test_editor_move_cursor_word_right_japanese() {
 
 #[test]
 fn test_editor_move_cursor_word_left_japanese() {
-    let mut editor = Editor::new(None);
+    let mut editor = Editor::new(None, None, None);
     let line = "漢字とひらがなとカタカナと英字123。".to_string();
     let line_len = line.len();
     editor.document.lines = vec![line];

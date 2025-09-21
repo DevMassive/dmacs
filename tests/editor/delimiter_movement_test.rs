@@ -1,7 +1,7 @@
 use dmacs::editor::Editor;
 
 fn setup_editor_with_content(content: Vec<&str>) -> Editor {
-    let mut editor = Editor::new(None);
+    let mut editor = Editor::new(None, None, None);
     editor.document.lines = content.iter().map(|&s| s.to_string()).collect();
     editor.scroll.screen_rows = 20; // Set a reasonable screen size for testing
     editor.scroll.screen_cols = 80;

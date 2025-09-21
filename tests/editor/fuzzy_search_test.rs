@@ -3,7 +3,7 @@ use pancurses::Input;
 
 #[test]
 fn test_enter_and_exit_fuzzy_search_mode() {
-    let mut editor = Editor::new(None);
+    let mut editor = Editor::new(None, None, None);
     editor.document.lines = vec!["line one".to_string(), "line two".to_string()];
 
     // Enter fuzzy search mode
@@ -21,7 +21,7 @@ fn test_enter_and_exit_fuzzy_search_mode() {
 
 #[test]
 fn test_fuzzy_search_and_select() {
-    let mut editor = Editor::new(None);
+    let mut editor = Editor::new(None, None, None);
     editor.document.lines = vec![
         "apple".to_string(),
         "banana".to_string(),
@@ -58,7 +58,7 @@ fn test_fuzzy_search_and_select() {
 
 #[test]
 fn test_fuzzy_search_navigation() {
-    let mut editor = Editor::new(None);
+    let mut editor = Editor::new(None, None, None);
     editor.document.lines = vec!["one".to_string(), "two".to_string(), "three".to_string()];
 
     // Enter fuzzy search mode
@@ -84,7 +84,7 @@ fn test_fuzzy_search_navigation() {
 
 #[test]
 fn test_fuzzy_search_no_match() {
-    let mut editor = Editor::new(None);
+    let mut editor = Editor::new(None, None, None);
     editor.document.lines = vec!["abc".to_string(), "def".to_string()];
 
     // Enter fuzzy search mode
@@ -111,7 +111,7 @@ fn test_fuzzy_search_no_match() {
 
 #[test]
 fn test_fuzzy_search_backspace() {
-    let mut editor = Editor::new(None);
+    let mut editor = Editor::new(None, None, None);
     editor.document.lines = vec![
         "apple".to_string(),
         "banana".to_string(),
@@ -137,7 +137,7 @@ fn test_fuzzy_search_backspace() {
 
 #[test]
 fn test_fuzzy_search_reset() {
-    let mut editor = Editor::new(None);
+    let mut editor = Editor::new(None, None, None);
     editor.document.lines = vec![
         "apple".to_string(),
         "banana".to_string(),

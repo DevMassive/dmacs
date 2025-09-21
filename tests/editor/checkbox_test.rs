@@ -9,7 +9,7 @@ fn simulate_ctrl_t(editor: &mut Editor) {
 
 #[test]
 fn test_toggle_checkbox_add() {
-    let mut editor = Editor::new(None);
+    let mut editor = Editor::new(None, None, None);
     editor.insert_text("Hello world").unwrap();
     editor.go_to_start_of_line();
     simulate_ctrl_t(&mut editor);
@@ -20,7 +20,7 @@ fn test_toggle_checkbox_add() {
 
 #[test]
 fn test_toggle_checkbox_check() {
-    let mut editor = Editor::new(None);
+    let mut editor = Editor::new(None, None, None);
     editor.insert_text("- [ ] Hello world").unwrap();
     editor.go_to_start_of_line();
     simulate_ctrl_t(&mut editor);
@@ -31,7 +31,7 @@ fn test_toggle_checkbox_check() {
 
 #[test]
 fn test_toggle_checkbox_uncheck() {
-    let mut editor = Editor::new(None);
+    let mut editor = Editor::new(None, None, None);
     editor.insert_text("- [x] Hello world").unwrap();
     editor.go_to_start_of_line();
     simulate_ctrl_t(&mut editor);
@@ -42,7 +42,7 @@ fn test_toggle_checkbox_uncheck() {
 
 #[test]
 fn test_toggle_checkbox_undo_redo() {
-    let mut editor = Editor::new(None);
+    let mut editor = Editor::new(None, None, None);
     editor.insert_text("Hello world").unwrap();
     editor.go_to_start_of_line();
     let initial_pos = editor.cursor_pos();
@@ -110,7 +110,7 @@ fn test_toggle_checkbox_undo_redo() {
 
 #[test]
 fn test_toggle_indented_checkbox_add() {
-    let mut editor = Editor::new(None);
+    let mut editor = Editor::new(None, None, None);
     editor.insert_text("  Hello world").unwrap();
     editor.go_to_start_of_line();
     simulate_ctrl_t(&mut editor);
@@ -120,7 +120,7 @@ fn test_toggle_indented_checkbox_add() {
 
 #[test]
 fn test_toggle_indented_checkbox_check() {
-    let mut editor = Editor::new(None);
+    let mut editor = Editor::new(None, None, None);
     editor.insert_text("  - [ ] Hello world").unwrap();
     editor.go_to_start_of_line();
     simulate_ctrl_t(&mut editor);
@@ -130,7 +130,7 @@ fn test_toggle_indented_checkbox_check() {
 
 #[test]
 fn test_toggle_indented_checkbox_uncheck() {
-    let mut editor = Editor::new(None);
+    let mut editor = Editor::new(None, None, None);
     editor.insert_text("  - [x] Hello world").unwrap();
     editor.go_to_start_of_line();
     simulate_ctrl_t(&mut editor);
@@ -140,7 +140,7 @@ fn test_toggle_indented_checkbox_uncheck() {
 
 #[test]
 fn test_toggle_indented_checkbox_add_cursor_middle() {
-    let mut editor = Editor::new(None);
+    let mut editor = Editor::new(None, None, None);
     editor.insert_text("  Hello world").unwrap();
     editor.set_cursor_pos(4, 0); // "  He|llo world"
     simulate_ctrl_t(&mut editor);
@@ -150,7 +150,7 @@ fn test_toggle_indented_checkbox_add_cursor_middle() {
 
 #[test]
 fn test_toggle_checkbox_selection_mixed_to_list() {
-    let mut editor = Editor::new(None);
+    let mut editor = Editor::new(None, None, None);
     editor.document.lines = vec![
         "Plain text".to_string(),
         "- List item".to_string(),
@@ -183,7 +183,7 @@ fn test_toggle_checkbox_selection_mixed_to_list() {
 
 #[test]
 fn test_toggle_checkbox_selection_ignores_empty_lines() {
-    let mut editor = Editor::new(None);
+    let mut editor = Editor::new(None, None, None);
     editor.document.lines = vec!["Line 1".to_string(), "".to_string(), "Line 3".to_string()];
     editor.set_cursor_pos(0, 0);
     editor.set_marker_action();
@@ -198,7 +198,7 @@ fn test_toggle_checkbox_selection_ignores_empty_lines() {
 
 #[test]
 fn test_toggle_checkbox_selection_excludes_last_line_if_cursor_x_is_zero() {
-    let mut editor = Editor::new(None);
+    let mut editor = Editor::new(None, None, None);
     editor.document.lines = vec!["Line 1".to_string(), "Line 2".to_string()];
     editor.set_cursor_pos(1, 0); // Mark start of selection
     editor.set_marker_action();

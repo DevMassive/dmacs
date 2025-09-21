@@ -2,14 +2,14 @@ use dmacs::editor::Editor;
 use pancurses::Input;
 
 fn editor_with_clipboard_disabled() -> Editor {
-    let mut editor = Editor::new(None);
+    let mut editor = Editor::new(None, None, None);
     editor._set_clipboard_enabled_for_test(false);
     editor
 }
 
 #[test]
 fn test_debounced_undo_insertion() {
-    let mut editor = Editor::new(None);
+    let mut editor = Editor::new(None, None, None);
     editor.set_undo_debounce_threshold(1);
 
     // Type 'a' - should create a new undo entry
@@ -62,7 +62,7 @@ fn test_debounced_undo_insertion() {
 
 #[test]
 fn test_debounced_undo_deletion() {
-    let mut editor = Editor::new(None);
+    let mut editor = Editor::new(None, None, None);
     editor.set_undo_debounce_threshold(1);
 
     editor.process_input(Input::Character('a'), false).unwrap();
@@ -124,7 +124,7 @@ fn test_debounced_undo_deletion() {
 
 #[test]
 fn test_debounced_undo_newline() {
-    let mut editor = Editor::new(None);
+    let mut editor = Editor::new(None, None, None);
     editor.set_undo_debounce_threshold(1);
 
     editor.process_input(Input::Character('a'), false).unwrap();
@@ -168,7 +168,7 @@ fn test_debounced_undo_newline() {
 
 #[test]
 fn test_debounced_undo_mixed_actions() {
-    let mut editor = Editor::new(None);
+    let mut editor = Editor::new(None, None, None);
     editor.set_undo_debounce_threshold(1);
 
     assert_eq!(editor.undo_redo.undo_stack.len(), 0);
@@ -202,7 +202,7 @@ fn test_debounced_undo_mixed_actions() {
 
 #[test]
 fn test_initial_state_undo() {
-    let mut editor = Editor::new(None);
+    let mut editor = Editor::new(None, None, None);
     editor.set_undo_debounce_threshold(1);
 
     assert_eq!(
@@ -228,7 +228,7 @@ fn test_initial_state_undo() {
 
 #[test]
 fn test_redo() {
-    let mut editor = Editor::new(None);
+    let mut editor = Editor::new(None, None, None);
     editor.set_undo_debounce_threshold(1);
 
     // Perform some actions
@@ -334,7 +334,7 @@ fn test_redo() {
 
 #[test]
 fn test_redo_simple() {
-    let mut editor = Editor::new(None);
+    let mut editor = Editor::new(None, None, None);
     editor.set_undo_debounce_threshold(1);
 
     // Perform some actions
@@ -565,7 +565,7 @@ fn test_undo_redo_cut_selection() {
 
 #[test]
 fn test_undo_redo_move_line() {
-    let mut editor = Editor::new(None);
+    let mut editor = Editor::new(None, None, None);
     editor.set_undo_debounce_threshold(0);
 
     editor.insert_text("Line 1").unwrap();

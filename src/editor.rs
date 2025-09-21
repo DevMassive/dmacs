@@ -54,65 +54,31 @@ pub struct Editor {
 }
 
 impl Editor {
-    pub fn new(filename: Option<String>) -> Self {
-        let document = match filename {
+    pub fn new(
+        filename: Option<String>,
+        line: Option<usize>,
+        column: Option<usize>,
+    ) -> Self {
+        let (document, restored_pos) = match filename {
             Some(fname) => {
                 if let Ok(doc) = Document::open(&fname) {
                     let last_modified = doc.last_modified().ok();
-                    if let Some(lm) = last_modified {
-                        debug!(
-                            "Attempting to restore cursor for file: {fname}, last_modified: {lm:?}"
-                        );
-                        if let Some((x, y, scroll_row, scroll_col)) =
-                            persistence::get_cursor_position(&fname, lm)
-                        {
-                            debug!(
-                                "Restoring cursor position for {fname}: ({x}, {y}), scroll: ({scroll_row}, {scroll_col})"
-                            );
-                            return Self {
-                                should_quit: false,
-                                document: doc,
-                                cursor_x: x,
-                                cursor_y: y,
-                                desired_cursor_x: x,
-                                status_message: "".to_string(),
-                                scroll: Scroll::new_with_offset(scroll_row, scroll_col),
-                                undo_redo: UndoRedo::new(),
-                                clipboard: clipboard::Clipboard::new(),
-                                is_alt_pressed: false,
-                                search: Search::new(),
-                                selection: selection::Selection::new(),
-                                no_exit_on_save: false,
-                                // New fields for task command
-                                mode: EditorMode::Normal,
-                                task: Task::new(),
-                                fuzzy_search: fuzzy_search::FuzzySearch::new(),
-                                keymap: Keymap::default(),
-                            };
-                        } else {
-                            debug!(
-                                "No matching cursor position found for {fname}. Starting at (0,0)."
-                            );
-                        }
+                    let restored = if let Some(lm) = last_modified {
+                        persistence::get_cursor_position(&fname, lm)
                     } else {
-                        debug!("Could not get last modified date for {fname}. Starting at (0,0).");
-                    }
-                    doc
+                        None
+                    };
+                    (doc, restored)
                 } else {
-                    debug!("Could not open file {fname}. Creating new empty document.");
                     let mut doc = Document::new_empty();
                     doc.filename = Some(fname);
-                    doc
+                    (doc, None)
                 }
             }
-            None => {
-                debug!("No filename provided. Creating new empty document.");
-                Document::default()
-            }
+            None => (Document::default(), None),
         };
 
-        // Save the initial state for undo after construction
-        Self {
+        let mut editor = Self {
             should_quit: false,
             document,
             cursor_x: 0,
@@ -126,12 +92,61 @@ impl Editor {
             search: Search::new(),
             selection: selection::Selection::new(),
             no_exit_on_save: false,
-            // New fields for task command
             mode: EditorMode::Normal,
             task: Task::new(),
             fuzzy_search: fuzzy_search::FuzzySearch::new(),
             keymap: Keymap::default(),
+        };
+
+        if let Some((x, y, scroll_row, scroll_col)) = restored_pos {
+            editor.cursor_x = x;
+            editor.cursor_y = y;
+            if y < editor.document.lines.len() {
+                editor.desired_cursor_x = editor
+                    .scroll
+                    .get_display_width_from_bytes(&editor.document.lines[y], x);
+            }
+            editor.scroll = Scroll::new_with_offset(scroll_row, scroll_col);
         }
+
+        if let Some(line) = line {
+            let y = line.saturating_sub(1); // Convert 1-based to 0-based
+            if y < editor.document.lines.len() {
+                editor.cursor_y = y;
+
+                let col = column.unwrap_or(1).saturating_sub(1); // 0-based char index
+                let line_content = &editor.document.lines[y];
+
+                let mut byte_offset = 0;
+                let mut current_col = 0;
+                for (i, c) in line_content.char_indices() {
+                    if current_col == col {
+                        byte_offset = i;
+                        break;
+                    }
+                    current_col += 1;
+                    byte_offset = i + c.len_utf8();
+                }
+                if current_col < col {
+                    // if col is out of bounds
+                    byte_offset = line_content.len();
+                }
+
+                editor.cursor_x = byte_offset;
+                editor.desired_cursor_x = editor
+                    .scroll
+                    .get_display_width_from_bytes(line_content, byte_offset);
+            } else {
+                // If line is out of bounds, just go to the end of the file.
+                let num_lines = editor.document.lines.len();
+                if num_lines > 0 {
+                    editor.cursor_y = num_lines - 1;
+                    editor.cursor_x = editor.document.lines[num_lines - 1].len();
+                }
+            }
+        }
+
+        editor
     }
 
     pub fn execute_action(&mut self, action: Action) -> Result<()> {

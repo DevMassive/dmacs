@@ -2,14 +2,14 @@ use dmacs::editor::Editor;
 use pancurses::Input;
 
 fn editor_with_clipboard_disabled() -> Editor {
-    let mut editor = Editor::new(None);
+    let mut editor = Editor::new(None, None, None);
     editor._set_clipboard_enabled_for_test(false);
     editor
 }
 
 #[test]
 fn test_set_marker() {
-    let mut editor = Editor::new(None);
+    let mut editor = Editor::new(None, None, None);
     editor.document.lines = vec!["hello world".to_string()];
     editor.set_cursor_pos(0, 0);
 
@@ -22,7 +22,7 @@ fn test_set_marker() {
 
 #[test]
 fn test_clear_marker() {
-    let mut editor = Editor::new(None);
+    let mut editor = Editor::new(None, None, None);
     editor.document.lines = vec!["hello world".to_string()];
     editor.set_cursor_pos(0, 0);
     editor.selection.marker_pos = Some((0, 0)); // Manually set marker for testing
@@ -68,7 +68,7 @@ fn test_copy_selection() {
 
 #[test]
 fn test_highlight_selection() {
-    let mut editor = Editor::new(None);
+    let mut editor = Editor::new(None, None, None);
     editor.document.lines = vec!["hello world".to_string()];
     editor.set_cursor_pos(0, 0);
     editor.selection.marker_pos = Some((6, 0)); // Marker at 'w'

@@ -3,7 +3,7 @@ use dmacs::editor::Editor;
 
 #[test]
 fn test_today_command() {
-    let mut editor = Editor::new(None);
+    let mut editor = Editor::new(None, None, None);
     editor.insert_text("/today").unwrap();
     editor.insert_newline().unwrap();
 
@@ -18,7 +18,7 @@ fn test_today_command() {
 
 #[test]
 fn test_now_command() {
-    let mut editor = Editor::new(None);
+    let mut editor = Editor::new(None, None, None);
     editor.insert_text("/now").unwrap();
     editor.insert_newline().unwrap();
 

@@ -6,7 +6,7 @@ use tempfile::NamedTempFile;
 
 #[test]
 fn test_editor_initial_state_no_file() {
-    let editor = Editor::new(None);
+    let editor = Editor::new(None, None, None);
     assert!(!editor.should_quit);
     assert_eq!(editor.document.lines.len(), 1);
     assert_eq!(editor.document.lines[0], "");
@@ -14,7 +14,7 @@ fn test_editor_initial_state_no_file() {
 
 #[test]
 fn test_editor_with_wide_chars() {
-    let mut editor = Editor::new(None);
+    let mut editor = Editor::new(None, None, None);
     editor.process_input(Input::Character('あ'), false).unwrap();
     editor.process_input(Input::Character('い'), false).unwrap();
     assert_eq!(editor.document.lines[0], "あい");
@@ -70,7 +70,7 @@ fn test_alt_s_saves_file() {
     let initial_content = "Hello, world!";
     fs::write(&path, initial_content).expect("Failed to write to temp file");
 
-    let mut editor = Editor::new(Some(path.to_str().unwrap().to_string()));
+    let mut editor = Editor::new(Some(path.to_str().unwrap().to_string()), None, None);
 
     // Insert some text
     editor.process_input(Input::Character('T'), false).unwrap();
@@ -87,7 +87,7 @@ fn test_alt_s_saves_file() {
 
 #[test]
 fn test_custom_keymap_overrides_default() {
-    let mut editor = Editor::new(None);
+    let mut editor = Editor::new(None, None, None);
     let custom_toml = r#"
         up = "Quit"
     "#;
@@ -103,7 +103,7 @@ fn test_custom_keymap_overrides_default() {
     assert!(editor.should_quit);
 
     // Let's also test that a default binding still works in a fresh editor
-    let mut editor2 = Editor::new(None);
+    let mut editor2 = Editor::new(None, None, None);
     // Process the 'down' arrow key, which should just move the cursor
     editor2.process_input(Input::KeyDown, false).unwrap();
     assert_eq!(editor2.cursor_pos(), (0, 0)); // Stays at 0,0 on a single line doc
@@ -117,7 +117,7 @@ fn test_ctrl_x_no_exit_on_save() {
     let initial_content = "Hello, world!";
     fs::write(&path, initial_content).expect("Failed to write to temp file");
 
-    let mut editor = Editor::new(Some(path.to_str().unwrap().to_string()));
+    let mut editor = Editor::new(Some(path.to_str().unwrap().to_string()), None, None);
     editor.set_no_exit_on_save(true);
 
     // Insert some text

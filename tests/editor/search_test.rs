@@ -3,7 +3,7 @@ use pancurses::Input;
 
 #[test]
 fn test_editor_search_mode_enter_and_exit() {
-    let mut editor = Editor::new(None);
+    let mut editor = Editor::new(None, None, None);
     editor.document.lines = vec!["test line one".to_string(), "test line two".to_string()];
 
     // Enter search mode
@@ -30,7 +30,7 @@ fn test_editor_search_mode_enter_and_exit() {
 
 #[test]
 fn test_editor_search_mode_escape_exit() {
-    let mut editor = Editor::new(None);
+    let mut editor = Editor::new(None, None, None);
     editor.document.lines = vec!["test line one".to_string()];
 
     // Enter search mode
@@ -56,7 +56,7 @@ fn test_editor_search_mode_escape_exit() {
 
 #[test]
 fn test_editor_search_next_and_previous_match() {
-    let mut editor = Editor::new(None);
+    let mut editor = Editor::new(None, None, None);
     editor.document.lines = vec![
         "apple banana apple".to_string(),
         "orange apple grape".to_string(),
@@ -113,7 +113,7 @@ fn test_editor_search_next_and_previous_match() {
 
 #[test]
 fn test_editor_search_no_match() {
-    let mut editor = Editor::new(None);
+    let mut editor = Editor::new(None, None, None);
     editor.document.lines = vec!["line one".to_string(), "line two".to_string()];
 
     // Enter search mode and search for "xyz" (no match)
@@ -137,7 +137,7 @@ fn test_editor_search_no_match() {
 
 #[test]
 fn test_editor_search_empty_query() {
-    let mut editor = Editor::new(None);
+    let mut editor = Editor::new(None, None, None);
     editor.document.lines = vec!["some text".to_string()];
 
     // Enter search mode

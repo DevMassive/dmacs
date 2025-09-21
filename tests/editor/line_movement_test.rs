@@ -3,7 +3,7 @@ use pancurses::Input;
 
 #[test]
 fn test_editor_move_line_up() {
-    let mut editor = Editor::new(None);
+    let mut editor = Editor::new(None, None, None);
     editor.document.lines = vec![
         "line1".to_string(),
         "line2".to_string(),
@@ -26,7 +26,7 @@ fn test_editor_move_line_up() {
 
 #[test]
 fn test_editor_move_line_down() {
-    let mut editor = Editor::new(None);
+    let mut editor = Editor::new(None, None, None);
     editor.document.lines = vec![
         "line1".to_string(),
         "line2".to_string(),

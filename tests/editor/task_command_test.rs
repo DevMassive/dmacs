@@ -3,7 +3,7 @@ use pancurses::Input;
 
 // Helper to create an editor with some initial content
 fn setup_editor(content: &[&str]) -> Editor {
-    let mut editor = Editor::new(None);
+    let mut editor = Editor::new(None, None, None);
     editor.document.lines = content.iter().map(|&s| s.to_string()).collect();
     editor.cursor_y = 0;
     editor.cursor_x = 0;
