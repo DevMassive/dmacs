@@ -21,9 +21,7 @@
 You need to have Rust and Cargo installed. Please install them from [rust-lang.org](https://www.rust-lang.org/tools/install).
 
 ```bash
-git clone https://github.com/DevMassive/dmacs.git
-cd dmacs
-cargo install --path .
+cargo install --git https://github.com/DevMassive/dmacs
 ```
 
 ## Usage
