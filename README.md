@@ -18,11 +18,17 @@
 
 ## Installation
 
+### From source
+
 You need to have Rust and Cargo installed. Please install them from [rust-lang.org](https://www.rust-lang.org/tools/install).
 
 ```bash
 cargo install --git https://github.com/DevMassive/dmacs
 ```
+
+### From pre-compiled binaries
+
+Pre-compiled binaries for major platforms are available on the [GitHub Releases page](https://github.com/DevMassive/dmacs/releases). Download the appropriate binary for your system, place it in a directory included in your system's `PATH`, and make it executable.
 
 ## Usage
 
