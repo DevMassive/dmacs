@@ -3,21 +3,22 @@ use pancurses::{
     init_color, init_pair, initscr, noecho, start_color, use_default_colors,
 };
 use std::io::{self, stdin};
+#[cfg(unix)]
 use std::os::unix::io::AsRawFd;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::mpsc::{self, Receiver};
 
-use crate::{Event, config::Colors};
+use crate::{config::Colors, Event};
 
 use crate::error::{DmacsError, Result};
 
 // Import necessary types and functions from the libc crate
-#[cfg(target_os = "macos")]
+#[cfg(all(unix, target_os = "macos"))]
 use libc::{
     _POSIX_VDISABLE, TCSANOW, VDSUSP, VLNEXT, VREPRINT, VSTATUS, VSTOP, tcgetattr, tcsetattr,
     termios,
 };
-#[cfg(not(target_os = "macos"))]
+#[cfg(all(unix, not(target_os = "macos")))]
 use libc::{
     _POSIX_VDISABLE, TCSANOW, VLNEXT, VREPRINT, VSTOP, VSUSP, tcgetattr, tcsetattr, termios,
 };
@@ -46,7 +47,10 @@ pub static CTRL_C_COUNT: AtomicUsize = AtomicUsize::new(0);
 
 pub struct Terminal {
     window: Window,
+    #[cfg(unix)]
     original_termios: termios,
+    #[cfg(not(unix))]
+    original_termios: (),
     event_rx: Receiver<Event>,
     event_tx: mpsc::Sender<Event>,
 }
@@ -60,44 +64,50 @@ impl Terminal {
         window.nodelay(true); // Make getch() non-blocking
         window.timeout(50); // Set a timeout for getch() to reduce CPU usage
 
-        // termios settings change starts here
-        let stdin_fd = stdin().as_raw_fd();
-        let mut termios_settings: termios = unsafe { std::mem::zeroed() };
-        let mut original_termios: termios = unsafe { std::mem::zeroed() };
+        #[cfg(unix)]
+        let original_termios = {
+            // termios settings change starts here
+            let stdin_fd = stdin().as_raw_fd();
+            let mut termios_settings: termios = unsafe { std::mem::zeroed() };
+            let mut original_termios: termios = unsafe { std::mem::zeroed() };
 
-        // Get current termios settings
-        if unsafe { tcgetattr(stdin_fd, &mut termios_settings) } != 0 {
-            return Err(DmacsError::Io(io::Error::last_os_error()));
-        }
-        original_termios.clone_from(&termios_settings);
+            // Get current termios settings
+            if unsafe { tcgetattr(stdin_fd, &mut termios_settings) } != 0 {
+                return Err(DmacsError::Io(io::Error::last_os_error()));
+            }
+            original_termios.clone_from(&termios_settings);
 
-        // Disable dsusp character
-        #[cfg(target_os = "macos")]
-        {
-            termios_settings.c_cc[VDSUSP] = _POSIX_VDISABLE;
-        }
-        #[cfg(not(target_os = "macos"))]
-        {
-            termios_settings.c_cc[VSUSP] = _POSIX_VDISABLE;
-        }
+            // Disable dsusp character
+            #[cfg(target_os = "macos")]
+            {
+                termios_settings.c_cc[VDSUSP] = _POSIX_VDISABLE;
+            }
+            #[cfg(not(target_os = "macos"))]
+            {
+                termios_settings.c_cc[VSUSP] = _POSIX_VDISABLE;
+            }
 
-        // Disable lnext character (Ctrl+V)
-        termios_settings.c_cc[VLNEXT] = _POSIX_VDISABLE;
+            // Disable lnext character (Ctrl+V)
+            termios_settings.c_cc[VLNEXT] = _POSIX_VDISABLE;
 
-        // Disable stop character (Ctrl+S)
-        termios_settings.c_cc[VSTOP] = _POSIX_VDISABLE;
+            // Disable stop character (Ctrl+S)
+            termios_settings.c_cc[VSTOP] = _POSIX_VDISABLE;
 
-        // Disable reprint character (Ctrl+R)
-        termios_settings.c_cc[VREPRINT] = _POSIX_VDISABLE;
+            // Disable reprint character (Ctrl+R)
+            termios_settings.c_cc[VREPRINT] = _POSIX_VDISABLE;
 
-        // Disable status character (Ctrl+T)
-        #[cfg(target_os = "macos")]
-        {
-            termios_settings.c_cc[VSTATUS] = _POSIX_VDISABLE;
-        }
-        if unsafe { tcsetattr(stdin_fd, TCSANOW, &termios_settings) } != 0 {
-            return Err(DmacsError::Io(io::Error::last_os_error()));
-        }
+            // Disable status character (Ctrl+T)
+            #[cfg(target_os = "macos")]
+            {
+                termios_settings.c_cc[VSTATUS] = _POSIX_VDISABLE;
+            }
+            if unsafe { tcsetattr(stdin_fd, TCSANOW, &termios_settings) } != 0 {
+                return Err(DmacsError::Io(io::Error::last_os_error()));
+            }
+            original_termios
+        };
+        #[cfg(not(unix))]
+        let original_termios = ();
 
         if pancurses::has_colors() {
             start_color();
@@ -236,12 +246,15 @@ impl Terminal {
 
 impl Drop for Terminal {
     fn drop(&mut self) {
-        let stdin_fd = stdin().as_raw_fd();
-        if unsafe { tcsetattr(stdin_fd, TCSANOW, &self.original_termios) } != 0 {
-            eprintln!(
-                "Error restoring terminal settings: {}",
-                DmacsError::Io(io::Error::last_os_error())
-            );
+        #[cfg(unix)]
+        {
+            let stdin_fd = stdin().as_raw_fd();
+            if unsafe { tcsetattr(stdin_fd, TCSANOW, &self.original_termios) } != 0 {
+                eprintln!(
+                    "Error restoring terminal settings: {}",
+                    DmacsError::Io(io::Error::last_os_error())
+                );
+            }
         }
         endwin();
     }
