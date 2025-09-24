@@ -1,3 +1,5 @@
+<img width="258" height="132" alt="Image" src="https://github.com/user-attachments/assets/38a44617-2ea1-417f-96b3-4c2a54406769" />
+
 # dmacs
 
 `dmacs` is a terminal text editor developed for DevMassive's daily use. It is built with Rust and designed for simplicity and efficiency.
