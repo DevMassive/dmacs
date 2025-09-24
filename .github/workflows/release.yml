@@ -1,0 +1,160 @@
+name: Release Binaries
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:  # ← 手動実行を有効化
+
+env:
+  CARGO_TERM_COLOR: always
+  BINARY_NAME: dmacs
+  RUSTUP_TOOLCHAIN: stable
+  VERSION: ${{ github.ref_name || 'manual-run' }}
+
+jobs:
+  build_release:
+    name: Build Release Binaries
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+          - os: macos-latest # Intel Mac
+            target: x86_64-apple-darwin
+          - os: macos-14 # Apple Silicon Mac
+            target: aarch64-apple-darwin
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # ← コミットログ生成に必要
+
+      - name: Install Rust ${{ env.RUSTUP_TOOLCHAIN }} and ${{ matrix.target }}
+        uses: nick-invision/retry@v2
+        with:
+          max_attempts: 3
+          timeout_minutes: 10
+          command: |
+            rustup update ${{ env.RUSTUP_TOOLCHAIN }}
+            rustup target add ${{ matrix.target }}
+
+      - name: Build binary
+        run: cargo build --release --target ${{ matrix.target }} --verbose
+
+      - name: Prepare package
+        shell: bash
+        run: |
+          # Define binary name and archive name based on OS
+          if [ "${{ runner.os }}" == "Windows" ]; then
+            BIN_NAME="${{ env.BINARY_NAME }}.exe"
+            ARCHIVE_NAME="${{ env.BINARY_NAME }}-${{ env.VERSION }}-${{ matrix.target }}.zip"
+          else
+            BIN_NAME="${{ env.BINARY_NAME }}"
+            ARCHIVE_NAME="${{ env.BINARY_NAME }}-${{ env.VERSION }}-${{ matrix.target }}.tar.gz"
+          fi
+
+          # Create a staging directory
+          mkdir staging
+
+          # Copy binary to staging
+          cp "target/${{ matrix.target }}/release/${BIN_NAME}" staging/
+          cp LICENSE* README* staging/ || true
+
+          if [ "${{ runner.os }}" == "Windows" ]; then
+            (cd staging && 7z a "../${ARCHIVE_NAME}" *)
+          else
+            (cd staging && tar czvf "../${ARCHIVE_NAME}" *)
+          fi
+
+          # Set asset path for upload
+          echo "ASSET_PATH=${ARCHIVE_NAME}" >> $GITHUB_ENV
+
+      - name: Upload artifact for release
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-asset-${{ matrix.target }}
+          path: ${{ env.ASSET_PATH }}
+
+  release:
+    name: Create GitHub Release
+    needs: build_release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # Needed to create releases
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download all release assets
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          pattern: release-asset-*
+          merge-multiple: true
+
+           # --- Generate changelog from commit logs (Conventional Commits aware) ---
+      - name: Generate changelog
+        id: changelog
+        run: |
+          PREV_TAG=$(git describe --tags --abbrev=0 "${GITHUB_REF}"^ 2>/dev/null || echo "")
+          if [ -z "$PREV_TAG" ]; then
+            RANGE=""
+          else
+            RANGE="$PREV_TAG..HEAD"
+          fi
+
+          echo "# Changelog" > CHANGELOG.md
+          echo "" >> CHANGELOG.md
+
+          FEAT=$(git log $RANGE --pretty=format:"* %s" | grep "^* feat" || true)
+          FIX=$(git log $RANGE --pretty=format:"* %s" | grep "^* fix" || true)
+          DOCS=$(git log $RANGE --pretty=format:"* %s" | grep "^* docs" || true)
+          CHORE=$(git log $RANGE --pretty=format:"* %s" | grep "^* chore" || true)
+          OTHERS=$(git log $RANGE --pretty=format:"* %s" | grep -vE "^* (feat|fix|docs|chore)" || true)
+
+          if [ -n "$FEAT" ]; then
+            echo "## Features" >> CHANGELOG.md
+            echo "$FEAT" >> CHANGELOG.md
+            echo "" >> CHANGELOG.md
+          fi
+
+          if [ -n "$FIX" ]; then
+            echo "## Fixes" >> CHANGELOG.md
+            echo "$FIX" >> CHANGELOG.md
+            echo "" >> CHANGELOG.md
+          fi
+
+          if [ -n "$DOCS" ]; then
+            echo "## Docs" >> CHANGELOG.md
+            echo "$DOCS" >> CHANGELOG.md
+            echo "" >> CHANGELOG.md
+          fi
+
+          if [ -n "$CHORE" ]; then
+            echo "## Chore" >> CHANGELOG.md
+            echo "$CHORE" >> CHANGELOG.md
+            echo "" >> CHANGELOG.md
+          fi
+
+          if [ -n "$OTHERS" ]; then
+            echo "## Others" >> CHANGELOG.md
+            echo "$OTHERS" >> CHANGELOG.md
+            echo "" >> CHANGELOG.md
+          fi
+
+          echo "changelog<<EOF" >> $GITHUB_OUTPUT
+          cat CHANGELOG.md >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Create Release and Upload Assets
+        uses: softprops/action-gh-release@v1
+        with:
+          files: release-assets/*
+          body: ${{ steps.changelog.outputs.changelog }}
