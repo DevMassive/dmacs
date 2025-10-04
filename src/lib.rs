@@ -31,18 +31,24 @@ pub fn run_editor(
     editor.set_no_exit_on_save(no_exit_on_save);
     editor.update_screen_size(screen_rows, screen_cols);
 
+    let mut dirty = true;
+
     loop {
-        editor.update_screen_size(terminal.size().0, terminal.size().1);
-        editor.draw(terminal.window());
+        if dirty {
+            editor.update_screen_size(terminal.size().0, terminal.size().1);
+            editor.draw(terminal.window());
+            dirty = false;
+        }
 
         if let Some(event) = terminal.next_event()? {
+            dirty = true; // Assume any event requires a redraw.
             match event {
                 Event::Key(key, is_alt_pressed) => {
                     editor.process_input(key, is_alt_pressed)?;
                     terminal::CTRL_C_COUNT.store(0, std::sync::atomic::Ordering::SeqCst);
                 }
                 Event::Resize => {
-                    // Handled by update_screen_size at the beginning of the loop
+                    // Already handled by update_screen_size at the beginning of the dirty block.
                 }
                 Event::Quit => {
                     let current_ctrl_c_count =
@@ -52,8 +58,10 @@ pub fn run_editor(
                         let tx_clone = terminal.get_tx_for_timeout();
                         std::thread::spawn(move || {
                             std::thread::sleep(std::time::Duration::from_secs(2));
-                            if let Err(e) = tx_clone.send(Event::ClearMessage) {
-                                eprintln!("Could not send clear message signal: {e}");
+                            if terminal::CTRL_C_COUNT.load(std::sync::atomic::Ordering::SeqCst) == 1 {
+                                if let Err(e) = tx_clone.send(Event::ClearMessage) {
+                                    eprintln!("Could not send clear message signal: {e}");
+                                }
                             }
                         });
                     } else if current_ctrl_c_count >= 2 {
@@ -62,6 +70,7 @@ pub fn run_editor(
                 }
                 Event::ClearMessage => {
                     editor.set_message("");
+                    terminal::CTRL_C_COUNT.store(0, std::sync::atomic::Ordering::SeqCst);
                 }
             }
         }
